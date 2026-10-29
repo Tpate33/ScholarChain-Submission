@@ -1,0 +1,169 @@
+# bash-allowlist.tsv -- factory-owned DATA, read by guard-dangerous.sh on every Bash call. Never executed.
+# Default deny: a Bash command runs only if it passes the character gate and matches an ACTIVE row for
+# the acting identity. This table is the proposed Bash column of the authority matrix (amendment B1,
+# proposed, not applied). Changing it is a constitutional amendment: factory-engineer prepares, human ratifies.
+#
+# Columns (TAB-separated): IDENTITY  STATUS  MODE  PROV  SPEC  JUSTIFICATION
+#   IDENTITY  agent name, ORCHESTRATOR, or @GROUP (a group row; identities include it with SPEC = @GROUP)
+#   STATUS    active | inactive:<reason>   (inactive rows never match; they exist so the decision is visible)
+#   MODE      allow (hook returns no decision; settings.json decides) | ask (hook returns permissionDecision ask)
+#   PROV      -        no repository script is executed
+#             hook     factory hook script (must be a regular file, not a symlink); see guard header
+#             git      program token must be tracked and unmodified versus HEAD, else deny
+#             git-ask  as git, but return ask instead of deny (dataset-engineer's own scripts)
+#             git+args as git, and every PATH argument (manifests) must also be tracked and unmodified
+#   SPEC      space-separated items, matched left to right, no backtracking:
+#             word       exact token          ?word   optional exact token
+#             <C>        one token of class C (also <C>? <C>* <C>+; <C:arg> passes an argument)
+#             {a;b;...}  option set, any order, each alternative at most once; alternatives:
+#                        --x  exact | --x=<C>  joined value | --x:<C>  separate value | --x:<C>+  1..n values
+#                        a leading ! makes the option required
+#   Classes: PATH[:prefix] REV REVX(REV or REV:PATH) INT SHA40 SHA256 REGION AWSID IMGID OUT RO
+#            SBT:<project> SBTTEST DSSCRIPT ENV ENVNP TFCHDIR TFPLAN (definitions in guard-dangerous.sh)
+#
+# Directives: @projects = sbt project ids (spec Phase 2 list); @env / @env-nonprod = ratified environment
+# names. Both environment lists are EMPTY until Phase 12 ratifies them, so ENV-based rows cannot match.
+@projects	core hadoop entityResolution sparkAnalytics storage rag services
+@env
+@env-nonprod
+#
+# ------------------------------------------------------------------ shared groups ----------------------
+@GIT	active	allow	-	git status {--porcelain;--short;--branch}	read-only git
+@GIT	active	allow	-	git diff {--stat;--name-only;--name-status;--cached;--staged;--no-ext-diff;--no-textconv;--unified=<INT>} <REV>* ?-- <PATH>*	read-only git; --output, --ext-diff, --textconv, --no-index excluded by construction
+@GIT	active	allow	-	git log {--oneline;--stat;--name-only;--max-count=<INT>;--no-ext-diff} <REV>? ?-- <PATH>*	read-only git; --format/--pretty/--grep/--output excluded
+@GIT	active	allow	-	git show {--stat;--name-only;--no-ext-diff;--no-textconv} <REVX>	read-only git
+@GIT	active	allow	-	git rev-parse {--short;--abbrev-ref;--verify;--show-toplevel} <REV>?	read-only git
+@GIT	active	allow	-	git ls-files {--others;--exclude-standard;--modified;--deleted} ?-- <PATH>*	read-only git
+@GIT	active	allow	-	git branch --show-current	read-only git
+@SBT-ALL	active	allow	-	sbt check	definition of done (E1: writes target/ and, via markTestRun inside check, the test marker)
+@SBT-ALL	active	allow	-	sbt clean check	definition of done from clean (E1)
+@SBT-ALL	active	allow	-	sbt compile	E1
+@SBT-ALL	active	allow	-	sbt Test/compile	E1
+@SBT-ALL	active	allow	-	sbt test	E1
+@AWS-RO	active	allow	-	aws sts get-caller-identity {!--profile:<RO>;--region:<REGION>;--output:<OUT>}	read-only identity check; --profile mandatory (read-only IAM role is the real boundary)
+@AWS-RO	active	allow	-	aws ecs describe-services {!--profile:<RO>;--region:<REGION>;--output:<OUT>;!--cluster:<AWSID>;!--services:<AWSID>+}	read-only verification
+@AWS-RO	active	allow	-	aws ecs describe-tasks {!--profile:<RO>;--region:<REGION>;--output:<OUT>;!--cluster:<AWSID>;!--tasks:<AWSID>+}	read-only verification
+@AWS-RO	active	allow	-	aws ecs list-tasks {!--profile:<RO>;--region:<REGION>;--output:<OUT>;!--cluster:<AWSID>;--service-name:<AWSID>}	read-only verification
+@AWS-RO	active	allow	-	aws ecs describe-task-definition {!--profile:<RO>;--region:<REGION>;--output:<OUT>;!--task-definition:<AWSID>}	read-only verification
+@AWS-RO	active	allow	-	aws ecr describe-images {!--profile:<RO>;--region:<REGION>;--output:<OUT>;!--repository-name:<AWSID>;--image-ids:<IMGID>+}	image digest check
+@AWS-RO	active	allow	-	aws cloudwatch describe-alarms {!--profile:<RO>;--region:<REGION>;--output:<OUT>;--alarm-names:<AWSID>+;--alarm-name-prefix:<AWSID>}	alarm check
+@AWS-RO	active	allow	-	aws stepfunctions describe-execution {!--profile:<RO>;--region:<REGION>;--output:<OUT>;!--execution-arn:<AWSID>}	pipeline status
+@AWS-RO	active	allow	-	aws stepfunctions list-executions {!--profile:<RO>;--region:<REGION>;--output:<OUT>;!--state-machine-arn:<AWSID>;--max-results:<INT>}	pipeline status
+@AWS-RO	active	allow	-	aws emr describe-cluster {!--profile:<RO>;--region:<REGION>;--output:<OUT>;!--cluster-id:<AWSID>}	EMR status (read-only)
+@AWS-RO	active	allow	-	aws emr list-steps {!--profile:<RO>;--region:<REGION>;--output:<OUT>;!--cluster-id:<AWSID>}	EMR status (read-only)
+@AWS-RO	inactive:MED-5-queue-url-not-expressible	allow	-	aws sqs get-queue-attributes {!--profile:<RO>;--region:<REGION>;--output:<OUT>;!--queue-url:<AWSID>;--attribute-names:<AWSID>+}	queue depth check; INACTIVE: a queue URL always contains // and https:, which AWSID rejects (MED-5); use mcp__aws-api. No URL class is added
+@AWS-RO	active	allow	-	aws elbv2 describe-target-health {!--profile:<RO>;--region:<REGION>;--output:<OUT>;!--target-group-arn:<AWSID>}	service health check
+#
+# ------------------------------------------------------------------ orchestrator ------------------------
+ORCHESTRATOR	active	allow	-	@GIT	/deploy gate 4
+ORCHESTRATOR	active	allow	hook	.claude/hooks/validate-agent-files.sh	reproduction step: agent validation
+ORCHESTRATOR	active	allow	hook	.claude/hooks/verify-tests-ran.sh --check	read-only check of uncommitted source against the test marker (not a deploy gate)
+ORCHESTRATOR	active	allow	-	java -version	versions.md evidence
+ORCHESTRATOR	active	allow	-	sbt --version	versions.md evidence
+ORCHESTRATOR	active	allow	-	terraform version	versions.md evidence
+ORCHESTRATOR	active	allow	-	aws --version	versions.md evidence
+ORCHESTRATOR	active	allow	-	python3 --version	versions.md evidence
+ORCHESTRATOR	active	allow	-	claude --version	versions.md evidence
+#
+# ------------------------------------------------------------------ factory-engineer --------------------
+factory-engineer	active	allow	-	@GIT	Required validation: complete diff
+factory-engineer	active	allow	-	bash -n <PATH:.claude/hooks/>	Required validation: shell syntax (bash -n checks exactly one file)
+factory-engineer	active	allow	-	shellcheck <PATH:.claude/hooks/>+	Required validation: shellcheck
+factory-engineer	active	allow	-	python3 -I -m json.tool .claude/settings.json	Required validation: JSON (exactly one argument; a second would be an output file)
+factory-engineer	active	allow	-	python3 -I -m json.tool .mcp.json	Required validation: JSON
+factory-engineer	active	allow	-	jq . .claude/settings.json	Required validation: JSON (factory agent file names jq .)
+factory-engineer	active	allow	-	jq . .mcp.json	Required validation: JSON
+factory-engineer	active	allow	-	test -x <PATH:.claude/hooks/>	Required validation: executable bit
+factory-engineer	active	allow	hook	.claude/hooks/validate-agent-files.sh ?--probes	Required validation and committed probe table
+#
+# ------------------------------------------------------------------ build-engineer ----------------------
+build-engineer	active	allow	-	@GIT	matrix row
+build-engineer	active	allow	-	@SBT-ALL	Phase 2
+build-engineer	active	allow	-	sbt fmt	repo-wide formatting (E2 repo-wide; build-engineer only)
+build-engineer	active	allow	-	sbt package	Phase 2 packaging
+build-engineer	active	allow	-	sbt packageJobs	Phase 2 packaging (build-engineer's own alias)
+build-engineer	active	ask	-	sbt dockerLocal	E7 local image build
+build-engineer	active	allow	-	sbt reload	build maintenance
+build-engineer	active	allow	-	sbt sbtVersion	versions evidence
+#
+# ------------------------------------------------------------------ module engineers --------------------
+domain-engineer	active	allow	-	@GIT	matrix row
+domain-engineer	active	allow	-	@SBT-ALL	sbt check
+domain-engineer	active	allow	-	sbt <SBT:core> <SBT:core>? <SBT:core>? <SBT:core>?	own-module tasks; scalafmt writes own module only (E2)
+hadoop-engineer	active	allow	-	@GIT	matrix row
+hadoop-engineer	active	allow	-	@SBT-ALL	sbt check
+hadoop-engineer	active	allow	-	sbt <SBT:hadoop> <SBT:hadoop>? <SBT:hadoop>? <SBT:hadoop>?	own-module tasks (E2)
+hadoop-engineer	inactive:B10-alias-pending	allow	-	sbt localPipeline	Phase 4 local bounded pipeline; alias authored by build-engineer
+entity-resolution-engineer	active	allow	-	@GIT	matrix row
+entity-resolution-engineer	active	allow	-	@SBT-ALL	sbt check
+entity-resolution-engineer	active	allow	-	sbt <SBT:entityResolution> <SBT:entityResolution>? <SBT:entityResolution>? <SBT:entityResolution>?	own-module tasks (E2)
+entity-resolution-engineer	inactive:B10-alias-pending	allow	-	sbt goldSetEval	Phase 5 gold-set evaluation
+spark-engineer	active	allow	-	@GIT	matrix row
+spark-engineer	active	allow	-	@SBT-ALL	sbt check
+spark-engineer	active	allow	-	sbt <SBT:sparkAnalytics> <SBT:sparkAnalytics>? <SBT:sparkAnalytics>? <SBT:sparkAnalytics>?	own-module tasks (E2)
+spark-engineer	inactive:B10-alias-pending	allow	-	sbt sparkIT	Phase 6 local Spark integration test
+storage-engineer	active	allow	-	@GIT	matrix row
+storage-engineer	active	allow	-	@SBT-ALL	sbt check
+storage-engineer	active	allow	-	sbt <SBT:storage> <SBT:storage>? <SBT:storage>? <SBT:storage>?	own-module tasks (E2)
+storage-engineer	inactive:B10-alias-pending	ask	-	sbt storageIT	Phase 7 bounded storage integration (opt-in profile)
+rag-engineer	active	allow	-	@GIT	matrix row
+rag-engineer	active	allow	-	@SBT-ALL	sbt check
+rag-engineer	active	allow	-	sbt <SBT:rag> <SBT:rag>? <SBT:rag>? <SBT:rag>?	own-module tasks (E2)
+rag-engineer	inactive:B10-alias-pending	allow	-	sbt benchmarkQueries	Phase 9 benchmark-query suite
+service-engineer	active	allow	-	@GIT	matrix row
+service-engineer	active	allow	-	@SBT-ALL	sbt check
+service-engineer	active	allow	-	sbt <SBT:services> <SBT:services>? <SBT:services>? <SBT:services>?	own-module tasks (E2)
+#
+# ------------------------------------------------------------------ data, tests -------------------------
+dataset-engineer	active	allow	-	@GIT	matrix row
+dataset-engineer	active	allow	-	@SBT-ALL	sbt check
+dataset-engineer	active	allow	git-ask	<DSSCRIPT> {--sample;--verify;--dry-run} <PATH:datasets/>*	E6 bounded sample/verify scripts; --full never (human runs full downloads)
+dataset-engineer	active	allow	-	shasum -a 256 <PATH:datasets/>+	checksums
+test-engineer	active	allow	-	@GIT	matrix row
+test-engineer	active	allow	-	@SBT-ALL	sbt check
+test-engineer	active	allow	-	sbt <SBTTEST> <SBTTEST>? <SBTTEST>? <SBTTEST>?	per-project suites
+test-engineer	inactive:G7-tests-project-pending	allow	-	sbt tests/Test/scalafmt	format test tree; project name pending Phase 2 and G7
+# code-reviewer: NO rows. It has no Bash tool, and the guard denies any Bash call carrying this identity.
+#
+# ------------------------------------------------------------------ infra -------------------------------
+infra-engineer	active	allow	-	@GIT	matrix row
+infra-engineer	active	allow	-	terraform -chdir=infra/terraform fmt -check -recursive	Terraform format check
+infra-engineer	inactive:B6+ENV-unratified	ask	-	terraform <TFCHDIR> init -input=false	E3; .gitignore must cover .terraform/ (B6)
+infra-engineer	inactive:ENV-unratified	allow	-	terraform <TFCHDIR> validate	Phase 12
+infra-engineer	inactive:B6+ENV-unratified	ask	-	terraform <TFCHDIR> plan -input=false -out=tfplan	E4; fixed -out; no -target/-var/-var-file/-destroy/-refresh-only
+infra-engineer	active	allow	-	bash -n <PATH:scripts/>	shell syntax check of own scripts
+infra-engineer	active	allow	-	shellcheck <PATH:scripts/>+	shell lint of own scripts
+infra-engineer	active	allow	git	scripts/check.sh	approved check script (committed, unmodified)
+infra-engineer	inactive:ENV-unratified	ask	git	scripts/plan.sh <ENVNP>	Phase 12 plan script
+infra-engineer	inactive:B3	ask	git	scripts/package.sh	B3 unresolved
+infra-engineer	inactive:B3	ask	git	scripts/smoke-test.sh <ENVNP>	B3 unresolved
+infra-engineer	active	allow	-	@AWS-RO	read-only verification
+# infra-engineer security scanner: no row (B5, tool not selected).
+#
+# ------------------------------------------------------------------ operators ---------------------------
+deploy-engineer	active	allow	-	@GIT	matrix row
+deploy-engineer	inactive:ENV-unratified	ask	git	scripts/deploy.sh <ENV> <SHA40> <SHA256>	/deploy
+deploy-engineer	inactive:ENV-unratified	ask	git	scripts/smoke-test.sh <ENV>	/deploy
+deploy-engineer	inactive:ENV-unratified	ask	git	scripts/rollback.sh <ENV> <REV>	failed in-flight deploy
+deploy-engineer	inactive:B2+G6	ask	git+args	scripts/run-bounded-pipeline.sh <ENV> <PATH:datasets/> <PATH>	/run-pipeline (operator pending G6)
+deploy-engineer	inactive:B4	ask	git	scripts/archive-evidence.sh <ENV> <SHA40>	evidence path and owner pending
+deploy-engineer	inactive:ENV-unratified	allow	-	shasum -a 256 <TFPLAN>	plan checksum gate
+deploy-engineer	inactive:ENV-unratified	allow	-	terraform <TFCHDIR> show -no-color tfplan	plan review; -json excluded (prints sensitive values)
+deploy-engineer	active	allow	-	@AWS-RO	read-only verification
+experiment-engineer	active	allow	-	@GIT	matrix row
+experiment-engineer	active	allow	-	@SBT-ALL	sbt check
+experiment-engineer	inactive:ENV-unratified	ask	git+args	scripts/run-experiment.sh <PATH:experiments/> <ENV>	/experiment; manifest must be committed and unmodified
+incident-responder	active	allow	-	@GIT	matrix row
+incident-responder	inactive:ENV-unratified	ask	git	scripts/rollback.sh <ENV> <REV>	/rollback
+incident-responder	inactive:ENV-unratified	ask	git	scripts/smoke-test.sh <ENV>	/incident, /rollback
+incident-responder	active	allow	-	@AWS-RO	read-only diagnosis
+#
+# ------------------------------------------------------------------ docs, dependencies ------------------
+documentation-engineer	active	allow	-	@GIT	matrix row
+documentation-engineer	active	allow	-	@SBT-ALL	replay sbt check
+documentation-engineer	active	allow	hook	.claude/hooks/validate-agent-files.sh	replay agent validation
+documentation-engineer	active	allow	git	scripts/check.sh	replay check script
+# documentation-engineer link checker: no row (B5). Cloud/API replay: not granted (B7).
+dependency-updater	active	allow	-	@GIT	matrix row
+dependency-updater	active	allow	-	@SBT-ALL	sbt check
+# dependency-updater vulnerability task: no row (B5, alias pending build-engineer).

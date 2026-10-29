@@ -1,0 +1,60 @@
+{
+  "mcpServers": {
+    "github": {
+      "type": "stdio",
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "-e",
+        "GITHUB_READ_ONLY=1",
+        "-e",
+        "GITHUB_TOOLSETS=repos,issues,pull_requests",
+        "ghcr.io/github/github-mcp-server",
+        "stdio",
+        "--read-only"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN:-}"
+      }
+    },
+    "aws-api": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "awslabs.aws-api-mcp-server"
+      ],
+      "env": {
+        "AWS_REGION": "${AWS_REGION:-us-east-1}",
+        "AWS_API_MCP_PROFILE_NAME": "${SCHOLARCHAIN_READONLY_AWS_PROFILE:-scholarchain-readonly}",
+        "READ_OPERATIONS_ONLY": "true",
+        "REQUIRE_MUTATION_CONSENT": "true",
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      }
+    },
+    "terraform": {
+      "type": "stdio",
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "hashicorp/terraform-mcp-server"
+      ]
+    },
+    "aws-docs": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "awslabs.aws-documentation-mcp-server"
+      ],
+      "env": {
+        "AWS_DOCUMENTATION_PARTITION": "aws",
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      }
+    }
+  }
+}

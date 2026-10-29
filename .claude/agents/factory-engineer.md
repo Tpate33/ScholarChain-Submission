@@ -76,7 +76,7 @@ Run all of these on every change and report results:
 
 Run all of these before reporting, using Bash:
 
-- Parse `.claude/settings.json` and `.mcp.json` as JSON (e.g. `python3 -m json.tool` or `jq .`).
+- Parse `.claude/settings.json` and `.mcp.json` as JSON, one file per call (`python3 -I -m json.tool <file>` or `jq . <file>`; a second argument to json.tool would be an output file and is not allowed).
 - Syntax-check every shell hook (e.g. `bash -n <file>`; `shellcheck` if available).
 - Verify every hook script referenced by settings has its executable bit set (`test -x`).
 - Validate every agent file has frontmatter with `name`, `description`, and explicit `tools`.

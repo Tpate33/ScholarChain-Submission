@@ -1,0 +1,53 @@
+# ScholarChain repository .gitignore (Phase 1 B6; owner: build-engineer)
+# Owner: build-engineer. One reason per pattern: see gitignore-rationale.md.
+# Rule: every pattern is anchored to the exact location where a tool writes
+# generated output. No unanchored directory globs. Adding an sbt project means
+# adding its exact <base>/target/ line here. The only negation is the single
+# root file !/.env.example (human decision 2026-10-28).
+
+# --- sbt build output (one line per sbt project base directory) ------------
+/target/
+/project/target/
+/project/project/target/
+/modules/core/target/
+/modules/entity-resolution/target/
+/modules/hadoop/target/
+/modules/spark/target/
+/modules/storage/target/
+/modules/rag/target/
+/modules/services/target/
+/tests/target/
+
+# --- Build server and IDE metadata (root build only) -----------------------
+/.bsp/
+/.bloop/
+/project/.bloop/
+/.metals/
+/project/metals.sbt
+/project/project/metals.sbt
+/.idea/
+/.vscode/
+
+# --- macOS Finder metadata (exact file name, never content) ----------------
+.DS_Store
+
+# --- Dataset download directory (human-confirmed 2026-10-28) ---------------
+/datasets/downloads/
+
+# --- Terraform working files (inside the Terraform territory only) ---------
+/infra/terraform/**/.terraform/
+/infra/terraform/**/*.tfplan
+/infra/terraform/**/tfplan
+/infra/terraform/**/*.tfstate
+/infra/terraform/**/*.tfstate.*
+/infra/terraform/**/crash.log
+
+# --- Local secret files at the repository root (role law 8) ----------------
+# Ignores /.env, /.env.<anything>, and /.envrc. Re-includes exactly one file,
+# the committed template /.env.example (human decision 2026-10-28).
+/.env*
+!/.env.example
+
+# --- Claude Code personal and generated files (exact files) ----------------
+/.claude/settings.local.json
+/.claude/.last-test-run
