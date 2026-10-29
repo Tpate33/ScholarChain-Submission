@@ -1,5 +1,5 @@
 # ScholarChain repository .gitignore (Phase 1 B6; owner: build-engineer)
-# Owner: build-engineer. One reason per pattern: see gitignore-rationale.md.
+# Owner: build-engineer. One reason per pattern: see the section comments below.
 # Rule: every pattern is anchored to the exact location where a tool writes
 # generated output. No unanchored directory globs. Adding an sbt project means
 # adding its exact <base>/target/ line here. The only negation is the single

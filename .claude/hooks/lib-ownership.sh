@@ -33,12 +33,17 @@ scholarchain_owner_of() {
     docs/agent-runs/readme.md)                                  echo "HUMAN" ;;
     docs/agent-runs/*/human-gate.md)                            echo "HUMAN" ;;
     docs/agent-runs/*/commit.txt)                               echo "HUMAN" ;;
+    # no sbt build definition in phase evidence either (Phase 2 review F1)
+    docs/agent-runs/*.sbt)                                      echo "UNASSIGNED" ;;
     docs/agent-runs/*)                                          echo "ORCHESTRATOR" ;;
     license)                                                    echo "HUMAN" ;;
     # --- build ----------------------------------------------------------------
     build.sbt|.scalafmt.conf|.gitignore)                        echo "build-engineer" ;;
     compose.yaml|compose.yml|docker-compose.yaml|docker-compose.yml) echo "build-engineer" ;;
     project/*)                                                  echo "build-engineer" ;;
+    # sbt loads *.sbt in every subproject base as build policy (Phase 2 review F1):
+    # only build.sbt and project/** above are writable; every other *.sbt fails closed.
+    *.sbt)                                                      echo "UNASSIGNED" ;;
     # --- application modules --------------------------------------------------
     modules/core/*)                                             echo "domain-engineer" ;;
     modules/hadoop/*)                                           echo "hadoop-engineer" ;;
@@ -90,6 +95,7 @@ docs/agents.md
 docs/agent-runs/README.md
 docs/agent-runs/x/human-gate.md
 docs/agent-runs/x/commit.txt
+docs/agent-runs/x/y.scala/x.sbt
 docs/agent-runs/x/y.scala
 LICENSE
 build.sbt
@@ -100,6 +106,7 @@ compose.yaml
 compose.yml
 docker-compose.yaml
 docker-compose.yml
+x/y.scala/x.sbt
 modules/core/x/y.scala
 modules/hadoop/x/y.scala
 modules/entity-resolution/x/y.scala

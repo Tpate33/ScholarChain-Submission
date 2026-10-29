@@ -63,6 +63,7 @@ This table is mirrored by `.claude/hooks/lib-ownership.sh`. `validate-agent-file
 | `docs/agent-runs/README.md` | `HUMAN` | amendment A1: spec "human-owned evidence" and Phase 1 item 7 (evidence format); content drafted by factory-engineer outside the repo, committed by the human |
 | `docs/agent-runs/*/human-gate.md` | `HUMAN` | spec: human ratification records are human-owned |
 | `docs/agent-runs/*/commit.txt` | `HUMAN` | amendment A2: spec "Human commits the accepted phase and records the commit hash" |
+| `docs/agent-runs/**/*.sbt` | `UNASSIGNED` | amendment F1 (Phase 2 review): no sbt build definition in phase evidence |
 | `docs/agent-runs/**` | `ORCHESTRATOR` | spec: orchestrator may assemble agent final reports |
 | `LICENSE` | `HUMAN` | gap G9: not in matrix |
 | `build.sbt` | `build-engineer` | matrix |
@@ -73,6 +74,7 @@ This table is mirrored by `.claude/hooks/lib-ownership.sh`. `validate-agent-file
 | `compose.yml` | `build-engineer` | matrix: local compose files |
 | `docker-compose.yaml` | `build-engineer` | matrix: local compose files |
 | `docker-compose.yml` | `build-engineer` | matrix: local compose files |
+| `**/*.sbt` | `UNASSIGNED` | amendment F1 (Phase 2 review): sbt loads every subproject `*.sbt` as build policy, so only `build.sbt` and `project/**` above are writable (by `build-engineer`); first match wins, so the constitutional `.claude/**` rows above still take precedence |
 | `modules/core/**` | `domain-engineer` | matrix |
 | `modules/hadoop/**` | `hadoop-engineer` | matrix |
 | `modules/entity-resolution/**` | `entity-resolution-engineer` | matrix |
@@ -96,6 +98,8 @@ This table is mirrored by `.claude/hooks/lib-ownership.sh`. `validate-agent-file
 <!-- ownership-table:end -->
 
 **Phase 2 skeleton exemption:** `build-engineer` may create empty `.gitkeep` placeholders inside other agents' territories so that "empty module source roots" and "empty required top-level directories" (spec Phase 2) exist. It may never do this inside `factory-engineer`, `HUMAN`, `GENERATED`, or `ORCHESTRATOR` paths.
+
+**sbt build definitions (amendment F1, Phase 2 review).** sbt loads every `*.sbt` file in a subproject base directory as settings for that project, so such a file could rewrite the definition of done. Only the root `build.sbt` and files under `project/**` are build definitions, and both belong to `build-engineer`. Every other `*.sbt` path is `UNASSIGNED` and fails closed for every identity, including module owners, `test-engineer`, `documentation-engineer`, the orchestrator under `docs/agent-runs/**`, and `build-engineer` itself, **except** paths under the constitutional rows `.claude/agents/**`, `.claude/hooks/**`, and `.claude/commands/**`. Those remain `factory-engineer`, because constitutional rows match first. `.claude` is not an sbt project base, and `project/BuildGuard.scala` would abort the sbt load if such a file existed. A new subproject build file requires a matrix amendment. `project/BuildGuard.scala` (owned by `build-engineer`) enforces the same rule inside `sbt check`.
 
 ## Agent catalog and tool fences
 

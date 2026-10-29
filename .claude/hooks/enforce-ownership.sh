@@ -79,6 +79,15 @@ Acting identity: $identity." ;;
 (main thread) may assemble it; subagents return their report as their final
 message instead. Acting identity: $identity. Owner: orchestrator (human-owned evidence)." ;;
   UNASSIGNED)
+    case "$(printf '%s' "$rel" | tr '[:upper:]' '[:lower:]')" in
+      *.sbt)
+        block "'$rel' is an sbt build definition outside build.sbt and project/ (Phase 2 review F1).
+sbt loads every subproject *.sbt as build policy, so such a file could rewrite the definition
+of done; project/BuildGuard.scala also aborts the sbt load if one exists. No agent may create it.
+Acting identity: $identity. Owner: UNASSIGNED. If a build setting is needed, return BLOCKED-ON
+build-engineer with the setting and its reason as BLOCKED-ON EVIDENCE (build-engineer changes
+build.sbt or project/; a new subproject build file needs a matrix amendment via factory-engineer)." ;;
+    esac
     block "'$rel' has no owner in the ratified authority matrix (docs/agents.md).
 Do not invent ownership. Acting identity: $identity. Owner: UNASSIGNED --
 escalate to the human architect for a matrix amendment via factory-engineer." ;;
