@@ -42,6 +42,7 @@ val munit = scalaDep("org.scalameta", "munit", "munit")
 val upickle = scalaDep("com.lihaoyi", "upickle", "upickle")
 val slf4jApi = javaDep("org.slf4j", "slf4j-api", "slf4j")
 val logbackClassic = javaDep("ch.qos.logback", "logback-classic", "logback")
+val typesafeConfig = javaDep("com.typesafe", "config", "typesafe-config")
 val hadoopClientApi = javaDep("org.apache.hadoop", "hadoop-client-api", "hadoop")
 val hadoopClientRuntime = javaDep("org.apache.hadoop", "hadoop-client-runtime", "hadoop")
 // Spark publishes no Scala 3 artifacts: use the _2.13 artifacts from Scala 3.
@@ -134,7 +135,7 @@ lazy val core = project
   .settings(commonSettings)
   .settings(
     name := "scholarchain-core",
-    libraryDependencies += upickle.value
+    libraryDependencies ++= Seq(upickle.value, typesafeConfig.value)
   )
 
 lazy val entityResolution = project

@@ -1,0 +1,86 @@
+<?xml version="1.0"?>
+<!-- ScholarChain sample excerpt. Owner: dataset-engineer. Assembled 2026-10-29.
+     NOT a byte copy of dblp.xml. Records are reconstructed in the dblp.xml element vocabulary
+     (dblp.dtd, "DTD changes of June 28, 2023") from facts returned by the official dblp SPARQL
+     endpoint https://sparql.dblp.org/sparql on 2026-10-29 (dblp.org/rec/*.xml was not reachable
+     from the tooling because of bot protection). The mdate and url elements are omitted because
+     they were not retrieved. The orcid attribute is written as a bare iD (form UNVERIFIED, see
+     datasets/schemas/dblp.md). Non-ASCII characters use the named entities declared in dblp.dtd.
+     dblp metadata: CC0 1.0 (secondary licence ODC-BY 1.0), Schloss Dagstuhl, https://dblp.org/xml/README.txt -->
+<!DOCTYPE dblp SYSTEM "dblp.dtd">
+<dblp>
+<article key="journals/tocs/CorbettDEFFFGGHHHKKLLMMNQRRSSTWW13">
+<author>James C. Corbett</author>
+<author>Jeffrey Dean</author>
+<author>Michael Epstein</author>
+<author>Andrew Fikes</author>
+<author>Christopher Frost 0001</author>
+<author>J. J. Furman</author>
+<author>Sanjay Ghemawat</author>
+<author>Andrey Gubarev</author>
+<author>Christopher Heiser</author>
+<author>Peter Hochschild</author>
+<author>Wilson C. Hsieh</author>
+<author>Sebastian Kanthak</author>
+<author>Eugene Kogan</author>
+<author>Hongyi Li</author>
+<author>Alexander Lloyd</author>
+<author>Sergey Melnik 0001</author>
+<author>David Mwaura</author>
+<author>David Nagle</author>
+<author>Sean Quinlan</author>
+<author>Rajesh Rao</author>
+<author>Lindsay Rolig</author>
+<author>Yasushi Saito</author>
+<author>Michal Szymaniak</author>
+<author>Christopher Taylor</author>
+<author>Ruth Wang</author>
+<author>Dale Woodford</author>
+<title>Spanner: Google's Globally Distributed Database.</title>
+<pages>8</pages>
+<year>2013</year>
+<volume>31</volume>
+<journal>ACM Trans. Comput. Syst.</journal>
+<number>3</number>
+<ee>https://doi.org/10.1145/2491245</ee>
+</article>
+<article key="journals/cacm/PopperMP21">
+<author orcid="0000-0002-2814-962X">Christina P&ouml;pper</author>
+<author orcid="0000-0001-6899-0651">Michail Maniatakos</author>
+<author orcid="0000-0003-1909-0336">Roberto Di Pietro</author>
+<title>Cyber security research in the Arab region: a blooming ecosystem with global ambitions.</title>
+<pages>96-101</pages>
+<year>2021</year>
+<volume>64</volume>
+<journal>Commun. ACM</journal>
+<number>4</number>
+<ee>https://doi.org/10.1145/3447741</ee>
+</article>
+<article key="journals/cacm/Varajao21">
+<author orcid="0000-0002-4303-3908">Jo&atilde;o Varaj&atilde;o</author>
+<title>Software development in disruptive times.</title>
+<pages>32-35</pages>
+<year>2021</year>
+<volume>64</volume>
+<journal>Commun. ACM</journal>
+<number>10</number>
+<ee>https://doi.org/10.1145/3453932</ee>
+</article>
+<inproceedings key="conf/osdi/ChangDGHWBCFG06">
+<author>Fay Chang</author>
+<author>Jeffrey Dean</author>
+<author>Sanjay Ghemawat</author>
+<author>Wilson C. Hsieh</author>
+<author>Deborah A. Wallach</author>
+<author>Michael Burrows</author>
+<author>Tushar Chandra</author>
+<author>Andrew Fikes</author>
+<author>Robert Gruber</author>
+<title>Bigtable: A Distributed Storage System for Structured Data (Awarded Best Paper!).</title>
+<pages>205-218</pages>
+<year>2006</year>
+<booktitle>OSDI</booktitle>
+<ee>http://www.usenix.org/events/osdi06/tech/chang.html</ee>
+<crossref>conf/osdi/2006</crossref>
+</inproceedings>
+</dblp>

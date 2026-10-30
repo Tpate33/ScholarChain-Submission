@@ -1,0 +1,23 @@
+# ScholarChain sample seed identifiers. Owner: dataset-engineer.
+# Columns (tab-separated): dataset, kind, identifier.
+# These are the upstream records behind datasets/samples/**. fetch-*.sh --sample fetches exactly
+# these records (bounded, one small request each) into datasets/downloads/<dataset>/sample/.
+# Every identifier below was observed in an official source response on 2026-10-29.
+dblp	rec	journals/tocs/CorbettDEFFFGGHHHKKLLMMNQRRSSTWW13
+dblp	rec	journals/cacm/PopperMP21
+dblp	rec	journals/cacm/Varajao21
+dblp	rec	conf/osdi/ChangDGHWBCFG06
+openalex	work	W3137759927
+openalex	work	W3147033813
+openalex	work	W3200477342
+openalex	author	A5113870699
+openalex	institution	I120250893
+crossref	doi	10.1145/2491245
+crossref	doi	10.1145/3447741
+crossref	doi	10.1145/3453932
+orcid	personal-details	0000-0002-2814-962X
+orcid	personal-details	0000-0001-6899-0651
+orcid	personal-details	0000-0002-4303-3908
+orcid	work	0000-0002-2814-962X/94866473
+orcid	work	0000-0001-6899-0651/94865737
+orcid	work	0000-0001-6899-0651/107628996

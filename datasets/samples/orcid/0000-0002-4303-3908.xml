@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ScholarChain sample excerpt. Owner: dataset-engineer. Assembled 2026-10-29.
+     NOT a byte copy of an ORCID public data file record. Values were read from the ORCID public
+     API v3.0 (https://pub.orcid.org/v3.0/0000-0002-4303-3908/personal-details) on 2026-10-29 and
+     written in the ORCID v3.0 record vocabulary. Data minimisation: only the iD and the public
+     name are kept.
+     Edge case: the works list is intentionally empty in this excerpt. The ORCID search API
+     (q=doi-self:"10.1145/3453932", 2026-10-29) returned exactly this iD, but the full works list
+     (about 3.4 million characters) was too large to read, so the work-summary and its put-code
+     were not retrieved and are not reproduced. Consumers must not treat an absent work as proof
+     that the researcher did not author it.
+     Licence: ORCID Public Data File is CC0 1.0; source: ORCID, https://info.orcid.org/public-data-file-use-policy/ -->
+<record:record xmlns:record="http://www.orcid.org/ns/record" xmlns:common="http://www.orcid.org/ns/common" xmlns:person="http://www.orcid.org/ns/person" xmlns:personal-details="http://www.orcid.org/ns/personal-details" xmlns:activities="http://www.orcid.org/ns/activities" path="/0000-0002-4303-3908">
+  <common:orcid-identifier>
+    <common:uri>https://orcid.org/0000-0002-4303-3908</common:uri>
+    <common:path>0000-0002-4303-3908</common:path>
+    <common:host>orcid.org</common:host>
+  </common:orcid-identifier>
+  <person:person path="/0000-0002-4303-3908/person">
+    <person:name visibility="public">
+      <personal-details:given-names>João</personal-details:given-names>
+      <personal-details:family-name>Varajão</personal-details:family-name>
+    </person:name>
+  </person:person>
+  <activities:activities-summary path="/0000-0002-4303-3908/activities">
+    <activities:works path="/0000-0002-4303-3908/works"/>
+  </activities:activities-summary>
+</record:record>

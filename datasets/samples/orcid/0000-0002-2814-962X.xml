@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ScholarChain sample excerpt. Owner: dataset-engineer. Assembled 2026-10-29.
+     NOT a byte copy of an ORCID public data file record. Values were read from the ORCID public
+     API v3.0 (https://pub.orcid.org/v3.0/0000-0002-2814-962X/personal-details and /works) on
+     2026-10-29 and written in the ORCID v3.0 record vocabulary. Data minimisation: only the iD,
+     the public name, and the one work group whose DOI overlaps the other ScholarChain samples are
+     kept. Emails, addresses, affiliations, keywords, researcher URLs, and other names are omitted.
+     The record has one public other-name that is deliberately not reproduced.
+     Licence: ORCID Public Data File is CC0 1.0; source: ORCID, https://info.orcid.org/public-data-file-use-policy/ -->
+<record:record xmlns:record="http://www.orcid.org/ns/record" xmlns:common="http://www.orcid.org/ns/common" xmlns:person="http://www.orcid.org/ns/person" xmlns:personal-details="http://www.orcid.org/ns/personal-details" xmlns:activities="http://www.orcid.org/ns/activities" xmlns:work="http://www.orcid.org/ns/work" path="/0000-0002-2814-962X">
+  <common:orcid-identifier>
+    <common:uri>https://orcid.org/0000-0002-2814-962X</common:uri>
+    <common:path>0000-0002-2814-962X</common:path>
+    <common:host>orcid.org</common:host>
+  </common:orcid-identifier>
+  <person:person path="/0000-0002-2814-962X/person">
+    <person:name visibility="public">
+      <personal-details:given-names>Christina</personal-details:given-names>
+      <personal-details:family-name>Poepper</personal-details:family-name>
+    </person:name>
+  </person:person>
+  <activities:activities-summary path="/0000-0002-2814-962X/activities">
+    <activities:works path="/0000-0002-2814-962X/works">
+      <activities:group>
+        <common:last-modified-date>2023-06-03T21:52:01.847Z</common:last-modified-date>
+        <common:external-ids>
+          <common:external-id>
+            <common:external-id-type>doi</common:external-id-type>
+            <common:external-id-value>10.1145/3447741</common:external-id-value>
+            <common:external-id-normalized>10.1145/3447741</common:external-id-normalized>
+            <common:external-id-relationship>self</common:external-id-relationship>
+          </common:external-id>
+          <common:external-id>
+            <common:external-id-type>source-work-id</common:external-id-type>
+            <common:external-id-value>06b25b01-8677-4af5-b139-0de6dd3c6eb9</common:external-id-value>
+            <common:external-id-normalized>06b25b01-8677-4af5-b139-0de6dd3c6eb9</common:external-id-normalized>
+            <common:external-id-relationship>self</common:external-id-relationship>
+          </common:external-id>
+          <common:external-id>
+            <common:external-id-type>eid</common:external-id-type>
+            <common:external-id-value>2-s2.0-85103197452</common:external-id-value>
+            <common:external-id-normalized>2-s2.0-85103197452</common:external-id-normalized>
+            <common:external-id-relationship>self</common:external-id-relationship>
+          </common:external-id>
+        </common:external-ids>
+        <work:work-summary put-code="94866473" path="/0000-0002-2814-962X/work/94866473" visibility="public" display-index="0">
+          <common:created-date>2021-06-02T22:24:51.874Z</common:created-date>
+          <common:last-modified-date>2023-06-03T21:52:01.847Z</common:last-modified-date>
+          <common:source>
+            <common:source-client-id>
+              <common:uri>https://orcid.org/client/APP-VOZZVWHV1K15COEN</common:uri>
+              <common:path>APP-VOZZVWHV1K15COEN</common:path>
+              <common:host>orcid.org</common:host>
+            </common:source-client-id>
+            <common:source-name>New York University Scholars</common:source-name>
+          </common:source>
+          <work:title>
+            <common:title>Cyber security research in the Arab region</common:title>
+          </work:title>
+          <common:external-ids>
+            <common:external-id>
+              <common:external-id-type>source-work-id</common:external-id-type>
+              <common:external-id-value>06b25b01-8677-4af5-b139-0de6dd3c6eb9</common:external-id-value>
+              <common:external-id-normalized>06b25b01-8677-4af5-b139-0de6dd3c6eb9</common:external-id-normalized>
+              <common:external-id-relationship>self</common:external-id-relationship>
+            </common:external-id>
+            <common:external-id>
+              <common:external-id-type>eid</common:external-id-type>
+              <common:external-id-value>2-s2.0-85103197452</common:external-id-value>
+              <common:external-id-normalized>2-s2.0-85103197452</common:external-id-normalized>
+              <common:external-id-relationship>self</common:external-id-relationship>
+            </common:external-id>
+            <common:external-id>
+              <common:external-id-type>doi</common:external-id-type>
+              <common:external-id-value>10.1145/3447741</common:external-id-value>
+              <common:external-id-normalized>10.1145/3447741</common:external-id-normalized>
+              <common:external-id-relationship>self</common:external-id-relationship>
+            </common:external-id>
+          </common:external-ids>
+          <work:type>journal-article</work:type>
+          <common:publication-date>
+            <common:year>2021</common:year>
+            <common:month>04</common:month>
+          </common:publication-date>
+          <work:journal-title>Communications of the ACM</work:journal-title>
+        </work:work-summary>
+      </activities:group>
+    </activities:works>
+  </activities:activities-summary>
+</record:record>
