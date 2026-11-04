@@ -75,11 +75,50 @@ object AuthorMention {
 }
 
 /**
- * A source work. `workId` is namespace plus authoritative source ID ([[WorkId]]), and the namespace
- * is the one of `source` ([[WorkRecord.NamespaceOf]]); `source` equals `provenance.sourceDataset`.
- * Authors are in source order with positions 0..n-1.
+ * A source work (schema `work-record.v3`). `workId` is namespace plus authoritative source ID
+ * ([[WorkId]]), and the namespace is the one of `source` ([[WorkRecord.NamespaceOf]]); `source`
+ * equals `provenance.sourceDataset`. Authors are in source order with positions 0..n-1.
+ *
+ * The v2 and v3 fields after `provenance` keep source fields that v1 lost. They have Scala defaults
+ * (empty) so that existing constructor calls still compile, but the wire format always carries
+ * every key (`serializeDefaults`), and [[Json.decode]] rejects a JSON object without one
+ * ([[WorkRecord.DefaultedFields]]).
+ *
+ * @param recordType
+ *   the source's own record type token: DBLP element name (`article`, `inproceedings`), OpenAlex
+ *   and Crossref `type`, ORCID `work:type`
+ * @param venueName
+ *   venue name as written by the source (DBLP `journal` or `booktitle`, OpenAlex
+ *   `primary_location.source.display_name`, Crossref `container-title[0]`, ORCID
+ *   `work:journal-title`), whether or not a [[Venue]] record could be built
+ * @param volume
+ *   source volume text
+ * @param issue
+ *   source issue text (DBLP `number`, OpenAlex `biblio.issue`, Crossref `issue`)
+ * @param pages
+ *   source page text, possibly an article number; for sources with separate first and last page,
+ *   `<first>-<last>` or `<first>`
+ * @param eeLinks
+ *   electronic-edition links (DBLP `ee`) in source order, distinct
+ * @param urls
+ *   other source URLs (DBLP `url`, which may be relative to dblp.org) in source order, distinct
+ * @param topicIds
+ *   topic IDs asserted by the source, primary topic first, distinct
+ * @param additionalIds
+ *   further source-specific work identifiers (for example OpenAlex `ids.mag`, ORCID `eid`, or
+ *   further DOIs), work schemes only, sorted ([[ExactId.compare]]) without duplicates, never
+ *   repeating `doi`, `arxivId`, or the work's own authoritative ID
+ * @param assertionSource
+ *   ORCID only: the `common:source` (and assertion origin) of the work summary
+ * @param sourceLocalWorkIds
+ *   ORCID only (schema `work-record.v3`): the work summary's own `source-work-id` external IDs,
+ *   each qualified by its issuer, which must be the summary's submitting source
+ *   (`assertionSource.sourceKind`, `assertionSource.sourceId`); sorted
+ *   ([[SourceLocalWorkId.compare]]) without duplicates. Not global identifiers: never part of
+ *   `additionalIds` or [[dedicatedIds]]
  */
 @allowUnknownKeys(false)
+@upickle.implicits.serializeDefaults(true)
 final case class WorkRecord(
     schemaVersion: String,
     workId: String,
@@ -93,7 +132,18 @@ final case class WorkRecord(
     arxivId: Option[String],
     authors: Vector[AuthorMention],
     abstractTextRef: Option[String],
-    provenance: Provenance
+    provenance: Provenance,
+    recordType: Option[String] = None,
+    venueName: Option[String] = None,
+    volume: Option[String] = None,
+    issue: Option[String] = None,
+    pages: Option[String] = None,
+    eeLinks: Vector[String] = Vector.empty,
+    urls: Vector[String] = Vector.empty,
+    topicIds: Vector[String] = Vector.empty,
+    additionalIds: Vector[ExactId] = Vector.empty,
+    assertionSource: Option[AssertionSource] = None,
+    sourceLocalWorkIds: Vector[SourceLocalWorkId] = Vector.empty
 ) derives ReadWriter
 
 object WorkRecord {
@@ -109,13 +159,106 @@ object WorkRecord {
     SourceType.Crossref -> "doi"
   )
 
+  /** The v2 fields with Scala defaults; required on the wire. */
+  val V2Fields: Vector[String] = Vector(
+    "recordType",
+    "venueName",
+    "volume",
+    "issue",
+    "pages",
+    "eeLinks",
+    "urls",
+    "topicIds",
+    "additionalIds",
+    "assertionSource"
+  )
+
+  /** The v3 field with a Scala default; required on the wire. */
+  val V3Fields: Vector[String] = Vector("sourceLocalWorkIds")
+
+  /** Every top-level field with a Scala default (v2 then v3 fields); all required on the wire. */
+  val DefaultedFields: Vector[String] = V2Fields ++ V3Fields
+
+  /** Identifiers a work already carries in dedicated fields (never repeated in additionalIds). */
+  def dedicatedIds(t: WorkRecord): Set[ExactId] = {
+    val own: Option[ExactId] = (Option(t.source), Option(t.workId)) match {
+      case (Some(SourceType.Dblp), Some(id)) if id.startsWith("work:dblp:") =>
+        Some(ExactId(ExactIdScheme.DblpKey, id.stripPrefix("work:dblp:")))
+      case (Some(SourceType.OpenAlex), Some(id)) if id.startsWith("work:openalex:") =>
+        Some(ExactId(ExactIdScheme.OpenAlexWork, id.stripPrefix("work:openalex:")))
+      case (Some(SourceType.Crossref), Some(id)) if id.startsWith("work:doi:") =>
+        Some(ExactId(ExactIdScheme.Doi, id.stripPrefix("work:doi:")))
+      case _ => None
+    }
+    (own.toVector ++
+      Option(t.doi).getOrElse(None).map(ExactId(ExactIdScheme.Doi, _)).toVector ++
+      Option(t.arxivId).getOrElse(None).map(ExactId(ExactIdScheme.Arxiv, _)).toVector).toSet
+  }
+
+  private def v2Fields(t: WorkRecord, p: String): Vector[ValidationError] = {
+    def optText(name: String, v: Option[String]): Vector[ValidationError] =
+      if (v == null) Vector(ValidationError.MissingField(at(p, name)))
+      else v.toVector.flatMap(Validated.text(at(p, name), _))
+    def links(name: String, v: Vector[String]): Vector[ValidationError] =
+      if (v == null) Vector(ValidationError.MissingField(at(p, name)))
+      else
+        v.zipWithIndex.flatMap { case (l, i) => Validated.link(at(p, s"$name[$i]"), l) } ++
+          Validated.distinct(at(p, name), v)
+    val topics = Option(t.topicIds).getOrElse(Vector.empty)
+    val extra = Option(t.additionalIds).getOrElse(Vector.empty)
+    val assertion = Option(t.assertionSource).getOrElse(None)
+    val dedicated = dedicatedIds(t)
+    all(
+      Option(t.recordType).getOrElse(None).toVector.flatMap { r =>
+        when(!StableId.isToken(r))(
+          ValidationError.InvalidValue(at(p, "recordType"), s"'$r' is not a token")
+        )
+      },
+      when(t.recordType == null)(ValidationError.MissingField(at(p, "recordType"))),
+      optText("venueName", t.venueName),
+      optText("volume", t.volume),
+      optText("issue", t.issue),
+      optText("pages", t.pages),
+      links("eeLinks", t.eeLinks),
+      links("urls", t.urls),
+      when(t.topicIds == null)(ValidationError.MissingField(at(p, "topicIds"))),
+      topics.zipWithIndex.flatMap { case (id, i) =>
+        StableId.check(IdKind.Topic, id, at(p, s"topicIds[$i]"))
+      },
+      Validated.distinct(at(p, "topicIds"), topics),
+      ExactId.checkSet(at(p, "additionalIds"), t.additionalIds, MatchEntityKind.Work),
+      extra.zipWithIndex.flatMap { case (e, i) =>
+        when(dedicated.contains(e))(
+          ValidationError.InvalidValue(
+            at(p, s"additionalIds[$i]"),
+            "repeats doi, arxivId, or the work's own ID"
+          )
+        )
+      },
+      when(t.assertionSource == null)(ValidationError.MissingField(at(p, "assertionSource"))),
+      assertion.toVector.flatMap(AssertionSource.check(at(p, "assertionSource"), _)),
+      when(assertion.isDefined && t.source != SourceType.Orcid)(
+        ValidationError.InvalidValue(at(p, "assertionSource"), "only allowed for ORCID works")
+      ),
+      SourceLocalWorkId.checkSet(at(p, "sourceLocalWorkIds"), t.sourceLocalWorkIds, assertion),
+      when(
+        t.sourceLocalWorkIds != null && t.sourceLocalWorkIds.nonEmpty &&
+          t.source != SourceType.Orcid
+      )(
+        ValidationError.InvalidValue(at(p, "sourceLocalWorkIds"), "only allowed for ORCID works")
+      )
+    )
+  }
+
   given contract: RecordContract[WorkRecord] =
     new RecordContract[WorkRecord]("WorkRecord", SchemaVersions.WorkRecord, true) {
+      override def fieldsWithDefaults: Vector[String] = DefaultedFields
       def schemaVersionOf(t: WorkRecord): String = t.schemaVersion
       def provenanceOf(t: WorkRecord): Provenance = t.provenance
       protected def fields(t: WorkRecord, p: String): Vector[ValidationError] = {
         val authors = Option(t.authors).getOrElse(Vector.empty)
         all(
+          v2Fields(t, p),
           StableId.check(IdKind.Work, t.workId, at(p, "workId")),
           when(t.source == null || !t.source.isDataset)(
             ValidationError.InvalidValue(at(p, "source"), "must be a dataset source")

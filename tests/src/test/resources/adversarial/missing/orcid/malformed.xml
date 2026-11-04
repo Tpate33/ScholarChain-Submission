@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record:record xmlns:record="http://www.orcid.org/ns/record" xmlns:common="http://www.orcid.org/ns/common">
+  <common:orcid-identifier>
+    <common:path>0000-0001-5109-3700</common:path>
+  <!-- the orcid-identifier element is never closed -->
+</record:record>

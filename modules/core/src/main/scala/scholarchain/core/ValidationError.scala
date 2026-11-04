@@ -85,6 +85,25 @@ object Validated {
       ValidationError.InvalidValue(field, "contains duplicate values")
     )
 
+  /** Rejects values that are not strictly ascending by UTF-8 bytes (unsorted or duplicated). */
+  def strictlyAscending(field: String, values: Seq[String]): Vector[ValidationError] =
+    when(
+      values.exists(_ == null) ||
+        values.sliding(2).exists(w => w.size == 2 && Canonical.compareUtf8(w(0), w(1)) >= 0)
+    )(ValidationError.InvalidValue(field, "must be sorted by UTF-8 bytes without duplicates"))
+
+  /** Non-blank text without ISO control characters (tab, newline, ...). */
+  def text(field: String, value: String): Vector[ValidationError] =
+    nonEmpty(field, value) ++ when(value != null && value.exists(Character.isISOControl))(
+      ValidationError.InvalidValue(field, "contains control characters")
+    )
+
+  /** A link or URL as given by the source: non-blank, without whitespace or control characters. */
+  def link(field: String, value: String): Vector[ValidationError] =
+    nonEmpty(field, value) ++ when(
+      value != null && value.exists(c => Character.isWhitespace(c) || Character.isISOControl(c))
+    )(ValidationError.InvalidValue(field, "contains whitespace or control characters"))
+
   def fromEither(r: Either[ValidationError, ?]): Vector[ValidationError] =
     r.left.toOption.toVector
 }

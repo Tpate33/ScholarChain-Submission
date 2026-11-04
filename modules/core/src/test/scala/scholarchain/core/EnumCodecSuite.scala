@@ -154,4 +154,32 @@ class EnumCodecSuite extends munit.FunSuite {
       Seq("orcid", "dblp-pid", "openalex", "doi", "ror", "issn", "crossref-member")
     )
   }
+
+  test("exact identifier schemes (Phase 4) and the entity kind each identifies") {
+    roundTrip(
+      ExactIdScheme.values.toSeq,
+      _.tag,
+      Seq(
+        "doi",
+        "arxiv",
+        "dblp-key",
+        "openalex-work",
+        "mag",
+        "scopus-eid",
+        "orcid",
+        "openalex-author",
+        "dblp-pid"
+      )
+    )
+    assertEquals(
+      ExactIdScheme.values.filter(_.entityKind == MatchEntityKind.Researcher).map(_.tag).toSeq,
+      Seq("orcid", "openalex-author", "dblp-pid")
+    )
+    assert(
+      ExactIdScheme.values.forall(s =>
+        s.entityKind == MatchEntityKind.Work || s.entityKind == MatchEntityKind.Researcher
+      )
+    )
+    roundTrip(AssertionSourceKind.values.toSeq, _.tag, Seq("client", "orcid"))
+  }
 }

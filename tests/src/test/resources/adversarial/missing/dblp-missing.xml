@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dblp>
+<article mdate="2020-01-01"><author>No Key</author><title>No key.</title><year>2020</year></article>
+<article key="X/Upper"><author>Bad Key</author><title>Bad key.</title><year>2020</year></article>
+<article key="journals/mf/NoTitle"><author>No Title</author><year>2020</year></article>
+<article key="journals/mf/BlankTitle"><author>Blank Title</author><title>   </title><year>2020</year></article>
+<article key="journals/mf/NoAuthors"><title>No authors at all.</title><year>2020</year></article>
+<article key="journals/mf/EmptyAuthor"><author>Ok Name</author><author>  </author><title>Empty author.</title><year>2020</year></article>
+<article key="journals/mf/NoYear"><author>Ny One</author><author>Ny Two</author><title>No year.</title></article>
+<article key="journals/mf/BadYear"><author>By One</author><title>Bad year.</title><year>20x0</year></article>
+<article key="journals/mf/Bare"><author>Ba Re</author><title>Only required fields.</title></article>
+<article key="journals/mf/BadOrcid"><author orcid="0000-0002-1825-0098">Bo Orcid</author><title>Bad author ORCID.</title><year>2020</year><ee>https://doi.org/10.5555/mf.1</ee><ee>not a link</ee></article>
+</dblp>

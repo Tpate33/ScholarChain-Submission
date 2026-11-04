@@ -23,7 +23,57 @@ class WireContractSuite extends munit.FunSuite {
     s"""{"schemaVersion":"scholarchain.author-mention.v1","mentionId":"mention:191fd11b93e4fceca68d7e03e0d62de4a2fb826cfbdec968e4951677afd6fcbf","workId":"work:dblp:journals/example/Synthetic21","position":1,"rawName":"Ben Example","normalizedName":"ben example","sourceAuthorId":{"scheme":"dblp-pid","value":"00/0002"},"orcid":null,"affiliationIds":[],"rawAffiliations":[],"provenance":$DblpProv}"""
 
   val WorkRecordGolden: String =
-    s"""{"schemaVersion":"scholarchain.work-record.v1","workId":"work:dblp:journals/example/Synthetic21","source":"dblp","sourceRecordId":"journals/example/Synthetic21","title":"A Synthetic Study of Collaboration","normalizedTitle":"a synthetic study of collaboration","year":2021,"venueId":"venue:dblp:journals/example","doi":"10.1234/example.2021.001","arxivId":null,"authors":[$Mention0,$Mention1],"abstractTextRef":null,"provenance":$DblpProv}"""
+    s"""{"schemaVersion":"scholarchain.work-record.v3","workId":"work:dblp:journals/example/Synthetic21","source":"dblp","sourceRecordId":"journals/example/Synthetic21","title":"A Synthetic Study of Collaboration","normalizedTitle":"a synthetic study of collaboration","year":2021,"venueId":"venue:dblp:journals/example","doi":"10.1234/example.2021.001","arxivId":null,"authors":[$Mention0,$Mention1],"abstractTextRef":null,"provenance":$DblpProv,"recordType":"article","venueName":"Example J.","volume":"64","issue":"3","pages":"1-22","eeLinks":["https://doi.org/10.1234/example.2021.001"],"urls":["db/journals/example/example64.html#Synthetic21"],"topicIds":[],"additionalIds":[],"assertionSource":null,"sourceLocalWorkIds":[]}"""
+
+  private def orcidProvJson(recordId: String) =
+    s"""{"sourceDataset":"orcid","sourceRecordId":"$recordId","snapshot":"orcid-2025-10-01","runId":"$Run","sourceSchemaVersion":"orcid-raw/1.0.0","policyVersion":null,"modelVersion":null,"promptVersion":null}"""
+  private val AssertionJson =
+    """{"sourceKind":"client","sourceId":"APP-EXAMPLE000000001","sourceName":"Example Client","originKind":"orcid","originId":"0000-0000-0000-0001","originName":"Ada Example"}"""
+
+  val OrcidWorkGolden: String =
+    s"""{"schemaVersion":"scholarchain.work-record.v3","workId":"work:orcid-work:0000-0000-0000-0001/work/1001","source":"orcid","sourceRecordId":"0000-0000-0000-0001/work/1001","title":"A Synthetic Study of Collaboration","normalizedTitle":"a synthetic study of collaboration","year":2021,"venueId":null,"doi":"10.1234/example.2021.001","arxivId":null,"authors":[],"abstractTextRef":null,"provenance":${orcidProvJson(
+        "0000-0000-0000-0001/work/1001"
+      )},"recordType":"journal-article","venueName":"Example Journal","volume":null,"issue":null,"pages":null,"eeLinks":[],"urls":[],"topicIds":[],"additionalIds":[{"scheme":"scopus-eid","value":"2-s2.0-1000000001"}],"assertionSource":$AssertionJson,"sourceLocalWorkIds":[{"issuerKind":"client","issuerId":"APP-EXAMPLE000000001","value":"00000000-0000-4000-8000-000000000001"}]}"""
+
+  private val OpenAlexProvW1 =
+    s"""{"sourceDataset":"openalex","sourceRecordId":"W1","snapshot":"openalex-2026-10-14","runId":"$Run","sourceSchemaVersion":"openalex-raw/1.0.0","policyVersion":null,"modelVersion":null,"promptVersion":null}"""
+
+  val OpenAlexWorkGolden: String =
+    s"""{"schemaVersion":"scholarchain.work-record.v3","workId":"work:openalex:W1","source":"openalex","sourceRecordId":"W1","title":"A Synthetic Study of Collaboration","normalizedTitle":"a synthetic study of collaboration","year":2021,"venueId":"venue:openalex:S1","doi":"10.1234/example.2021.001","arxivId":null,"authors":[],"abstractTextRef":null,"provenance":$OpenAlexProvW1,"recordType":"article","venueName":"Example Journal","volume":"64","issue":"3","pages":"1-22","eeLinks":[],"urls":[],"topicIds":["topic:openalex:T1","topic:openalex:T2"],"additionalIds":[{"scheme":"mag","value":"1000001"}],"assertionSource":null,"sourceLocalWorkIds":[]}"""
+
+  private val M0 = "mention:4d99b473c7f1d066094cb66ae71ded0bb0305eea0b75006f46ff2fd12c4c0bc4"
+  private val M1 = "mention:191fd11b93e4fceca68d7e03e0d62de4a2fb826cfbdec968e4951677afd6fcbf"
+  private def candProv(recordId: String) =
+    s"""{"sourceDataset":"scholarchain-derived","sourceRecordId":"$recordId","snapshot":"dblp-2026-10-03","runId":"$Run","sourceSchemaVersion":"scholarchain.work-record.v2","policyVersion":null,"modelVersion":null,"promptVersion":null}"""
+
+  val CandidateBlockGolden: String =
+    s"""{"schemaVersion":"scholarchain.candidate-block.v1","blockId":"block:5e4eb70030f3c1fa0e7f973c21ea1400787f7b38edc34f965f7bbe010f3713d6","entityKind":"researcher","blockingVersion":"er-keys-1.0.0","level":0,"blockKey":"example|a","maxBlockSize":5,"size":3,"memberIds":["$M1","$M0","source-author:openalex:A1"],"sourceDatasets":["dblp","openalex"],"provenance":${candProv(
+        "example|a"
+      )}}"""
+
+  val MatchCandidateGolden: String =
+    s"""{"schemaVersion":"scholarchain.match-candidate.v1","candidateId":"mcand:400ad93720eceb8fc152cf580854ebf0788262cd4b4d446ec53a51dbed53d300","entityKind":"researcher","sourceIdA":"$M0","sourceIdB":"source-author:openalex:A1","sourceDatasetA":"dblp","sourceDatasetB":"openalex","blockKeys":[{"level":0,"key":"example|a"},{"level":1,"key":"example|ada"}],"blockingVersion":"er-keys-1.0.0","featureVersion":"er-features-1.0.0","features":{"nameSimilarity":0.92,"orcidEqual":1},"exactIdAgreements":[{"scheme":"orcid","value":"0000-0000-0000-0001"}],"provenance":${candProv(
+        M0
+      )}}"""
+
+  val IdentityLinkGolden: String =
+    s"""{"schemaVersion":"scholarchain.identity-link.v1","linkId":"idlink:91a4645916260ea98c3855b3c3be3f6e2153e7d2f6f4151afe3f57b1f76c5dbe","identifier":{"scheme":"orcid","value":"0000-0000-0000-0001"},"entityKind":"researcher","entityId":"$M0","workId":"work:dblp:journals/example/Synthetic21","assertedBy":"dblp","assertionSource":null,"provenance":$DblpProv}"""
+
+  val ClaimLinkGolden: String =
+    s"""{"schemaVersion":"scholarchain.identity-link.v1","linkId":"idlink:24c2c226c444f9e083343853ae922c343bf29b7e678d8e0133489d032288f04e","identifier":{"scheme":"orcid","value":"0000-0000-0000-0001"},"entityKind":"researcher","entityId":"source-author:orcid:0000-0000-0000-0001","workId":"work:orcid-work:0000-0000-0000-0001/work/1001","assertedBy":"orcid","assertionSource":$AssertionJson,"provenance":${orcidProvJson(
+        "0000-0000-0000-0001/work/1001"
+      )}}"""
+
+  private val OpenAlexProvA1 =
+    s"""{"sourceDataset":"openalex","sourceRecordId":"A1","snapshot":"openalex-2026-10-14","runId":"$Run","sourceSchemaVersion":"openalex-raw/1.0.0","policyVersion":null,"modelVersion":null,"promptVersion":null}"""
+
+  val OpenAlexProfileGolden: String =
+    s"""{"schemaVersion":"scholarchain.source-author-profile.v1","profileId":"source-author:openalex:A1","source":"openalex","sourceRecordId":"A1","displayName":"Ada Example","givenNames":null,"familyName":null,"nameVariants":["A. Example","Ada B. Example"],"orcid":"0000-0000-0000-0001","externalIds":[{"scheme":"openalex","value":"A1"}],"institutionIds":["institution:openalex:I1"],"claimedWorkIds":[],"provenance":$OpenAlexProvA1}"""
+
+  val OrcidProfileGolden: String =
+    s"""{"schemaVersion":"scholarchain.source-author-profile.v1","profileId":"source-author:orcid:0000-0000-0000-0001","source":"orcid","sourceRecordId":"0000-0000-0000-0001","displayName":null,"givenNames":"Ada","familyName":"Example","nameVariants":["A. Example"],"orcid":"0000-0000-0000-0001","externalIds":[],"institutionIds":[],"claimedWorkIds":["work:orcid-work:0000-0000-0000-0001/work/1001"],"provenance":${orcidProvJson(
+        "0000-0000-0000-0001"
+      )}}"""
 
   val CoauthorEdgeGolden: String =
     s"""{"schemaVersion":"scholarchain.coauthor-edge.v1","edgeId":"coauthor:cd7c4e8bd9050455fb19cf46ce86ecd73659cbe3c0a9bce3e4206e1596f23071","researcherA":"researcher:orcid:0000-0000-0000-0001","researcherB":"researcher:orcid:0000-0000-0000-001X","window":{"startYear":2015,"endYear":2024},"jointPublicationCount":3,"firstCollaborationYear":2017,"lastCollaborationYear":2021,"representativeWorkIds":["work:dblp:journals/example/Synthetic21","work:dblp:conf/example/Synthetic22"],"provenance":${derived(
@@ -73,7 +123,7 @@ class WireContractSuite extends munit.FunSuite {
     s"""{"sourceDataset":"openalex","sourceRecordId":"I1","snapshot":"openalex-2026-10-14","runId":"$Run","sourceSchemaVersion":"openalex-raw/1.0.0","policyVersion":null,"modelVersion":null,"promptVersion":null}"""
 
   val CoauthorPairCandidateGolden: String =
-    s"""{"schemaVersion":"scholarchain.coauthor-pair-candidate.v1","endpointA":"mention:191fd11b93e4fceca68d7e03e0d62de4a2fb826cfbdec968e4951677afd6fcbf","endpointB":"mention:4d99b473c7f1d066094cb66ae71ded0bb0305eea0b75006f46ff2fd12c4c0bc4","workId":"work:dblp:journals/example/Synthetic21","year":2021,"teamSize":2,"provenance":$DblpProv}"""
+    s"""{"schemaVersion":"scholarchain.coauthor-pair-candidate.v2","endpointA":"mention:191fd11b93e4fceca68d7e03e0d62de4a2fb826cfbdec968e4951677afd6fcbf","endpointB":"mention:4d99b473c7f1d066094cb66ae71ded0bb0305eea0b75006f46ff2fd12c4c0bc4","positionA":1,"positionB":0,"workId":"work:dblp:journals/example/Synthetic21","year":2021,"teamSize":2,"provenance":$DblpProv}"""
 
   val PublicationTeamGolden: String =
     s"""{"schemaVersion":"scholarchain.publication-team.v1","workId":"work:dblp:journals/example/Synthetic21","year":2021,"researcherIds":["researcher:orcid:0000-0000-0000-0001","researcher:orcid:0000-0000-0000-001X"],"teamSize":2,"unresolvedMentionIds":[],"provenance":${derived(
@@ -142,6 +192,15 @@ class WireContractSuite extends munit.FunSuite {
   frozen("EvidenceItem", evidenceWork, EvidenceItemGolden)
   frozen("AuthorMention", mention1, AuthorMentionGolden)
 
+  frozen("WorkRecord (ORCID, assertion source, source-work-id)", orcidWork, OrcidWorkGolden)
+  frozen("WorkRecord (OpenAlex, topics and MAG)", openAlexWork, OpenAlexWorkGolden)
+  frozen("CandidateBlock", block, CandidateBlockGolden)
+  frozen("MatchCandidate", matchCandidate, MatchCandidateGolden)
+  frozen("IdentityLink", mentionLink, IdentityLinkGolden)
+  frozen("IdentityLink (ORCID claim)", claimLink, ClaimLinkGolden)
+  frozen("SourceAuthorProfile (OpenAlex)", openAlexProfile, OpenAlexProfileGolden)
+  frozen("SourceAuthorProfile (ORCID)", orcidProfile, OrcidProfileGolden)
+
   test("every record contract has a frozen wire example") {
     val frozenTypes = Set(
       "WorkRecord",
@@ -163,7 +222,11 @@ class WireContractSuite extends munit.FunSuite {
       "Topic",
       "GraphNode",
       "EvidenceItem",
-      "AuthorMention"
+      "AuthorMention",
+      "MatchCandidate",
+      "CandidateBlock",
+      "IdentityLink",
+      "SourceAuthorProfile"
     )
     assertEquals(frozenTypes, SchemaVersions.all.keySet)
   }
@@ -194,6 +257,10 @@ class WireContractSuite extends munit.FunSuite {
   roundTrip("AnswerClaim", claim)
   roundTrip("AnswerResponse", answer)
   roundTrip("RunManifest", manifest)
+  roundTrip("MatchCandidate", matchCandidate)
+  roundTrip("CandidateBlock", block)
+  roundTrip("IdentityLink", claimLink)
+  roundTrip("SourceAuthorProfile", orcidProfile)
 
   test("optional fields round-trip both as null and as values") {
     val withOptionals =

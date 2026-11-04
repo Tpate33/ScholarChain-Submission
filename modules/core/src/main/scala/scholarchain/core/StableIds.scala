@@ -4,8 +4,9 @@ package scholarchain.core
  * Stable ID kinds. Every ID is `<prefix>:<body>`, printable ASCII without whitespace.
  *
  * Namespaced IDs carry an authoritative source ID: `work`, `researcher` (ORCID form), `venue`,
- * `institution`, `topic`, `snapshot`, `query`. Hash IDs have the body `<64 lowercase hex>`, the
- * SHA-256 of the netstring encoding of a domain tag plus their inputs (see [[Canonical]]).
+ * `institution`, `topic`, `snapshot`, `query`, `source-author`. Hash IDs have the body `<64
+ * lowercase hex>`, the SHA-256 of the netstring encoding of a domain tag plus their inputs (see
+ * [[Canonical]]).
  */
 enum IdKind(val prefix: String) {
   case Work extends IdKind("work")
@@ -25,6 +26,10 @@ enum IdKind(val prefix: String) {
   case Answer extends IdKind("answer")
   case Query extends IdKind("query")
   case Run extends IdKind("run")
+  case SourceAuthor extends IdKind("source-author")
+  case MatchCandidate extends IdKind("mcand")
+  case CandidateBlock extends IdKind("block")
+  case IdentityLink extends IdKind("idlink")
 }
 
 /** Parsing and validation of stable IDs of every kind. */
@@ -44,6 +49,9 @@ object StableId {
     val Claim = "scholarchain.claim.v1"
     val Answer = "scholarchain.answer.v1"
     val Run = "scholarchain.run.v1"
+    val MatchCandidate = "scholarchain.match-candidate.v1"
+    val CandidateBlock = "scholarchain.candidate-block.v1"
+    val IdentityLink = "scholarchain.identity-link.v1"
   }
 
   private val Token = "^[A-Za-z0-9._-]+$".r
@@ -145,6 +153,11 @@ object StableId {
           )
         case IdKind.Topic =>
           namespaced(rest, Map("openalex" -> (s => Identifiers.isValidOpenAlex('T', s))))
+        case IdKind.SourceAuthor =>
+          namespaced(
+            rest,
+            SourceAuthorId.Namespaces.map { case (ns, (_, ok)) => ns -> ok }
+          )
         case IdKind.Snapshot =>
           namespaced(
             rest,
@@ -586,4 +599,146 @@ object RunId {
       Right(StableId.hashId(IdKind.Run, fields*))
     }
   }
+}
+
+/**
+ * Source author profile ID = `source-author:<namespace>:<source author ID>`, the authoritative
+ * author ID of one source: `openalex` (A-ID, source OpenAlex), `orcid` (bare ORCID iD of the record
+ * holder, source ORCID), `dblp-pid` (DBLP person ID, source DBLP). Not a researcher ID: a profile
+ * is a source record, resolved to a researcher only by entity resolution.
+ */
+object SourceAuthorId {
+
+  /** Namespace -> (source dataset, value rule). */
+  val Namespaces: Map[String, (SourceType, String => Boolean)] = Map(
+    "openalex" -> (SourceType.OpenAlex, s => Identifiers.isValidOpenAlex('A', s)),
+    "orcid" -> (SourceType.Orcid, Identifiers.isValidOrcid),
+    "dblp-pid" -> (SourceType.Dblp, Identifiers.isValidDblpPid)
+  )
+
+  def of(namespace: String, sourceId: String): Result =
+    StableId.validate(IdKind.SourceAuthor, s"source-author:$namespace:$sourceId", "profileId")
+
+  def openAlex(raw: String): Result =
+    Identifiers
+      .normalizeOpenAlex('A', raw)
+      .left
+      .map(why =>
+        ValidationError.MalformedId("profileId", "source-author", String.valueOf(raw), why)
+      )
+      .flatMap(of("openalex", _))
+
+  def orcid(raw: String): Result =
+    Identifiers
+      .normalizeOrcid(raw)
+      .left
+      .map(why =>
+        ValidationError.MalformedId("profileId", "source-author", String.valueOf(raw), why)
+      )
+      .flatMap(of("orcid", _))
+
+  /** (namespace, source ID) of a valid profile ID. */
+  def parts(id: String): Option[(String, String)] =
+    if (StableId.validate(IdKind.SourceAuthor, id).isLeft) None
+    else {
+      val rest = id.stripPrefix("source-author:")
+      val i = rest.indexOf(':')
+      Some((rest.substring(0, i), rest.substring(i + 1)))
+    }
+
+  /** Dataset source of a valid profile ID (from its namespace). */
+  def sourceOf(id: String): Option[SourceType] =
+    parts(id).flatMap(p => Namespaces.get(p._1).map(_._1))
+}
+
+/**
+ * Candidate block ID = `block:` + SHA-256(netstrings("scholarchain.candidate-block.v1", entityKind
+ * tag, blockingVersion, level in decimal, blockKey, runId)). A block is one (entity kind, key
+ * formula version, fallback level, key) group of one run.
+ */
+object CandidateBlockId {
+  def of(
+      entityKind: MatchEntityKind,
+      blockingVersion: String,
+      level: Int,
+      blockKey: String,
+      runId: String
+  ): Result =
+    for {
+      v <- StableId.tokenOrError("blockingVersion", blockingVersion)
+      _ <-
+        if (level >= 0) Right(level)
+        else Left(ValidationError.InvalidValue("level", s"$level is negative"))
+      k <- BlockKey.checkKey("blockKey", blockKey).headOption.toLeft(blockKey)
+      r <- StableId.validate(IdKind.Run, runId, "runId")
+    } yield StableId.hashId(
+      IdKind.CandidateBlock,
+      StableId.Tags.CandidateBlock,
+      entityKind.tag,
+      v,
+      level.toString,
+      k,
+      r
+    )
+}
+
+/**
+ * Match candidate ID = `mcand:` + SHA-256(netstrings("scholarchain.match-candidate.v1", entityKind
+ * tag, first, second, blockingVersion, featureVersion, runId)), where (first, second) is the
+ * canonical pair ([[CanonicalPair]]) of the two source IDs, so both input orders give one ID. Block
+ * keys and feature values are not inputs: one candidate per pair, version set, and run.
+ */
+object MatchCandidateId {
+  def of(
+      entityKind: MatchEntityKind,
+      pair: CanonicalPair,
+      blockingVersion: String,
+      featureVersion: String,
+      runId: String
+  ): Result =
+    for {
+      b <- StableId.tokenOrError("blockingVersion", blockingVersion)
+      f <- StableId.tokenOrError("featureVersion", featureVersion)
+      r <- StableId.validate(IdKind.Run, runId, "runId")
+    } yield StableId.hashId(
+      IdKind.MatchCandidate,
+      StableId.Tags.MatchCandidate,
+      entityKind.tag,
+      pair.first,
+      pair.second,
+      b,
+      f,
+      r
+    )
+}
+
+/**
+ * Identity link ID = `idlink:` + SHA-256(netstrings("scholarchain.identity-link.v1", scheme tag,
+ * identifier value, entityKind tag, entityId, workId or "", assertedBy source tag, runId)).
+ */
+object IdentityLinkId {
+  def of(
+      identifier: ExactId,
+      entityKind: MatchEntityKind,
+      entityId: String,
+      workId: Option[String],
+      assertedBy: SourceType,
+      runId: String
+  ): Result =
+    for {
+      _ <- ExactId.check("identifier", identifier).headOption.toLeft(())
+      _ <- StableId.validateAny(entityId, "entityId")
+      w <- workId.fold[Result](Right(""))(StableId.validate(IdKind.Work, _, "workId"))
+      r <- StableId.validate(IdKind.Run, runId, "runId")
+    } yield StableId.hashId(
+      IdKind.IdentityLink,
+      StableId.Tags.IdentityLink,
+      identifier.scheme.tag,
+      identifier.value,
+      entityKind.tag,
+      entityId,
+      w,
+      assertedBy.tag,
+      r
+    )
 }

@@ -62,15 +62,22 @@ object PublicationTeam {
 }
 
 /**
- * One undirected coauthor pair emitted for one work (before consolidation). Endpoints are
- * researcher IDs or, before identity resolution, author mention IDs, and are stored in canonical
- * order (`endpointA < endpointB`, see [[CanonicalPair]]).
+ * One undirected coauthor pair emitted for one work (before consolidation), schema
+ * `coauthor-pair-candidate.v2`. Endpoints are researcher IDs or, before identity resolution, author
+ * mention IDs, and are stored in canonical order (`endpointA < endpointB`, see [[CanonicalPair]]).
+ *
+ * Positions travel with their endpoints: `positionA` is the 0-based author position of `endpointA`
+ * on the work and `positionB` that of `endpointB`. Canonical order is by endpoint ID, not by
+ * position, so `positionA > positionB` is normal. Positions are distinct and below `teamSize`; for
+ * an author mention endpoint the position must reproduce the mention ID ([[MentionId.of]]).
  */
 @allowUnknownKeys(false)
 final case class CoauthorPairCandidate(
     schemaVersion: String,
     endpointA: String,
     endpointB: String,
+    positionA: Int,
+    positionB: Int,
     workId: String,
     year: Option[Int],
     teamSize: Int,
@@ -79,10 +86,15 @@ final case class CoauthorPairCandidate(
 
 object CoauthorPairCandidate {
 
-  /** Builds a candidate with canonically ordered endpoints. */
+  /**
+   * Builds a candidate from two endpoints and their author positions on the work. The pair is put
+   * in canonical order, and each position follows its endpoint.
+   */
   def of(
       x: String,
+      positionX: Int,
       y: String,
+      positionY: Int,
       workId: String,
       year: Option[Int],
       teamSize: Int,
@@ -91,10 +103,13 @@ object CoauthorPairCandidate {
     CanonicalPair.of(x, y, "endpointA,endpointB") match {
       case Left(e) => Left(Vector(e))
       case Right(pair) =>
+        val (pa, pb) = if (pair.first == x) (positionX, positionY) else (positionY, positionX)
         val c = CoauthorPairCandidate(
           SchemaVersions.CoauthorPairCandidate,
           pair.first,
           pair.second,
+          pa,
+          pb,
           workId,
           year,
           teamSize,
@@ -105,6 +120,25 @@ object CoauthorPairCandidate {
     }
 
   private val EndpointKinds: Set[IdKind] = Set(IdKind.Researcher, IdKind.Mention)
+
+  private def positionCheck(
+      field: String,
+      endpoint: String,
+      position: Int,
+      t: CoauthorPairCandidate
+  ): Vector[ValidationError] =
+    if (position < 0) Vector(ValidationError.InvalidValue(field, s"$position is negative"))
+    else if (t.teamSize >= 2 && position >= t.teamSize)
+      Vector(ValidationError.InvalidValue(field, s"$position is not below teamSize ${t.teamSize}"))
+    else if (StableId.prefixKind(endpoint).contains(IdKind.Mention))
+      MentionId.of(t.workId, position) match {
+        case Right(expected) =>
+          when(expected != endpoint)(
+            ValidationError.InvalidValue(field, s"is not the position of $endpoint on ${t.workId}")
+          )
+        case Left(_) => Vector.empty
+      }
+    else Vector.empty
 
   given contract: RecordContract[CoauthorPairCandidate] =
     new RecordContract[CoauthorPairCandidate](
@@ -121,7 +155,12 @@ object CoauthorPairCandidate {
           CanonicalPair.checkStored(at(p, "endpointA,endpointB"), t.endpointA, t.endpointB),
           StableId.check(IdKind.Work, t.workId, at(p, "workId")),
           Option(t.year).getOrElse(None).toVector.flatMap(Validated.year(at(p, "year"), _)),
-          when(t.teamSize < 2)(ValidationError.InvalidValue(at(p, "teamSize"), "must be >= 2"))
+          when(t.teamSize < 2)(ValidationError.InvalidValue(at(p, "teamSize"), "must be >= 2")),
+          positionCheck(at(p, "positionA"), t.endpointA, t.positionA, t),
+          positionCheck(at(p, "positionB"), t.endpointB, t.positionB, t),
+          when(t.positionA == t.positionB)(
+            ValidationError.InvalidValue(at(p, "positionA,positionB"), "positions must differ")
+          )
         )
     }
 }

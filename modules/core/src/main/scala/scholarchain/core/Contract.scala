@@ -7,16 +7,26 @@ import upickle.default.ReadWriter
 /**
  * Schema version constants. Every record carries `schemaVersion`; a decoder accepts only the
  * versions listed in its contract. Changing a frozen wire example requires a new version here.
- * Value objects nested in records (Provenance, TimeWindow, ExternalId, SnapshotRef, QueryStep) are
- * versioned by their enclosing record.
+ * Value objects nested in records (Provenance, TimeWindow, ExternalId, ExactId, BlockKey,
+ * AssertionSource, SnapshotRef, QueryStep) are versioned by their enclosing record.
+ *
+ * Version history (a superseded version is rejected on decode unless stated otherwise):
+ *   - `work-record.v2` (Phase 4): adds recordType, venueName, volume, issue, pages, eeLinks, urls,
+ *     topicIds, additionalIds, assertionSource. v1 is rejected: no v1 work record was ever accepted
+ *     into a curated output.
+ *   - `work-record.v3` (Phase 4, work order 1b): adds sourceLocalWorkIds (ORCID `source-work-id`
+ *     qualified by its issuing source). v2 is rejected: it was never committed or accepted into a
+ *     curated output, and its frozen examples changed bytes.
+ *   - `coauthor-pair-candidate.v2` (Phase 4): adds positionA and positionB. v1 is rejected for the
+ *     same reason.
  */
 object SchemaVersions {
-  val WorkRecord = "scholarchain.work-record.v1"
+  val WorkRecord = "scholarchain.work-record.v3"
   val AuthorMention = "scholarchain.author-mention.v1"
   val CanonicalResearcher = "scholarchain.canonical-researcher.v1"
   val AuthorshipRecord = "scholarchain.authorship-record.v1"
   val PublicationTeam = "scholarchain.publication-team.v1"
-  val CoauthorPairCandidate = "scholarchain.coauthor-pair-candidate.v1"
+  val CoauthorPairCandidate = "scholarchain.coauthor-pair-candidate.v2"
   val CoauthorEdge = "scholarchain.coauthor-edge.v1"
   val ResearcherMetrics = "scholarchain.researcher-metrics.v1"
   val Venue = "scholarchain.venue.v1"
@@ -31,6 +41,16 @@ object SchemaVersions {
   val AnswerClaim = "scholarchain.answer-claim.v1"
   val AnswerResponse = "scholarchain.answer-response.v1"
   val RunManifest = "scholarchain.run-manifest.v1"
+  val MatchCandidate = "scholarchain.match-candidate.v1"
+  val CandidateBlock = "scholarchain.candidate-block.v1"
+  val IdentityLink = "scholarchain.identity-link.v1"
+  val SourceAuthorProfile = "scholarchain.source-author-profile.v1"
+
+  /** Superseded versions that no decoder accepts (kept to make the rejection explicit). */
+  val retired: Map[String, Vector[String]] = Map(
+    "WorkRecord" -> Vector("scholarchain.work-record.v1", "scholarchain.work-record.v2"),
+    "CoauthorPairCandidate" -> Vector("scholarchain.coauthor-pair-candidate.v1")
+  )
 
   /** Every current version, keyed by record type name. */
   val all: Map[String, String] = Map(
@@ -53,7 +73,11 @@ object SchemaVersions {
     "QueryPlan" -> QueryPlan,
     "AnswerClaim" -> AnswerClaim,
     "AnswerResponse" -> AnswerResponse,
-    "RunManifest" -> RunManifest
+    "RunManifest" -> RunManifest,
+    "MatchCandidate" -> MatchCandidate,
+    "CandidateBlock" -> CandidateBlock,
+    "IdentityLink" -> IdentityLink,
+    "SourceAuthorProfile" -> SourceAuthorProfile
   )
 }
 
@@ -69,6 +93,13 @@ abstract class RecordContract[T](
 
   /** Versions this build decodes. Currently exactly the current version. */
   def supportedVersions: Vector[String] = Vector(currentVersion)
+
+  /**
+   * Top-level fields that have a Scala default value (for source compatibility of constructor
+   * calls). The wire format still requires them: [[Json.decode]] rejects a JSON object that lacks
+   * one, and the record type is annotated to always serialize them.
+   */
+  def fieldsWithDefaults: Vector[String] = Vector.empty
 
   def schemaVersionOf(t: T): String
   def provenanceOf(t: T): Provenance
@@ -112,7 +143,8 @@ object Json {
 
   /**
    * Parses and validates. Order: JSON syntax, top-level object, `schemaVersion` present and
-   * supported, `provenance` present and non-null, structural decode, then field validation.
+   * supported, `provenance` present and non-null, every key with a Scala default present (checked
+   * only for a supported version, whose key set it is), structural decode, then field validation.
    */
   def decode[T](json: String)(using c: RecordContract[T]): Either[Vector[ValidationError], T] = {
     val parsed: Either[Vector[ValidationError], ujson.Value] =
@@ -134,7 +166,15 @@ object Json {
               case Some(_: ujson.Obj) => Vector.empty
               case _ => Vector(ValidationError.MissingProvenance(c.recordType, "provenance"))
             }
-        val pre = version ++ provenance
+        val missing = c.fieldsWithDefaults.filterNot(obj.value.contains)
+        val keys =
+          if (missing.isEmpty || version.nonEmpty) Vector.empty
+          else
+            Vector(
+              ValidationError
+                .Undecodable(c.recordType, s"missing key(s): ${missing.mkString(", ")}")
+            )
+        val pre = version ++ provenance ++ keys
         if (pre.nonEmpty) Left(pre)
         else {
           val decoded =

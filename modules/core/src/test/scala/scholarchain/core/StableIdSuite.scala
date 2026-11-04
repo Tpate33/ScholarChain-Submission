@@ -69,6 +69,125 @@ class StableIdSuite extends munit.FunSuite {
     )
   }
 
+  private val RunLit = "run:8dc188c7670e600b1e1f8bf679a11809bd4ebadbd4a9ed27d27e318a59a88614"
+
+  test("candidate block ID is SHA-256 of the documented netstring encoding") {
+    val encoding =
+      "31:scholarchain.candidate-block.v1," +
+        "10:researcher," +
+        "13:er-keys-1.0.0," +
+        "1:0," +
+        "9:example|a," +
+        s"68:$RunLit,"
+    assertEquals(block.blockId, "block:" + Canonical.sha256HexUtf8(encoding))
+    assertEquals(
+      block.blockId,
+      "block:5e4eb70030f3c1fa0e7f973c21ea1400787f7b38edc34f965f7bbe010f3713d6"
+    )
+  }
+
+  test("match candidate ID is SHA-256 of the documented netstring encoding (canonical pair)") {
+    val encoding =
+      "31:scholarchain.match-candidate.v1," +
+        "10:researcher," +
+        "72:mention:4d99b473c7f1d066094cb66ae71ded0bb0305eea0b75006f46ff2fd12c4c0bc4," +
+        "25:source-author:openalex:A1," +
+        "13:er-keys-1.0.0," +
+        "17:er-features-1.0.0," +
+        s"68:$RunLit,"
+    assertEquals(matchCandidate.candidateId, "mcand:" + Canonical.sha256HexUtf8(encoding))
+    assertEquals(
+      matchCandidate.candidateId,
+      "mcand:400ad93720eceb8fc152cf580854ebf0788262cd4b4d446ec53a51dbed53d300"
+    )
+  }
+
+  test("identity link ID is SHA-256 of the documented netstring encoding") {
+    val encoding =
+      "29:scholarchain.identity-link.v1," +
+        "5:orcid," +
+        "19:0000-0000-0000-0001," +
+        "10:researcher," +
+        "72:mention:4d99b473c7f1d066094cb66ae71ded0bb0305eea0b75006f46ff2fd12c4c0bc4," +
+        "38:work:dblp:journals/example/Synthetic21," +
+        "4:dblp," +
+        s"68:$RunLit,"
+    assertEquals(mentionLink.linkId, "idlink:" + Canonical.sha256HexUtf8(encoding))
+    assertEquals(
+      mentionLink.linkId,
+      "idlink:91a4645916260ea98c3855b3c3be3f6e2153e7d2f6f4151afe3f57b1f76c5dbe"
+    )
+    assertEquals(
+      claimLink.linkId,
+      "idlink:24c2c226c444f9e083343853ae922c343bf29b7e678d8e0133489d032288f04e"
+    )
+    val noWork =
+      "29:scholarchain.identity-link.v1,3:doi,24:10.1234/example.2021.001,4:work," +
+        "38:work:dblp:journals/example/Synthetic21,0:,4:dblp," + s"68:$RunLit,"
+    assertEquals(
+      IdentityLinkId.of(
+        ExactId(ExactIdScheme.Doi, "10.1234/example.2021.001"),
+        MatchEntityKind.Work,
+        workId,
+        None,
+        SourceType.Dblp,
+        runId
+      ),
+      Right("idlink:" + Canonical.sha256HexUtf8(noWork)),
+      "an absent workId is encoded as the empty field"
+    )
+  }
+
+  test("new hash IDs change with every documented input") {
+    val pair = ok(CanonicalPair.of(mention0.mentionId, openAlexProfileId))
+    def mc(k: MatchEntityKind = MatchEntityKind.Researcher, b: String = blockingVersion)(
+        f: String = featureVersion,
+        r: String = runId
+    ) = ok(MatchCandidateId.of(k, pair, b, f, r))
+    val base = mc()()
+    assertNotEquals(mc(k = MatchEntityKind.Work)(), base)
+    assertNotEquals(mc(b = "er-keys-2.0.0")(), base)
+    assertNotEquals(mc()(f = "er-features-2.0.0"), base)
+    assertNotEquals(mc()(r = ok(RunId.of(manifest.copy(attempt = 2)))), base)
+    assert(
+      MatchCandidateId
+        .of(MatchEntityKind.Researcher, pair, "bad version", featureVersion, runId)
+        .isLeft
+    )
+
+    def bl(level: Int = 0, key: String = "example|a") =
+      CandidateBlockId.of(MatchEntityKind.Researcher, blockingVersion, level, key, runId)
+    assertNotEquals(bl(level = 1), bl())
+    assertNotEquals(bl(key = "example|b"), bl())
+    assert(bl(level = -1).isLeft)
+    assert(bl(key = "tab\there").isLeft, "control characters are not valid key text")
+    assert(bl(key = " ").isLeft)
+  }
+
+  test("source author profile IDs are namespace plus the source's canonical author ID") {
+    assertEquals(
+      SourceAuthorId.openAlex("https://openalex.org/A5113870699"),
+      Right("source-author:openalex:A5113870699")
+    )
+    assertEquals(
+      SourceAuthorId.orcid("https://orcid.org/0000-0002-1825-0097"),
+      Right("source-author:orcid:0000-0002-1825-0097")
+    )
+    assertEquals(
+      SourceAuthorId.of("dblp-pid", "69/6042-1"),
+      Right("source-author:dblp-pid:69/6042-1")
+    )
+    assert(SourceAuthorId.openAlex("W1").isLeft, "a work ID is not an author ID")
+    assert(SourceAuthorId.orcid("0000-0002-1825-0098").isLeft, "checksum is verified")
+    assert(SourceAuthorId.of("crossref", "x").isLeft, "unknown namespace")
+    assertEquals(
+      SourceAuthorId.sourceOf("source-author:orcid:0000-0002-1825-0097"),
+      Some(SourceType.Orcid)
+    )
+    assertEquals(SourceAuthorId.sourceOf("source-author:dblp-pid:69/6042-1"), Some(SourceType.Dblp))
+    assertEquals(SourceAuthorId.sourceOf("researcher:orcid:0000-0002-1825-0097"), None)
+  }
+
   test("graph edge ID is SHA-256 of the documented netstring encoding") {
     val encoding =
       "26:scholarchain.graph-edge.v1," +
@@ -239,7 +358,11 @@ class StableIdSuite extends munit.FunSuite {
       IdKind.MatchDecision -> matchDecision.decisionId,
       IdKind.Bundle -> bundle.bundleId,
       IdKind.Claim -> claim.claimId,
-      IdKind.Answer -> answer.responseId
+      IdKind.Answer -> answer.responseId,
+      IdKind.SourceAuthor -> openAlexProfileId,
+      IdKind.MatchCandidate -> matchCandidate.candidateId,
+      IdKind.CandidateBlock -> block.blockId,
+      IdKind.IdentityLink -> mentionLink.linkId
     )
     good.foreach { case (kind, id) =>
       assertEquals(StableId.validate(kind, id), Right(id), s"${kind.prefix} $id")

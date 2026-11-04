@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record:record xmlns:record="http://www.orcid.org/ns/record" xmlns:common="http://www.orcid.org/ns/common" xmlns:person="http://www.orcid.org/ns/person" xmlns:personal-details="http://www.orcid.org/ns/personal-details" xmlns:activities="http://www.orcid.org/ns/activities" xmlns:work="http://www.orcid.org/ns/work">
+  <common:orcid-identifier>
+    <common:path>0000-0002-1825-0097</common:path>
+  </common:orcid-identifier>
+  <person:person>
+    <person:name visibility="public">
+      <personal-details:given-names>Josiah</personal-details:given-names>
+      <personal-details:family-name>Carberry</personal-details:family-name>
+    </person:name>
+  </person:person>
+  <activities:activities-summary>
+    <activities:works>
+      <activities:group>
+        <work:work-summary put-code="5001">
+          <work:title><common:title>Cross shared ORCID</common:title></work:title>
+          <common:external-ids>
+            <common:external-id>
+              <common:external-id-type>doi</common:external-id-type>
+              <common:external-id-value>10.5555/cross</common:external-id-value>
+              <common:external-id-relationship>self</common:external-id-relationship>
+            </common:external-id>
+          </common:external-ids>
+          <work:type>journal-article</work:type>
+          <common:publication-date><common:year>2022</common:year></common:publication-date>
+        </work:work-summary>
+      </activities:group>
+    </activities:works>
+  </activities:activities-summary>
+</record:record>

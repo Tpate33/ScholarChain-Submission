@@ -1,0 +1,9 @@
+{"title":"No id"}
+{"id":"https://openalex.org/X123","title":"Bad id"}
+{"id":"https://openalex.org/W7001"}
+{"id":"https://openalex.org/W7002","title":"Nameless author","authorships":[{"author":{"id":"https://openalex.org/A1"}}]}
+{"id":"https://openalex.org/W7003","title":"Minimal OpenAlex work"}
+{"id":"https://openalex.org/W7004","title":"Bad optional identifiers","doi":"not-a-doi","authorships":[{"raw_author_name":"Oa One","author":{"id":"https://openalex.org/Abc","orcid":"https://orcid.org/0000-0002-1825-0098"}}]}
+{"id": "W7005", "title":
+[1,2,3]
+{"id":"https://openalex.org/W7006","display_name":"Display name only","publication_year":2020}

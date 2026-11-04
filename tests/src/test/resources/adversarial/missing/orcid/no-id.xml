@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record:record xmlns:record="http://www.orcid.org/ns/record" xmlns:common="http://www.orcid.org/ns/common" xmlns:person="http://www.orcid.org/ns/person" xmlns:personal-details="http://www.orcid.org/ns/personal-details">
+  <person:person>
+    <person:name visibility="public">
+      <personal-details:given-names>Nobody</personal-details:given-names>
+      <personal-details:family-name>Withoutid</personal-details:family-name>
+    </person:name>
+  </person:person>
+</record:record>

@@ -132,6 +132,46 @@ object Identifiers {
   def isValidCrossrefMember(s: String): Boolean =
     s != null && s.nonEmpty && s.forall(c => c >= '0' && c <= '9')
 
+  // ---------------------------------------------------------------- MAG, Scopus EID
+  private val MagPattern = "^[0-9]+$".r
+  private val ScopusEidPattern = "^2-s2\\.0-[0-9]+$".r
+
+  /** Microsoft Academic Graph work ID as carried by OpenAlex `ids.mag`: a digit string. */
+  def isValidMag(s: String): Boolean = s != null && MagPattern.matches(s)
+
+  /** Scopus EID as observed inside ORCID external IDs: `2-s2.0-<digits>` (observed form). */
+  def isValidScopusEid(s: String): Boolean = s != null && ScopusEidPattern.matches(s)
+
+  /** Validates an exact identifier value against its scheme's canonical form (no rewriting). */
+  def validateExact(scheme: ExactIdScheme, value: String): Either[String, String] = {
+    val ok = scheme match {
+      case ExactIdScheme.Doi => isCanonicalDoi(value)
+      case ExactIdScheme.Arxiv => isValidArxiv(value)
+      case ExactIdScheme.DblpKey => isValidDblpKey(value)
+      case ExactIdScheme.OpenAlexWork => isValidOpenAlex('W', value)
+      case ExactIdScheme.Mag => isValidMag(value)
+      case ExactIdScheme.ScopusEid => isValidScopusEid(value)
+      case ExactIdScheme.Orcid => isValidOrcid(value)
+      case ExactIdScheme.OpenAlexAuthor => isValidOpenAlex('A', value)
+      case ExactIdScheme.DblpPid => isValidDblpPid(value)
+    }
+    if (ok) Right(value) else Left(s"not a canonical ${scheme.tag} identifier")
+  }
+
+  /**
+   * Normalizes a raw exact identifier to its canonical form: DOI resolver prefixes and case, the
+   * ORCID URI prefix, and the OpenAlex URI prefix are removed. Other schemes must already be
+   * canonical.
+   */
+  def normalizeExact(scheme: ExactIdScheme, raw: String): Either[String, String] =
+    scheme match {
+      case ExactIdScheme.Doi => normalizeDoi(raw)
+      case ExactIdScheme.Orcid => normalizeOrcid(raw)
+      case ExactIdScheme.OpenAlexWork => normalizeOpenAlex('W', raw)
+      case ExactIdScheme.OpenAlexAuthor => normalizeOpenAlex('A', raw)
+      case other => validateExact(other, raw)
+    }
+
   /** Validates an external identifier value against its scheme's canonical form. */
   def validateExternal(scheme: ExternalIdScheme, value: String): Either[String, String] =
     scheme match {

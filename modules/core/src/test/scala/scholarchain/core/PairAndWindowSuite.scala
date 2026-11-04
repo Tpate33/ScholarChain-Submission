@@ -69,7 +69,9 @@ class PairAndWindowSuite extends munit.FunSuite {
     val c = ok(
       CoauthorPairCandidate.of(
         mention0.mentionId,
+        0,
         mention1.mentionId,
+        1,
         workId,
         Some(2021),
         2,
@@ -81,7 +83,7 @@ class PairAndWindowSuite extends munit.FunSuite {
     assert(isNonCanonical(CoauthorPairCandidate.contract.validate(reversed)))
     assert(
       CoauthorPairCandidate
-        .of(mention0.mentionId, mention0.mentionId, workId, None, 2, dblpProv)
+        .of(mention0.mentionId, 0, mention0.mentionId, 0, workId, None, 2, dblpProv)
         .isLeft
     )
   }

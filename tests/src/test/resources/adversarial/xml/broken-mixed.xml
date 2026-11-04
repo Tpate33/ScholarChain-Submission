@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE dblp SYSTEM "dblp.dtd">
+<dblp>
+<article key="journals/adv/Good1" mdate="2020-01-01" note="a>b"><author>Alice Good</author><author>Bob Good</author><title>Good one.</title><year>2020</year><journal>J. Adv.</journal></article>
+stray text between records &amp; <b>bold</b> <articles>x</articles> <article-ish/> <articlex key="x"/>
+<www key="homepages/00/0000" mdate="2020-01-01"><author>Alice Good</author><title>Home Page</title><url>https://example.org/alice</url></www>
+<person key="persons/adv/1"><author>Some Body</author></person>
+<data key="data/adv/1"><title>Some data set</title></data>
+<article key="journals/adv/BadEntity"><author>Carl &undeclared; Bad</author><title>Bad entity.</title><year>2020</year></article>
+<article key="journals/adv/Good2"><author>Dana Good</author><author>Eve Good</author><author>Fay Good</author><title>Good two: <i>Caf&eacute;</i> &amp; &ouml;l.</title><year>2021</year><journal>J. Adv.</journal></article>
+<article key="journals/adv/Mismatch"><author>Gus Bad</author><title>Mismatched <i>tags</title></i><year>2020</year></article>
+<article key="journals/adv/MalformedAmp"><author>Hal Bad</author><title>Fish & Chips.</title><year>2020</year></article>
+<article key="journals/adv/Good3"><author>Ian Good</author><author>Jo Good</author><title>Good three
+   spans
+lines.</title><year>2022</year></article>
+<article key="journals/adv/Empty"/>
+<book key="books/adv/Book1"><author>Kat Book</author><title>A filtered book.</title><year>2019</year></book>
+</dblp>

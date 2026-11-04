@@ -202,3 +202,41 @@ object ExternalIdScheme {
   def fromTag(tag: String): Option[ExternalIdScheme] = values.find(_.tag == tag)
   given ReadWriter[ExternalIdScheme] = EnumCodec.tagged("ExternalIdScheme", values.toSeq, _.tag)
 }
+
+/**
+ * Scheme of an exact identifier: the join keys of identity-link records, exact-identifier
+ * agreements of match candidates, and additional source-specific work IDs. Each scheme identifies
+ * exactly one entity kind (`entityKind`). Value formats are checked by
+ * [[Identifiers.validateExact]]. Separate from [[ExternalIdScheme]] so that the records already
+ * frozen with that enum keep their exact wire contract.
+ */
+enum ExactIdScheme(val tag: String, val entityKind: MatchEntityKind) {
+  case Doi extends ExactIdScheme("doi", MatchEntityKind.Work)
+  case Arxiv extends ExactIdScheme("arxiv", MatchEntityKind.Work)
+  case DblpKey extends ExactIdScheme("dblp-key", MatchEntityKind.Work)
+  case OpenAlexWork extends ExactIdScheme("openalex-work", MatchEntityKind.Work)
+  case Mag extends ExactIdScheme("mag", MatchEntityKind.Work)
+  case ScopusEid extends ExactIdScheme("scopus-eid", MatchEntityKind.Work)
+  case Orcid extends ExactIdScheme("orcid", MatchEntityKind.Researcher)
+  case OpenAlexAuthor extends ExactIdScheme("openalex-author", MatchEntityKind.Researcher)
+  case DblpPid extends ExactIdScheme("dblp-pid", MatchEntityKind.Researcher)
+}
+object ExactIdScheme {
+  def fromTag(tag: String): Option[ExactIdScheme] = values.find(_.tag == tag)
+  given ReadWriter[ExactIdScheme] = EnumCodec.tagged("ExactIdScheme", values.toSeq, _.tag)
+}
+
+/**
+ * Kind of the party that asserted an ORCID item (ORCID `common:source` and
+ * `common:assertion-origin-*`): a member API client (`source-client-id`) or an ORCID iD holder
+ * (`source-orcid`).
+ */
+enum AssertionSourceKind(val tag: String) {
+  case Client extends AssertionSourceKind("client")
+  case Orcid extends AssertionSourceKind("orcid")
+}
+object AssertionSourceKind {
+  def fromTag(tag: String): Option[AssertionSourceKind] = values.find(_.tag == tag)
+  given ReadWriter[AssertionSourceKind] =
+    EnumCodec.tagged("AssertionSourceKind", values.toSeq, _.tag)
+}

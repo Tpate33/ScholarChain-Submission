@@ -61,12 +61,28 @@ object Fixtures {
     promptVersion = None
   )
 
+  def orcidProv(recordId: String): Provenance = Provenance(
+    sourceDataset = SourceType.Orcid,
+    sourceRecordId = recordId,
+    snapshot = "orcid-2025-10-01",
+    runId = runId,
+    sourceSchemaVersion = "orcid-raw/1.0.0",
+    policyVersion = None,
+    modelVersion = None,
+    promptVersion = None
+  )
+
+  /**
+   * Provenance of the derived fixtures frozen before work-record.v2. Their input schema is pinned
+   * to the literal v1 string (a provenance pointer, not a decodable version), so that the
+   * WorkRecord bump does not silently change their frozen wire examples.
+   */
   def derivedProv(policy: String): Provenance = Provenance(
     sourceDataset = SourceType.Derived,
     sourceRecordId = workId,
     snapshot = "dblp-2026-10-03",
     runId = runId,
-    sourceSchemaVersion = SchemaVersions.WorkRecord,
+    sourceSchemaVersion = "scholarchain.work-record.v1",
     policyVersion = Some(policy),
     modelVersion = None,
     promptVersion = None
@@ -113,7 +129,90 @@ object Fixtures {
     arxivId = None,
     authors = Vector(mention0, mention1),
     abstractTextRef = None,
-    provenance = dblpProv
+    provenance = dblpProv,
+    recordType = Some("article"),
+    venueName = Some("Example J."),
+    volume = Some("64"),
+    issue = Some("3"),
+    pages = Some("1-22"),
+    eeLinks = Vector("https://doi.org/10.1234/example.2021.001"),
+    urls = Vector("db/journals/example/example64.html#Synthetic21"),
+    topicIds = Vector.empty,
+    additionalIds = Vector.empty,
+    assertionSource = None
+  )
+
+  val orcidWorkId: String = ok(WorkId.orcidWork(orcidA, 1001L))
+
+  val assertion: AssertionSource = AssertionSource(
+    sourceKind = AssertionSourceKind.Client,
+    sourceId = "APP-EXAMPLE000000001",
+    sourceName = Some("Example Client"),
+    originKind = Some(AssertionSourceKind.Orcid),
+    originId = Some(orcidA),
+    originName = Some("Ada Example")
+  )
+
+  /** A synthetic `source-work-id` of the example client (shape of the UUIDs in the samples). */
+  val localWorkId: SourceLocalWorkId =
+    SourceLocalWorkId.issuedBy(assertion, "00000000-0000-4000-8000-000000000001")
+
+  /**
+   * An ORCID work summary: no contributors, a Scopus EID, its assertion source, and the client's
+   * own source-work-id.
+   */
+  val orcidWork: WorkRecord = WorkRecord(
+    schemaVersion = SchemaVersions.WorkRecord,
+    workId = orcidWorkId,
+    source = SourceType.Orcid,
+    sourceRecordId = s"$orcidA/work/1001",
+    title = "A Synthetic Study of Collaboration",
+    normalizedTitle = "a synthetic study of collaboration",
+    year = Some(2021),
+    venueId = None,
+    doi = Some("10.1234/example.2021.001"),
+    arxivId = None,
+    authors = Vector.empty,
+    abstractTextRef = None,
+    provenance = orcidProv(s"$orcidA/work/1001"),
+    recordType = Some("journal-article"),
+    venueName = Some("Example Journal"),
+    volume = None,
+    issue = None,
+    pages = None,
+    eeLinks = Vector.empty,
+    urls = Vector.empty,
+    topicIds = Vector.empty,
+    additionalIds = Vector(ExactId(ExactIdScheme.ScopusEid, "2-s2.0-1000000001")),
+    assertionSource = Some(assertion),
+    sourceLocalWorkIds = Vector(localWorkId)
+  )
+
+  /** An OpenAlex work: topics, a MAG ID, and biblio fields. */
+  val openAlexWork: WorkRecord = WorkRecord(
+    schemaVersion = SchemaVersions.WorkRecord,
+    workId = "work:openalex:W1",
+    source = SourceType.OpenAlex,
+    sourceRecordId = "W1",
+    title = "A Synthetic Study of Collaboration",
+    normalizedTitle = "a synthetic study of collaboration",
+    year = Some(2021),
+    venueId = Some("venue:openalex:S1"),
+    doi = Some("10.1234/example.2021.001"),
+    arxivId = None,
+    authors = Vector.empty,
+    abstractTextRef = None,
+    provenance = openAlexProv("W1"),
+    recordType = Some("article"),
+    venueName = Some("Example Journal"),
+    volume = Some("64"),
+    issue = Some("3"),
+    pages = Some("1-22"),
+    eeLinks = Vector.empty,
+    urls = Vector.empty,
+    topicIds = Vector("topic:openalex:T1", "topic:openalex:T2"),
+    additionalIds = Vector(ExactId(ExactIdScheme.Mag, "1000001")),
+    assertionSource = None
   )
 
   val venue: Venue = Venue(
@@ -203,12 +302,120 @@ object Fixtures {
   val pairCandidate: CoauthorPairCandidate = ok(
     CoauthorPairCandidate.of(
       mention1.mentionId,
+      1,
       mention0.mentionId,
+      0,
       workId,
       Some(2021),
       2,
       dblpProv
     )
+  )
+
+  // ---------------------------------------------------------------- Phase 4 candidates
+
+  val blockingVersion = "er-keys-1.0.0"
+  val featureVersion = "er-features-1.0.0"
+
+  /** Provenance of a derived Phase 4 candidate record (input schema work-record.v2). */
+  def candidateProv(recordId: String): Provenance = Provenance(
+    sourceDataset = SourceType.Derived,
+    sourceRecordId = recordId,
+    snapshot = "dblp-2026-10-03",
+    runId = runId,
+    sourceSchemaVersion = "scholarchain.work-record.v2",
+    policyVersion = None,
+    modelVersion = None,
+    promptVersion = None
+  )
+
+  val openAlexProfileId: String = ok(SourceAuthorId.openAlex("https://openalex.org/A1"))
+  val orcidProfileId: String = ok(SourceAuthorId.orcid(orcidA))
+
+  val block: CandidateBlock = ok(
+    CandidateBlock.build(
+      MatchEntityKind.Researcher,
+      blockingVersion,
+      0,
+      "example|a",
+      5,
+      Vector(openAlexProfileId, mention1.mentionId, mention0.mentionId),
+      Vector(SourceType.OpenAlex, SourceType.Dblp),
+      candidateProv("example|a")
+    )
+  )
+
+  val matchCandidate: MatchCandidate = ok(
+    MatchCandidate.build(
+      MatchEntityKind.Researcher,
+      openAlexProfileId,
+      SourceType.OpenAlex,
+      mention0.mentionId,
+      SourceType.Dblp,
+      Vector(BlockKey(1, "example|ada"), BlockKey(0, "example|a")),
+      blockingVersion,
+      featureVersion,
+      SortedMap("orcidEqual" -> 1.0, "nameSimilarity" -> 0.92),
+      Vector(ExactId(ExactIdScheme.Orcid, orcidA)),
+      candidateProv(mention0.mentionId)
+    )
+  )
+
+  // ---------------------------------------------------------------- source identity
+
+  val mentionLink: IdentityLink = ok(
+    IdentityLink.build(
+      ExactId(ExactIdScheme.Orcid, orcidA),
+      MatchEntityKind.Researcher,
+      mention0.mentionId,
+      Some(workId),
+      None,
+      dblpProv
+    )
+  )
+
+  /** The ORCID holder-to-work claim as an identity link, with its assertion source. */
+  val claimLink: IdentityLink = ok(
+    IdentityLink.build(
+      ExactId(ExactIdScheme.Orcid, orcidA),
+      MatchEntityKind.Researcher,
+      orcidProfileId,
+      Some(orcidWorkId),
+      Some(assertion),
+      orcidProv(s"$orcidA/work/1001")
+    )
+  )
+
+  val openAlexProfile: SourceAuthorProfile = SourceAuthorProfile(
+    schemaVersion = SchemaVersions.SourceAuthorProfile,
+    profileId = openAlexProfileId,
+    source = SourceType.OpenAlex,
+    sourceRecordId = "A1",
+    displayName = Some("Ada Example"),
+    givenNames = None,
+    familyName = None,
+    nameVariants = Vector("A. Example", "Ada B. Example"),
+    orcid = Some(orcidA),
+    externalIds = Vector(ExternalId(ExternalIdScheme.OpenAlex, "A1")),
+    institutionIds = Vector("institution:openalex:I1"),
+    claimedWorkIds = Vector.empty,
+    provenance = openAlexProv("A1")
+  )
+
+  val orcidProfile: SourceAuthorProfile = SourceAuthorProfile(
+    schemaVersion = SchemaVersions.SourceAuthorProfile,
+    profileId = orcidProfileId,
+    source = SourceType.Orcid,
+    sourceRecordId = orcidA,
+    displayName = None,
+    givenNames = Some("Ada"),
+    familyName = Some("Example"),
+    nameVariants = Vector("A. Example"),
+    orcid = Some(orcidA),
+    externalIds = Vector.empty,
+    institutionIds = Vector.empty,
+    claimedWorkIds = Vector(orcidWorkId),
+    provenance = orcidProv(orcidA)
   )
 
   val coauthorEdge: CoauthorEdge = ok(

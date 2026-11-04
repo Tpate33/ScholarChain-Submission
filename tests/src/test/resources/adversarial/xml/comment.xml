@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dblp>
+<article key="journals/adv/CommentBefore"><author>Cb One</author><author>Cb Two</author><title>Before the comment.</title><year>2020</year></article>
+<!-- This comment is longer than one small input split, so the record tag below lies in a later split than the comment opener. Padding padding padding padding padding padding padding.
+<article key="journals/adv/Ghost"><author>Ghost Writer</author><author>Phantom Author</author><title>Ghost record inside a comment.</title><year>1999</year></article>
+end of the commented-out region -->
+<article key="journals/adv/CommentAfter"><author>Ca One</author><author>Ca Two</author><title>After the comment.</title><year>2021</year></article>
+</dblp>

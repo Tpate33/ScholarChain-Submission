@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dblp>
+<article key="journals/dup/Same"><author>Ann One</author><author>Bob Two</author><title>Same title.</title><year>2020</year><ee>https://doi.org/10.5555/same</ee></article>
+<article key="journals/dup/Same"><author>Ann One</author><author>Bob Two</author><title>Same title.</title><year>2020</year><ee>https://doi.org/10.5555/same</ee></article>
+<article key="journals/dup/Diff"><author>Cal Three</author><title>First version.</title><year>2020</year></article>
+<article key="journals/dup/Diff"><author>Cal Three</author><title>Second version.</title><year>2020</year></article>
+<article key="journals/dup/DoiA"><author>Dee Four</author><title>Doi A.</title><year>2021</year><ee>https://doi.org/10.5555/shared</ee></article>
+<article key="journals/dup/DoiB"><author>Eva Five</author><title>Doi B.</title><year>2021</year><ee>https://doi.org/10.5555/SHARED</ee></article>
+<article key="journals/dup/TwoDois"><author>Fin Six</author><title>Two DOIs.</title><year>2021</year><ee>https://doi.org/10.5555/two1</ee><ee>https://doi.org/10.5555/two2</ee></article>
+<article key="journals/dup/OrcidTwice"><author orcid="0000-0002-1825-0097">Gil Seven</author><author orcid="https://orcid.org/0000-0002-1825-0097">Hob Eight</author><title>One ORCID on two authors.</title><year>2022</year></article>
+<article key="journals/dup/CrossShared"><author>Ann One</author><title>Cross shared.</title><year>2022</year><ee>https://doi.org/10.5555/cross</ee></article>
+</dblp>

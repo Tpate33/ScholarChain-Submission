@@ -1,0 +1,6 @@
+{"title":["No DOI"]}
+{"DOI":"not a doi","title":["Bad DOI"]}
+{"DOI":"10.5555/CR.NOTITLE"}
+{"DOI":"10.5555/cr.noname","title":["Nameless"],"author":[{"affiliation":[]}]}
+{"DOI":"10.5555/CR.MIN","title":["Minimal crossref"]}
+{"DOI":"10.5555/cr.issn","title":["Bad ISSN"],"ISSN":["1234-5678"],"container-title":["J. Missing"],"author":[{"name":"Consortium X"}]}
