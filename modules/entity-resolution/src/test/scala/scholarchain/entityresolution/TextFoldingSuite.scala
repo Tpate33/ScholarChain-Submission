@@ -29,7 +29,8 @@ class TextFoldingSuite extends munit.FunSuite {
   }
 
   test("control characters, tabs and newlines become separators; null and blanks fold to empty") {
-    assertEquals(fold("a\tb\u0000c\nd‍e", keepHyphen = false), "a b c d e")
+    assertEquals(fold("a\tb\u0000c\nd\u0085e", keepHyphen = false), "a b c d e")
+    assertEquals(fold("a b c d　e", keepHyphen = false), "a b c d e", "Zl Zp Zs")
     assertEquals(fold(null, keepHyphen = false), "")
     assertEquals(fold("  \t ", keepHyphen = false), "")
     assertEquals(fold("́", keepHyphen = false), "", "a lone combining mark")

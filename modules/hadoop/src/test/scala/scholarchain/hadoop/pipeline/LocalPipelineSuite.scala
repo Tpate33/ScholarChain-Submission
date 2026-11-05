@@ -285,7 +285,10 @@ class LocalPipelineSuite extends munit.FunSuite {
     assert(blocks("researcher").nonEmpty && blocks("work").nonEmpty, "both entities blocked")
     val allBlocks = blocks.values.flatten.toVector
     assert(allBlocks.forall(_.size <= 4), "no block exceeds scholarchain.blocking.maxBlockSize")
-    assert(allBlocks.forall(_.blockingVersion == "er-blocking.v1"))
+    assert(
+      allBlocks.forall(_.blockingVersion == EntityResolution.blockingKeysVersion),
+      "every block carries the production key source version"
+    )
     assert(allBlocks.forall(_.provenance.runId == runId))
     assert(allBlocks.forall(_.provenance.sourceDataset == SourceType.Derived))
     assert(allBlocks.forall(_.sourceDatasets.nonEmpty))

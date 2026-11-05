@@ -162,7 +162,7 @@ class UnicodeSuite extends munit.FunSuite {
     Vector("W1", "W5", "W6").foreach(k => assertEquals(key0(k), "wang|j", k))
     assertEquals(key0("T1"), key0("T2"))
     assertEquals(key0("T1"), "isik|i")
-    Vector("W3", "W4", "R1").foreach(k => println(s"[adversarial-unicode] key $k=${key0(k)}"))
+    println(s"[adversarial-unicode] key R1=${key0("R1")}")
     val r1 = works("R1").authors
     r1.foreach(m => assert(EntityResolution.researcherBlockingKeys(works("R1"), m).nonEmpty))
     // Every researcher membership's block key is the mention's key at that level, recomputed.
@@ -176,6 +176,46 @@ class UnicodeSuite extends munit.FunSuite {
       mentions.keySet,
       "every mention blocked once (maxBlockSize 50)"
     )
+  }
+
+  // TE-P5-00 (Phase 4 accepted deferral 1): er-blocking.v1 folded ZWJ/ZWNJ to spaces, so W3/W4
+  // keyed as "ng|j" (family "ng") and never met W1. Regression-sensitive: every assertion on W3/W4
+  // keys, blocks, and candidates below fails under the v1 fold.
+  test("ZWJ and ZWNJ inside Wang: key wang|j, same pipeline block and candidate as W1, raw kept") {
+    val blockOf = memberships.map(mb => (mb.memberId, mb.level) -> mb).toMap
+    val w1 = blockOf((m0("W1").mentionId, 0))
+    assertEquals(w1.blockKey, "wang|j")
+    Vector("W3" -> 0x200d, "W4" -> 0x200c).foreach { case (k, fmt) =>
+      assertEquals(key0(k), "wang|j", k)
+      assertEquals(
+        EntityResolution.researcherBlockingKeys(works(k), m0(k)).take(2),
+        Vector("wang|j", "wang|j|jian"),
+        k
+      )
+      val mb = blockOf.getOrElse((m0(k).mentionId, 0), fail(s"$k has no level-0 membership"))
+      assertEquals(mb.blockId, w1.blockId, s"$k is in W1's pipeline block")
+      assertEquals(mb.blockKey, "wang|j", k)
+      assertEquals(mb.blockingVersion, EntityResolution.blockingKeysVersion, k)
+      val c = candidate("W1", k).getOrElse(fail(s"no W1/$k candidate"))
+      assertEquals(feature(c, "name.family_exact"), 1.0, k)
+      assertEquals(feature(c, "name.first_given_agree"), 1.0, k)
+      // The curated rawName keeps the original format character, byte for byte.
+      val expected = "Jian Wa" + cp(fmt) + "ng"
+      val raw = m0(k).rawName
+      assertEquals(raw, expected, k)
+      assert(
+        java.util.Arrays.equals(
+          raw.getBytes(StandardCharsets.UTF_8),
+          expected.getBytes(StandardCharsets.UTF_8)
+        ),
+        k
+      )
+      assert(raw.contains(cp(fmt)), s"$k rawName lost U+${fmt.toHexString}")
+      val mention = decodeAll[AuthorMention](lines(conf, new Path(runDir, "normalize/mentions")))
+        .find(_.mentionId == m0(k).mentionId)
+        .getOrElse(fail(s"$k mention not in normalize/mentions"))
+      assertEquals(mention.rawName, expected, s"$k in normalize/mentions")
+    }
   }
 
   test("cross-module: curated lines decode with Json.decode and reference existing records") {

@@ -163,7 +163,9 @@ class ShuffleAndParamsSuite extends munit.FunSuite {
 
   test("the production key source delegates to entity-resolution (keys, version, levels)") {
     val src = new jobs.EntityResolutionKeySource
-    assertEquals(src.version, "er-blocking.v1")
+    assertEquals(src.version, scholarchain.entityresolution.EntityResolution.blockingKeysVersion)
+    // Single literal pin in this module: an unannounced key-version change must fail here.
+    assertEquals(src.version, "er-blocking.v2")
     assertEquals(src.levels, 4)
     val (w, n) = {
       val norm = normalize.OpenAlexNormalizer.workLine(

@@ -86,8 +86,8 @@ class MatchFeaturesSuite extends munit.FunSuite {
   private val namelessProfile = popperOrcid.copy(givenNames = None, familyName = None)
 
   test("pinned version") {
-    assertEquals(MatchFeatures.Version, "er-features.v1")
-    assertEquals(EntityResolution.featuresVersion, "er-features.v1")
+    assertEquals(MatchFeatures.Version, "er-features.v2")
+    assertEquals(EntityResolution.featuresVersion, "er-features.v2")
     assert(StableId.isToken(MatchFeatures.Version))
   }
 
@@ -388,6 +388,24 @@ class MatchFeaturesSuite extends munit.FunSuite {
       if (counts(k)) assert(v >= 0.0 && v == math.floor(v), s"$k=$v")
       else assert(v >= 0.0 && v <= 1.0, s"$k=$v")
     })
+  }
+
+  test("format characters inside names and titles do not change any feature (er-features.v2)") {
+    def cp(c: Int): String = new String(Character.toChars(c))
+    val zwsp = cp(0x200b)
+    val shy = cp(0x00ad)
+    val dirty = spannerCrossref.copy(
+      title = "Span" + zwsp + "ner: Google's Glob" + shy + "ally Distributed Database",
+      authors = spannerCrossref.authors.map(a =>
+        a.copy(rawName = cp(0xfeff) + a.rawName.patch(2, cp(0x200d), 0) + cp(0x200f))
+      )
+    )
+    assertEquals(
+      researcher(em(spannerDblp, 4), em(dirty, 4)),
+      researcher(em(spannerDblp, 4), em(spannerCrossref, 4))
+    )
+    assertEquals(work(spannerDblp, dirty), work(spannerDblp, spannerCrossref))
+    assertEquals(work(spannerDblp, dirty)("title.exact"), 1.0)
   }
 
   test("prepared and unprepared calls agree") {

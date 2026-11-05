@@ -8,20 +8,50 @@ import java.text.Normalizer
  * `fold` applies, in order:
  *   1. Unicode NFKD (compatibility decomposition: ligatures such as U+FB01 become `fi`, accented
  *      letters become base letter plus combining mark, superscript digits become digits).
- *   2. Removal of every combining mark (Unicode categories Mn, Me, Mc): `o` + U+0308 (from `ö`)
+ *   2. Deletion of every format character ([[isFormat]]: Unicode general category Cf, i.e.
+ *      `Character.getType(cp) == Character.FORMAT`), checked first for each code point, before any
+ *      other classification. Examples: U+00AD soft hyphen, U+061C Arabic letter mark, U+200B zero
+ *      width space, U+200C ZWNJ, U+200D ZWJ, U+200E/U+200F LRM/RLM, U+202A-U+202E bidi embeddings
+ *      and overrides, U+2060 word joiner, U+2066-U+2069 bidi isolates, U+FEFF BOM, and the tag
+ *      characters U+E0001, U+E0020-U+E007F. They are invisible and occur inside words, so `Wa` +
+ *      U+200B + `ng` folds to `wang`, not `wa ng`. See "Format characters" below.
+ *   3. Removal of every combining mark (Unicode categories Mn, Me, Mc): `o` + U+0308 (from `ö`)
  *      becomes `o`, `a` + U+0303 (from `ã`) becomes `a`.
- *   3. An explicit transliteration table for letters that NFKD does not decompose ([[Special]]):
+ *   4. An explicit transliteration table for letters that NFKD does not decompose ([[Special]]):
  *      `ß` -> `ss`, `æ` -> `ae`, `œ` -> `oe`, `ø` -> `o`, `ł` -> `l`, `đ`/`ð` -> `d`, `þ` -> `th`,
  *      dotless `ı` -> `i`, `ħ` -> `h`, `ŧ` -> `t` (both cases).
- *   4. Lower-casing per code point with `Character.toLowerCase(int)`, which uses Unicode data only
+ *   5. Lower-casing per code point with `Character.toLowerCase(int)`, which uses Unicode data only
  *      and never the default locale (so Turkish `I` is `i` on every JVM).
- *   5. Apostrophes (U+0027, U+2018, U+2019, U+02BC, U+0060) are deleted, so `O'Brien` is `obrien`.
- *   6. Hyphens and dashes (U+002D, U+2010-U+2015, U+2212) become `-` when `keepHyphen`, otherwise a
- *      space. Every other character that is not a letter or digit (any script) becomes a space.
- *   7. Space runs are collapsed and the result trimmed.
+ *   6. Apostrophes (U+0027, U+2018, U+2019, U+02BC, U+0060) are deleted, so `O'Brien` is `obrien`.
+ *   7. Hyphens and dashes (U+002D, U+2010-U+2015, U+2212) become `-` when `keepHyphen`, otherwise a
+ *      space. Every other character that is not a letter or digit (any script) becomes a space;
+ *      this includes whitespace (Zs, Zl, Zp) and controls (Cc: tab, NUL, newline), which therefore
+ *      still separate words.
+ *   8. Space runs are collapsed and the result trimmed.
  *
  * The output therefore contains only lower-case letters and digits of any script, single spaces,
- * and (with `keepHyphen`) `-`. It never contains a tab, a control character, or `|`.
+ * and (with `keepHyphen`) `-`. It never contains a tab, a control character, a format character, or
+ * `|`. `fold` is idempotent: `fold(fold(x, h), h) == fold(x, h)`.
+ *
+ * Format characters (policy of `er-blocking.v2` / `er-features.v2`):
+ *   - The deleted set is exactly category Cf as reported by the running JDK's Unicode tables. Cc,
+ *     Cs, Co, Cn, and whitespace keep the space behaviour of step 7.
+ *   - Deletion never removes a real separator: `Wang` + U+200B + ` Jun` still gives two words
+ *     because the ASCII space remains. A Cf character that is the only thing between two words
+ *     (`Jun` + U+200B + `Wang`) joins them into `junwang`. This is accepted: a Cf character is not
+ *     a word separator in Unicode (ZWSP is only a line-break opportunity), such a string renders
+ *     with no visible gap, and Cf characters in scholarly metadata are overwhelmingly copy-paste
+ *     and markup artefacts inside words, where splitting is the error that loses blocking recall.
+ *   - The soft hyphen U+00AD is a hyphenation hint, not a hyphen: it is deleted even when
+ *     `keepHyphen` is set, so `Garcia` + U+00AD + `Molina` is `garciamolina`, while a real hyphen
+ *     still gives `garcia-molina` (and `garcia molina` without `keepHyphen`).
+ *   - Persian and other Arabic-script text uses ZWNJ (U+200C) inside one word to stop letter
+ *     joining; deleting it keeps the word whole, which is the intended reading.
+ *   - NFKD neither creates nor decomposes Cf characters, so deleting after NFKD equals deleting
+ *     before it. Combining marks that follow a deleted Cf character are removed by step 3 as usual.
+ *   - Only derived keys and features change. Raw input strings (`AuthorMention.rawName`, profile
+ *     names, `WorkRecord.title`) are never modified: Java strings are immutable and these functions
+ *     return new values.
  */
 object TextFolding {
 
@@ -60,6 +90,28 @@ object TextFolding {
     t == Character.COMBINING_SPACING_MARK
   }
 
+  /**
+   * True for a Unicode format character (general category Cf), which `fold` deletes. Examples: soft
+   * hyphen, zero width space/joiner/non-joiner, word joiner, bidi marks, embeddings, overrides and
+   * isolates, BOM.
+   */
+  def isFormat(cp: Int): Boolean = Character.getType(cp) == Character.FORMAT
+
+  /** `s` with every format character ([[isFormat]]) deleted; `null` gives the empty string. */
+  def removeFormat(s: String): String =
+    if (s == null) ""
+    else if (!s.codePoints.anyMatch(cp => isFormat(cp))) s
+    else {
+      val sb = new java.lang.StringBuilder(s.length)
+      var i = 0
+      while (i < s.length) {
+        val cp = s.codePointAt(i)
+        i += Character.charCount(cp)
+        if (!isFormat(cp)) { val _ = sb.appendCodePoint(cp) }
+      }
+      sb.toString
+    }
+
   /** Folds `raw` as documented on the object. `null` folds to the empty string. */
   def fold(raw: String, keepHyphen: Boolean): String =
     if (raw == null) ""
@@ -70,7 +122,8 @@ object TextFolding {
       while (i < d.length) {
         val cp = d.codePointAt(i)
         i += Character.charCount(cp)
-        if (!isMark(cp)) {
+        if (isFormat(cp)) () // deleted, never a separator (see "Format characters")
+        else if (!isMark(cp)) {
           Special.get(cp) match {
             case Some(s) => sb.append(s)
             case None =>

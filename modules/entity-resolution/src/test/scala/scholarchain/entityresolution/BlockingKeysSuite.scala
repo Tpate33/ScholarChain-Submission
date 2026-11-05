@@ -21,8 +21,8 @@ class BlockingKeysSuite extends munit.FunSuite {
   private def rkeys(w: WorkRecord, i: Int) = researcherKeys(w, w.authors(i))
 
   test("pinned versions and level count") {
-    assertEquals(BlockingKeys.Version, "er-blocking.v1")
-    assertEquals(EntityResolution.blockingKeysVersion, "er-blocking.v1")
+    assertEquals(BlockingKeys.Version, "er-blocking.v2")
+    assertEquals(EntityResolution.blockingKeysVersion, "er-blocking.v2")
     assertEquals(BlockingKeys.Levels, 4)
     assertEquals(EntityResolution.blockingLevels, 4)
     assert(StableId.isToken(BlockingKeys.Version))

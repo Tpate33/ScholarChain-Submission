@@ -52,8 +52,13 @@ import scholarchain.core.{AuthorMention, Canonical, SourceAuthorProfile, WorkRec
  */
 object BlockingKeys {
 
-  /** Version of the key formulas; recorded as `blockingVersion` on blocks and candidates. */
-  val Version: String = "er-blocking.v1"
+  /**
+   * Version of the key formulas; recorded as `blockingVersion` on blocks and candidates.
+   *
+   * History: `er-blocking.v1` (Phase 4) folded Unicode format characters (Cf) to spaces, splitting
+   * names such as `Wa` + U+200B + `ng`; `er-blocking.v2` deletes them ([[TextFolding.fold]]).
+   */
+  val Version: String = "er-blocking.v2"
 
   /** Maximum number of key levels any record yields. */
   val Levels: Int = 4

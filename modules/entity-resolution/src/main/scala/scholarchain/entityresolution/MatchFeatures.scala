@@ -147,8 +147,14 @@ final case class PreparedWork(
  */
 object MatchFeatures {
 
-  /** Version of the feature functions; recorded as `featureVersion` on candidates. */
-  val Version: String = "er-features.v1"
+  /**
+   * Version of the feature functions; recorded as `featureVersion` on candidates.
+   *
+   * History: `er-features.v1` (Phase 4); `er-features.v2` deletes Unicode format characters (Cf) in
+   * every folded name, title, venue, and affiliation input ([[TextFolding.fold]]), which changes
+   * name, title, venue, and affiliation feature values for inputs that contain them.
+   */
+  val Version: String = "er-features.v2"
 
   /** Researcher identifier schemes with per-scheme features, in feature order. */
   val ResearcherIdSchemes: Vector[ExactIdScheme] =

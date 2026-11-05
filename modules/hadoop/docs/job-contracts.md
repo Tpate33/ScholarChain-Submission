@@ -89,10 +89,10 @@ WorkRecord (and of every other core record) uses the strict core decoder `Json.d
 | `scholarchain.team.sources` | dataset sources whose works form teams and pairs | `dblp` |
 | `scholarchain.team.maxSize` | oversize-team REPORTING threshold (>= 2): larger teams are counted and flagged; all their pairs are still emitted | `100` (`20` in the oversize test) |
 | `scholarchain.blocking.keySource` | class implementing `jobs.BlockingKeySource`; production: `scholarchain.hadoop.jobs.EntityResolutionKeySource` | `EntityResolutionKeySource` |
-| `scholarchain.blocking.keySourceVersion` | must equal the key source's `version` (driver check); records the key-formula version in the manifest | `er-blocking.v1` |
+| `scholarchain.blocking.keySourceVersion` | must equal the key source's `version` (driver check); records the key-formula version in the manifest | `er-blocking.v2` |
 | `scholarchain.blocking.maxBlockSize` | maximum block size (>= 2); also bounds the candidate stage | `4` |
 | `scholarchain.blocking.oversizePolicy` | `drop` or `fail` after the last fallback level | `drop` |
-| `scholarchain.candidates.featureVersion` | must equal `EntityResolution.featuresVersion` (driver check); records the feature version in the manifest | `er-features.v1` |
+| `scholarchain.candidates.featureVersion` | must equal `EntityResolution.featuresVersion` (driver check); records the feature version in the manifest | `er-features.v2` |
 | `scholarchain.reducers.{normalize,exactIds,teams,blocking,candidates}` | reducer counts (`candidates` applies to all three candidate jobs) | `3, 2, 2, 2, 2` |
 | `scholarchain.codec.intermediate` | map-output codec class | `org.apache.hadoop.io.compress.DefaultCodec` |
 | `scholarchain.codec.output` | final-output codec class | `org.apache.hadoop.io.compress.GzipCodec` |
@@ -300,7 +300,7 @@ Source mapping (pure functions; details in their Scaladoc):
 | INPUT unit | blocking members (mentions, profiles, works), counted once in round 0: `INPUT` = `ACCEPTED` + `MISSING_KEY` + `FLAGGED.invalid-blocking-key` + `REJECTED` (undecodable lines). `RECORDS_READ.{works,profiles}` counts records. |
 | Reject conditions | no key (`missing-key`, flagged), a key with control characters or blank (`invalid-blocking-key`, flagged), oversize group (`oversize-block`, flagged), undecodable record (rejected) |
 | Stats | `largestGroup.<entity>` (largest observed blocking group), `largestBlock.<entity>` (largest emitted block) |
-| Reducers | `scholarchain.reducers.blocking` per round; rounds <= `levels` (4 for `er-blocking.v1`); a round runs only if the previous one spilled |
+| Reducers | `scholarchain.reducers.blocking` per round; rounds <= `levels` (4 for `er-blocking.v2`, `BlockingKeys.Levels`); a round runs only if the previous one spilled |
 | Outputs | `<run>/blocking/round-<r>/{blocks/<entity>,members/<entity>,spill,rejects,stats}` |
 | Test fixture | `LocalPipelineSuite` (real keys: refinement to levels 2 and 3; fixture keys: drop and fail policies) |
 

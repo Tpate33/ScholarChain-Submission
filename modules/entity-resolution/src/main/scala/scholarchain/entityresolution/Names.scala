@@ -154,10 +154,10 @@ object PersonName {
 /**
  * Title and other free-text folding for keys and features.
  *
- * Titles: a trailing parenthesised note (DBLP appends editorial notes such as `(Awarded Best
- * Paper!)`) is removed when text remains before it; then the title is folded with hyphens as spaces
- * ([[TextFolding.fold]]), so `Cyber-security` and `Cyber security` agree and the trailing `.` of
- * DBLP titles disappears.
+ * Titles: format characters (Unicode Cf) are deleted, then a trailing parenthesised note (DBLP
+ * appends editorial notes such as `(Awarded Best Paper!)`) is removed when text remains before it;
+ * then the title is folded with hyphens as spaces ([[TextFolding.fold]]), so `Cyber-security` and
+ * `Cyber security` agree and the trailing `.` of DBLP titles disappears.
  */
 object TitleText {
 
@@ -203,12 +203,17 @@ object TitleText {
     }
   }
 
-  /** Folded title words in order (may be empty). */
+  /**
+   * Folded title words in order (may be empty). Format characters are deleted before the trailing
+   * note is detected, so an invisible character after `)` or `.` does not hide the note.
+   */
   def words(title: String): Vector[String] =
     if (title == null) Vector.empty
     else
       TextFolding.words(
-        stripTrailingNote(Normalizer.normalize(title, Normalizer.Form.NFC)),
+        stripTrailingNote(
+          TextFolding.removeFormat(Normalizer.normalize(title, Normalizer.Form.NFC))
+        ),
         keepHyphen = false
       )
 
