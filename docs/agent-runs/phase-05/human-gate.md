@@ -48,3 +48,18 @@ Phase 4 AWS prerequisites and other deferred items remain outside this acceptanc
 
 ## Commit and clean-tree verification
 Pending; to be recorded after the prerequisite commit.
+
+## Final prerequisite closure — 2026-11-04
+The pending verification conditions above are now satisfied.
+I accept commit 127819b6a6e8eefd5c9ce270e924759f485a4523 as the completed
+Unicode prerequisite, retaining the documented limitations.
+
+I personally ran sbt -no-colors check on that commit with an empty
+git status --porcelain captured immediately before execution.
+Result: exit 0; 443 passed, 0 failed, 0 errors, 0 skipped; 34 suites.
+Completed: 2026-11-04 22:04:09 America/Chicago.
+Evidence: prereq-unicode-clean-test-report.md.
+commit.txt records the Unicode prerequisite commit only.
+
+This closes only the Unicode prerequisite. Main Phase 5 remains unimplemented
+and unaccepted. The follow-up commit records evidence only.
