@@ -12,13 +12,41 @@
 # datasets/downloads/ and exports SCHOLARCHAIN_SAMPLE_BUDGET_LEDGER; every child ds_fetch reads the
 # bytes already spent from it, lowers its per-request cap to the remaining budget, and adds the
 # bytes it received. The ledger is removed when this script exits.
+#
+# ER candidate sample set (work orders DS-P5-01, DS-P5-03):
+#   datasets/scripts/fetch-samples.sh (--dry-run | --verify | --sample) datasets/er-candidates
+#       runs datasets/scripts/fetch-er-candidates.sh with the same mode (see that script);
+#   datasets/scripts/fetch-samples.sh --verify datasets/er-candidates datasets/downloads/dblp/full/<release>.xml.gz
+#       runs fetch-er-candidates.sh --verify --with-release (the path must be the manifest-pinned release);
+#   datasets/scripts/fetch-samples.sh --verify datasets/er-candidates/fixture
+#       runs fetch-er-candidates.sh --fixture (offline extractor self-test; writes only to a temp dir).
+# This entry point exists because a newly created script has no executable bit until the human sets
+# it; this committed script invokes it through bash. Only path arguments are used, so every ER mode
+# has a plain "<script> <mode> <datasets/ paths>" shape.
 set -euo pipefail
 DS_NAME=fetch-samples
 DS_DATASET=all
 # shellcheck source=datasets/scripts/lib-datasets.sh
 . "$(cd "$(dirname "$0")" && pwd)/lib-datasets.sh"
 
-[ "$#" -eq 1 ] || ds_die "usage: fetch-samples.sh (--dry-run | --verify | --sample)" 2
+ER_USAGE="usage: fetch-samples.sh (--dry-run | --verify | --sample) datasets/er-candidates | --verify datasets/er-candidates <pinned release path> | --verify datasets/er-candidates/fixture"
+if [ "$#" -eq 2 ] && [ "$2" = "datasets/er-candidates/fixture" ]; then
+  [ "$1" = "--verify" ] || ds_die "$ER_USAGE" 2
+  exec bash "$DS_SCRIPT_DIR/fetch-er-candidates.sh" --fixture
+fi
+if [ "$#" -eq 3 ] && [ "$2" = "datasets/er-candidates" ]; then
+  [ "$1" = "--verify" ] || ds_die "$ER_USAGE" 2
+  pinned="datasets/downloads/dblp/full/$(basename "$(ds_manifest_get datasets.dblp.official_source.download_url)")"
+  [ "$3" = "$pinned" ] || ds_die "the release path must be the manifest-pinned $pinned (got $3)" 2
+  exec bash "$DS_SCRIPT_DIR/fetch-er-candidates.sh" --verify --with-release
+fi
+if [ "$#" -eq 2 ] && [ "$2" = "datasets/er-candidates" ]; then
+  case "$1" in
+    --dry-run|--verify|--sample) exec bash "$DS_SCRIPT_DIR/fetch-er-candidates.sh" "$1" ;;
+    *) ds_die "$ER_USAGE" 2 ;;
+  esac
+fi
+[ "$#" -eq 1 ] || ds_die "usage: fetch-samples.sh (--dry-run | --verify | --sample) [datasets/er-candidates ...]" 2
 case "$1" in
   --dry-run|--verify|--sample) ;;
   --full) ds_die "--full is never forwarded; run the single dataset script after a human decision" 3 ;;

@@ -79,6 +79,8 @@ datasets:
       verify_command: "datasets/scripts/fetch-dblp.sh --verify"
       full_command: "SCHOLARCHAIN_CONFIRM_FULL_DOWNLOAD=dblp-2026-10-03 datasets/scripts/fetch-dblp.sh --full"
       full_download_by_default: false
+      full_transfer_bounds: "RV-P5-02 finding 1 (DS-P5-04), constants in datasets/scripts/lib-datasets.sh: curl --connect-timeout 30 (seconds to open the connection), --speed-limit 1024 --speed-time 120 (a transfer slower than 1024 bytes/s for 120 consecutive seconds is a stall), --max-filesize 2000000000, https only (also on redirects). There is deliberately no total --max-time, so a slow but healthy 1.03 GB transfer is never cut off. A connect timeout or stall makes curl exit 28; the script exits 28 and keeps the .part file for resume. DS-P5-06 (RV-P5-07 NIT-5): -q is curl's first argument, so ~/.curlrc is not read (CURL_HOME and proxy environment variables still apply). DS-P5-06 (RV-P5-07 MINOR-1): before any network access, and again before the transfer and before the rename, the run refuses with exit 2 when datasets/downloads itself, any path component below it down to the release file, the release file, its .part, its .sha256 or its .sha256.tmp is a symbolic link (tested with -L, which never follows the link); a link is never followed, deleted or written through. The sidecar temporary file is created with noclobber (O_EXCL)."
+      full_failure_behavior: "RV-P5-02 finding 2 (DS-P5-04). On every curl failure the .part file is KEPT and a RECOVERY line names its path and the next step: exit 28 (stall or connect timeout) re-run to resume; HTTP 416 (range not satisfiable: the .part is already at least the release length but its MD5 is not the pin) or curl exit 33 (server will not resume) delete the .part by hand (rm <path>) and re-run; exit 63 (over the size cap) stop and report. A .part is never deleted automatically after a failed transfer, because the exact byte size of the release is not published (size.expected.uncompressed and the compressed byte count are UNVERIFIED), so the script cannot prove a .part is complete. The one documented automatic deletion: when curl reports the transfer COMPLETE and the MD5 (or gzip -t) check then fails, the bytes are the whole response and wrong, resuming cannot repair them, so the .part is deleted and the message says so. A .part that already matches the MD5 pin is not requested again. DS-P5-05 additions: an HTTP 416 reply is handled as the 416 failure even when curl exits 0 (exit 22, .part kept, manual step printed); the printed rm step is shell-escaped (printf %q; RV-P5-03 N3); if the MD5 tool is missing or fails, the run refuses before the transfer (ds_need_md5) or, after it, keeps the .part unchecked and undeleted (RV-P5-03 N4); the sha256 sidecar is written through a temporary file and mv, and a final file left without its sidecar by an interrupted run is re-checked (MD5 pin, gzip -t) and only then given its sidecar, without a new download; a file without a sidecar that fails the checks is left in place and replaced only by a new download that passes both (RV-P5-02 nit 12); the final log line states the bytes actually transferred in this run (RV-P5-03 N5). DS-P5-06 (RV-P5-07 NIT-5): the HTTP 416 message depends on what the MD5 check of the .part found before the request: an MD5 that is not the pin gives the manual rm step; an MD5 that could not be computed says so, claims no mismatch and says not to delete the .part before the MD5 tool is fixed; no .part checked gives re-run first, rm only if the error repeats. A refused symbolic link exits 2 with a message naming the link (see full_transfer_bounds)."
       raw_zone_upload: "Out of scope for dataset-engineer. Upload of the verified file to raw_prefix is done by the approved pipeline script (infra-engineer authors, deploy-engineer or human runs)."
     format:
       file_format: "XML validated by dblp.dtd (one root element dblp, one child element per record)"
@@ -149,6 +151,7 @@ datasets:
       - "pages may hold an article number (Spanner: 8) instead of a page range."
       - "The XML dump contains non-publication records (www, person, data) that must be filtered."
       - "Records were sampled through the dblp SPARQL endpoint because dblp.org/rec/*.xml returned a bot-protection page to the verification tool."
+      - "Per-record dblp XML is never requested by any script (DS-P5-03): https://dblp.org/robots.txt (read 2026-11-05) disallows /rec/xml, /*.xml and /*.json. fetch-dblp.sh --sample fetches only dblp.dtd (https://dblp.org/xml/dblp.dtd, not disallowed) and the DROPS release .md5 file."
     validation_commands:
       - "datasets/scripts/validate-manifest.sh --verify"
       - "datasets/scripts/fetch-dblp.sh --verify"
@@ -159,7 +162,9 @@ datasets:
       - "datasets/samples/dblp/dblp-sample.xml"
     unverified:
       - item: "format.encoding"
-        reason: "The XML declaration of the full dump was not read; only the DTD and listings were fetched."
+        reason: "The XML declaration of the full dump was not read; only the DTD and listings were fetched. An attempt to read https://dblp.org/xml/README.txt for an encoding statement on 2026-11-05 (DS-P5-04) did not complete (tool usage limit). The extractor fixture therefore tests the plausible declarations ISO-8859-1, UTF-8 and US-ASCII; the real one is still unknown."
+      - item: "exact compressed byte size of dblp-2026-10-03.xml.gz"
+        reason: "Only the display value 1.03 GB is published on the pages read, so fetch-dblp.sh --full cannot prove that a .part file is complete and never deletes one after a failed transfer (retrieval.full_failure_behavior)."
       - item: "size.expected.uncompressed_bytes and record_count"
         reason: "Not stated on any official page read on 2026-10-29."
       - item: "source_identifiers.orcid attribute value form"
@@ -536,3 +541,160 @@ datasets:
         reason: "Not stated on the pages read."
       - item: "Existence of a 2026 public data file"
         reason: "The official bulk-data page listed 2020-2025 on 2026-10-29."
+er_candidates:
+  name: "Entity-resolution candidate sample set (work order DS-P5-01)"
+  owning_agent: dataset-engineer
+  schema_version: "er-candidates-raw/1.0.0"
+  schema_notes: "datasets/schemas/er-candidates.md"
+  purpose: "Real, licensed, source-traceable records from which entity-resolution candidate pairs are generated for human review (Phase 5 gold set). Records only: no labels, no expected match outcomes, no scores or decisions. A shared author name is never evidence of identity."
+  selection_file: "datasets/er-candidates/selection.tsv"
+  split_file: "datasets/er-candidates/split-assignment.tsv"
+  samples_dir: "datasets/samples/er-candidates"
+  ledger: "datasets/samples/er-candidates/PROVENANCE.tsv"
+  failures_file: "datasets/samples/er-candidates/FETCH-FAILURES.tsv"
+  ranges_file: "datasets/samples/er-candidates/DBLP-RELEASE-RANGES.tsv"
+  selected_on: "2026-11-05"
+  retrieval:
+    script: "datasets/scripts/fetch-er-candidates.sh"
+    entry_point_note: "Until the human commits fetch-er-candidates.sh with its executable bit, it is run through the committed datasets/scripts/fetch-samples.sh with the extra argument datasets/er-candidates."
+    dry_run_command: "datasets/scripts/fetch-samples.sh --dry-run datasets/er-candidates"
+    sample_command: "datasets/scripts/fetch-samples.sh --sample datasets/er-candidates"
+    verify_command: "datasets/scripts/fetch-samples.sh --verify datasets/er-candidates"
+    verify_with_release_command: "datasets/scripts/fetch-samples.sh --verify datasets/er-candidates datasets/downloads/dblp/full/dblp-2026-10-03.xml.gz"
+    fixture_command: "datasets/scripts/fetch-samples.sh --verify datasets/er-candidates/fixture"
+    full_download_by_default: false
+    bounds: "Fixed record list only (selection.tsv), plus at most 6 OpenAlex author records per ordinary-criterion work. Per-response caps of 100 KB to 400 KB (200 KB per dblp record byte range), one 8 MiB total budget (bytes already in PROVENANCE.tsv plus every network body and every dblp excerpt written in the run; each dblp excerpt is counted before it is written and refused with byte-budget-reached if it would exceed the budget, RV-P5-02 finding 3), a 500 s run budget, per-host pacing (OpenAlex 0.2 s, Crossref 0.5 s), no retry after HTTP 429. Idempotent: a stored file that matches its ledger row is never fetched or extracted again. No API key, no mailto, no authenticated endpoint."
+    dblp_offline_only: "dblp records are extracted OFFLINE ONLY from the pinned release datasets/downloads/dblp/full/dblp-2026-10-03.xml.gz, which only the human downloads (datasets.dblp.retrieval.full_command). Before any extraction the release must exist, its MD5 must equal datasets.dblp.integrity.upstream_checksum.value, its SHA-256 must equal its .sha256 sidecar, and datasets.dblp.snapshot.id must still be dblp-2026-10-03. If any check fails, or the release layout violates the excerpt rule (datasets/schemas/er-candidates.md), every pending dblp record fails closed: no dblp file is written and no network request is made. No code path requests a dblp per-record URL (work order DS-P5-03)."
+    network_hosts: "--sample makes HTTPS requests to api.openalex.org (works by DOI, authors by A-ID) and api.crossref.org (works by DOI filter) only. --dry-run, --verify, --verify with the release path, and the fixture make no network request."
+    writes: "datasets/er-candidates/split-assignment.tsv and datasets/samples/er-candidates/** (committed-ready samples). This differs from the fetch-<dataset>.sh scripts, which write only to the git-ignored datasets/downloads/. The fixture writes only to a temporary directory that it removes."
+  robots_compliance:
+    source: "https://dblp.org/robots.txt"
+    read_on: "2026-11-05"
+    rules: "User-agent *: Crawl-delay 4; Allow /rec; Disallow /rec/xml; Disallow /*.xml; Disallow /*.json (also /rec/bib, /rec/ris, /rec/nt, /rec/rdf, /*.bib, /*.ris, /*.nt, /*.ttl, /*.rdf)."
+    finding: "The DS-P5-01 run (and fetch-dblp.sh --sample before DS-P5-03) requested https://dblp.org/rec/<key>.xml and https://dblp.uni-trier.de/rec/<key>.xml, which these rules disallow. All 120 requests received HTTP 202 and stored nothing. DS-P5-03 removed every such request path. The DROPS release URL is allowed (https://drops.dagstuhl.de/robots.txt, read 2026-11-05, disallows only /api/*, /metadata/*/* and /entities/*/metadata/*)."
+  byte_range_ledger:
+    file: "datasets/samples/er-candidates/DBLP-RELEASE-RANGES.tsv"
+    columns:
+      - "file"
+      - "record_key"
+      - "release_id"
+      - "release_file"
+      - "release_md5"
+      - "release_gz_sha256"
+      - "header_offset"
+      - "header_length"
+      - "record_offset"
+      - "record_length"
+      - "footer_offset"
+      - "footer_length"
+      - "excerpt_bytes"
+      - "excerpt_sha256"
+    meaning: "Offsets and lengths are bytes of the decompressed release stream. The excerpt file equals the header range, then the record range, then the footer range. The same ranges and the .gz SHA-256 are repeated in the PROVENANCE.tsv request_url cell as 'release:<file> sha256=<gz sha256> header=<offset>+<length> record=<offset>+<length> footer=<offset>+<length>', and the excerpt SHA-256 is the PROVENANCE.tsv sha256 cell."
+    checks: "--verify checks offline that every dblp ledger row has a range row, that the ranges are ordered and add up to the file size, that the SHA-256 values agree, and that the file slices follow the header/record/footer rule. The --verify run with the release path also re-checks the release MD5 and sidecar and compares the release bytes at every recorded offset with the stored file."
+    write_order: "RV-P5-02 finding 4 (DS-P5-04): file + ranges row + PROVENANCE row are all-or-nothing from the next run's point of view. 1. the excerpt bytes are written to <file>.part (fsync) and re-hashed; on a mismatch the .part is removed, no row is written and the record fails with excerpt-write-failed; 2. os.replace to <file>; 3. the ranges row is written by an atomic rewrite of DBLP-RELEASE-RANGES.tsv (temporary file + rename), replacing any uncommitted row for the same file; 4. the PROVENANCE.tsv row is appended LAST and is the commit point. --sample counts a dblp record as present only when its PROVENANCE row, its ranges row and the file agree. Without a PROVENANCE row, a leftover file, .part or ranges row is reported as RECOVER and replaced by re-extraction (deterministic bytes of the pinned release). A PROVENANCE row that disagrees with the ranges row or the file is reported as excerpt-state-inconsistent with the manual repair step and never counted as present. A PROVENANCE or ranges line torn by an interrupted append (no trailing newline and fewer tab-separated columns than a row) is dropped with a REPAIRED message before reading, and the record is re-extracted or re-fetched. A last line without a trailing newline that has a full row's columns (possibly a complete hand-edited row) is never dropped: --sample stops with exit 2 before any fetch or extraction, the file is unchanged, and the message names the manual repair (RV-P5-03 N1). The release is hashed and scanned in one pass, and no excerpt is written before both digests match (RV-P5-02 nit 11). --verify fails on every one of these states (torn last line, file or .part without a PROVENANCE row, ranges row without a PROVENANCE row, PROVENANCE row without a consistent ranges row)."
+    state: "No dblp excerpt exists yet (the release has not been downloaded), so the file is not present."
+  missing_record_policy: "Records are never substituted. A selection.tsv dblp key absent from dblp-2026-10-03 is recorded in FETCH-FAILURES.tsv with reason key-not-in-pinned-release. No other release, mirror, SPARQL result or API record replaces it, and the pin is not changed to improve coverage (human instruction, decisions-03). selection.tsv and split-assignment.tsv membership is unchanged; the unit stays in its split with fewer records. Keys suspected to be absent because they are from 2025-2026 (DS-P5-02): journals/tjs/CamaraCB26, journals/comcom/RioMSJC26, journals/theoretics/PintoH26, conf/citc/ChatterjeeLV26, journals/bspc/ErenT26 (UNVERIFIED until the release is read)."
+  failure_reasons:
+    - "release-missing: the pinned release file does not exist (whole dblp step refused)"
+    - "release-sidecar-missing: its .sha256 sidecar does not exist (whole step refused)"
+    - "release-checksum-mismatch: MD5 differs from the manifest pin, or SHA-256 differs from the sidecar (whole step refused)"
+    - "release-pin-mismatch: the manifest dblp pin is not dblp-2026-10-03 or is malformed (whole step refused)"
+    - "release-layout-error: no <dblp> header line, a wanted record tag not at line start, a duplicate wanted key, a record without its end tag, text after an end tag, a last line that is not </dblp>, or an undecompressable stream (whole step refused)"
+    - "key-not-in-pinned-release: that key only"
+    - "record-exceeds-cap: that record's byte range is larger than 200000 bytes"
+    - "byte-budget-reached: writing that excerpt would take the ER sample over the one 8 MiB budget; nothing is written for it (that record only)"
+    - "selection refusals (er_load_selection / er_plan, the whole run stops with exit 2 before any write): a dblp key containing __ (its file name would not be unique), or two planned records mapping to one file, compared case-insensitively (RV-P5-02 nit 10)"
+    - "excerpt-check-failed: the excerpt is not well-formed, or lacks the expected DOI or author selection fact"
+    - "excerpt-write-failed: the bytes written to <file>.part do not hash to the excerpt; the .part is removed and no row is written (that record only)"
+    - "excerpt-state-inconsistent: a PROVENANCE row exists but its ranges row is missing or disagrees with it or with the file; not counted as present; the message names the manual repair (that record only)"
+  fixture:
+    path: "datasets/er-candidates/fixture/fixture-release.xml"
+    content: "The four records of datasets/samples/dblp/dblp-sample.xml, copied unchanged, between a release-style header and the </dblp> footer. It is not a dblp release and is never extracted into datasets/samples/."
+    command: "datasets/scripts/fetch-samples.sh --verify datasets/er-candidates/fixture"
+    covers: "Gzips the fixture into a temporary directory, writes a sha256 sidecar, pins its MD5, and runs the same er_dblp_step used by --sample. Checks: 4 records extracted; offsets equal an independent search; file = header + record + footer; the offline range check and the release re-check pass; a different release and a shifted offset are both caught; and an absent real selection key gives key-not-in-pinned-release with no file written. These cases fail closed, writing nothing: release missing, sidecar missing, MD5 mismatch, sidecar mismatch, record tag not at line start, missing </dblp>, missing <dblp>, duplicate key, missing record end tag, text after an end tag, truncated gzip. No network call is attempted (er_curl and subprocess.run are trapped). Added by DS-P5-04 (RV-P5-02 finding 7): record-exceeds-cap (a 205132-byte record with 5126 authors; that record only) and a 197132-byte large team extracted whole; realistic release lines (mdate, publtype and cdate attributes before or after key, unwanted thesis, www, one-line, proceedings and prefix-key records between the wanted ones) under the XML declarations ISO-8859-1, UTF-8 and US-ASCII with the non-ASCII author written in each, plus bytes that contradict the declaration (excerpt-check-failed); er_fetch end to end on throw-away roots with a dblp-only selection: FETCH-FAILURES rows and exit 1, already-present records skipped without rewriting any row, a crash before the PROVENANCE commit recovered on the next run, a torn PROVENANCE row repaired, a PROVENANCE row without a ranges row reported as excerpt-state-inconsistent and repaired by the documented manual step, a failed post-write sha check leaving no file, .part or row, and release-pin-mismatch (wrong snapshot id, malformed MD5) refusing every dblp item. fetch-dblp.sh --full transfer logic (ds_full_download) against a curl stub first on PATH with a .invalid URL (the one sanctioned subprocess): the curl bounds, a stall (exit 28, .part kept), HTTP 416 and curl exit 33 (.part kept, manual rm step named), a completed transfer with the wrong MD5 (.part deleted, stated), success (sidecar written), and a .part already matching the pin (not requested again). Added by DS-P5-05: dblp excerpts counted against the 8 MiB budget (one excerpt fits exactly, the rest fail byte-budget-reached; and through er_fetch with a full ledger); dblp keys containing __ refused; a complete PROVENANCE row without its final newline is not dropped (exit 2, file unchanged); FETCH-FAILURES reasons carry no absolute path; a straddling ORCID iD (lower-case x form) in dblp excerpts of both splits fails er-verify, with a positive control; --verify --with-release passes after extraction and fails when verification stops before the release is read; HTTP 416 with curl exit 0, a shell-escaped rm path with a quote, spaces and ;, a failing MD5 tool (.part kept), the transferred-byte count, and a final file without a sidecar (re-checked and given its sidecar, or replaced when wrong); and fetch-dblp.sh --full EXECUTED on copies of the three scripts in a throw-away root (exit 3 without or with a wrong confirmation, curl exit 28 passed through, wrong MD5 exit 1, success with the final log line, re-run with 0 bytes fetched). Added by DS-P5-06 (RV-P5-07): symbolic links on the --full write path refused with exit 2 before curl is called, the link kept and nothing written through it, for datasets/downloads itself (ds_full_download and the executed fetch-dblp.sh --full), a directory component, the .part (linked to an existing file), the .sha256.tmp, the .sha256 and the final file (MINOR-1); a Crossref author ORCID in a heldout unit equal to the ORCID of a dev OpenAlex authorship fails er-verify, with a passing control that has the same author name and different ORCID iDs (MINOR-2); release-missing and release-sidecar-missing reasons in FETCH-FAILURES.tsv name the repository-relative release path and no absolute path (NIT-3); the complete-row-without-newline message warns that the last column may be cut (NIT-4); -q is curl's first argument, and HTTP 416 with a failing MD5 tool (curl exit 22 and 0) claims no MD5 mismatch (NIT-5)."
+    verified_on: "2026-11-12 (DS-P5-06 additions: see the fixture run reported for DS-P5-06)"
+  split_rule: "Selection unit = one row group of selection.tsv with one unit_id (a name group for homonym, name-variant and ORCID criteria; a work cluster for the work criteria). key = sha256('scholarchain-er-split.v1|' + unit_id). Within each criterion units are ranked by key; the first ceil(3n/5) are heldout and the rest dev. The rule reads only unit IDs. It was fixed in code before the first fetch, and the assignment file was written before any record was requested. Policy development may use only dev. Human gold labels for evaluation come only from heldout. Run the pipeline once per split so that no candidate pair crosses the split."
+  criteria:
+    - id: homonym-rare
+      rule: "dblp SPARQL, 2026-11-05: names held by exactly 2 dblp persons (primaryCreatorName), ordered by SHA256('ds-p5-01|c1|' + name), first 16. Kept every name for which both persons had a publication with a DOI, 2-5 creators, year 2010-2024, not CoRR. Per person: the lexicographically smallest record key among those."
+      units: 7
+      records_per_unit: "2 dblp records (one per person) + the 2 OpenAlex works by DOI"
+    - id: homonym-east-asian
+      rule: "A priori list Wei Wang, Lei Zhang, Yang Liu, Jing Li, Jin Kim, Ji-Hoon Kim. Per name: the two lowest-numbered homonyms (0001-0010) with a publication with a DOI, 2-4 creators, 2019-2024, not CoRR. Jin Kim (one qualifying homonym in 0001-0008) and Ji-Hoon Kim (no numbered homonym labels) were dropped."
+      units: 4
+      records_per_unit: "2 dblp + 2 OpenAlex works"
+    - id: homonym-western
+      rule: "A priori list Thomas Müller, Michael Müller, David Brown, David Smith, Peter Schneider. Filters were widened to 2010-2024 and 2-5 creators after the 2019-2024 query returned at most one qualifying homonym per name. Per name: the dblp '(disambiguation)' record (an unassigned signature) when it is an article or inproceedings, plus the lowest-numbered homonym; otherwise the two lowest-numbered homonyms."
+      units: 5
+      records_per_unit: "2 dblp + 2 OpenAlex works"
+    - id: name-variant
+      rule: "dblp persons with exactly 2 creatorName values, ordered by SHA256('ds-p5-01|c4|' + person URI), first 16. Kept every person with a qualifying publication (DOI, 2-5 creators, not CoRR) under each of the two names. Per name: the smallest record key. Variants cover hyphenation, initials, diacritics, an added family name, and a full versus short given name."
+      units: 9
+      records_per_unit: "2 dblp + 2 OpenAlex works"
+    - id: orcid-vs-none
+      rule: "dblp persons with a dblp:orcid, ordered by SHA256('ds-p5-01|c5|' + person URI), first 30. Kept persons with one publication whose signature carries an ORCID and one whose signature does not (DOI, 2-5 creators, not CoRR; smallest key each). The first 8 by person URI were used."
+      units: 8
+      records_per_unit: "2 dblp + 2 OpenAlex works"
+    - id: preprint-vs-vor
+      rule: "dblp pairs of a CoRR record and a non-CoRR record with the identical title and the same number of creators (2-4), both with a DOI, ordered by SHA256('ds-p5-01|c7|' + CoRR record URI), first 8."
+      units: 8
+      records_per_unit: "2 dblp + 2 OpenAlex works (arXiv DOI and version-of-record DOI)"
+    - id: retraction
+      rule: "Crossref REST API, 2026-11-05: works?filter=update-type:retraction,from-pub-date:2021-01-01,until-pub-date:2023-12-31&query.bibliographic=algorithm network&rows=6. The first 3 items in Crossref relevance order (the order is not guaranteed to be reproducible)."
+      units: 3
+      records_per_unit: "OpenAlex and Crossref records of the retraction notice and of the retracted work"
+    - id: same-title
+      rule: "dblp records titled 'Editorial.', 'Guest Editorial.', 'Introduction.' or 'Preface.', year 2020, 1-2 creators, DOI. Per title: the pair of distinct records with the smallest SHA256('ds-p5-01|c8|' + recordA + '|' + recordB)."
+      units: 4
+      records_per_unit: "2 dblp + 2 OpenAlex works"
+    - id: multi-doi
+      rule: "dblp records carrying two DOIs (neither an arXiv DOI), 2-4 creators, not CoRR, ordered by SHA256('ds-p5-01|c9|' + record URI), first 6."
+      units: 6
+      records_per_unit: "1 dblp + OpenAlex by each DOI + Crossref by the second DOI"
+    - id: conf-vs-journal
+      rule: "dblp pairs of an Inproceedings and a non-CoRR Article with the identical title (longer than 30 characters), 2-4 and 2-5 creators, both with a DOI, ordered by SHA256('ds-p5-01|c10|' + inproceedings URI), first 8."
+      units: 8
+      records_per_unit: "2 dblp + 2 OpenAlex works"
+    - id: ordinary
+      rule: "Easy cases so that the queue is not adversarial-only: 2022 records in the dblp streams journals/tse, cacm, jss, ipl, csur, tkde, jacm, toplas with 2-3 creators and a DOI, ordered by SHA256('ds-p5-01|c11|' + record URI), first 8. A broader all-dblp query returned HTTP 429 from the SPARQL endpoint."
+      units: 8
+      records_per_unit: "1 dblp + 1 OpenAlex work + 1 Crossref work + up to 6 OpenAlex author records"
+  not_targeted:
+    - id: openalex-cluster-split-merge
+      note: "Not a selection criterion: no public list of OpenAlex author split or merge errors was verified. It shows up incidentally where OpenAlex returns one W for two DOIs, or different A IDs for one dblp person. That is visible in the stored records without running any policy."
+  licenses:
+    - source: dblp
+      license: "CC0 1.0 (secondary ODC-BY 1.0); covers the XML export formats"
+      url: "https://dblp.org/xml/README.txt"
+      verified_on: "2026-11-05"
+    - source: openalex
+      license: "CC0 1.0 ('Our data is CC0')"
+      url: "https://openalex.org/about"
+      verified_on: "2026-11-05"
+    - source: crossref
+      license: "'almost none of the metadata is subject to copyright, and you may use it for any purpose'; abstracts may be copyrighted and are not requested"
+      url: "https://www.crossref.org/documentation/retrieve-metadata/rest-api/"
+      verified_on: "2026-11-05"
+  privacy:
+    - "No ORCID record is fetched. A byte-faithful ORCID personal-details response can carry a biography, which the Phase 3 minimisation rule forbids, so ORCID evidence comes only from ORCID iDs asserted inside dblp, OpenAlex and Crossref records (Crossref author[].ORCID)."
+    - "OpenAlex author records are limited by select to id, orcid, display_name, display_name_alternatives, last_known_institutions, ids."
+    - "Names, ORCID iDs and affiliation strings are public bibliographic data used only for linkage and review; never infer identity from a name match."
+  labeler_visibility: "RV-P5-02 finding 5. These columns encode dblp's own identity claims and MUST be withheld from human gold-set labelers, and never copied into a review-queue row or a label file. In selection.tsv: criterion (homonym units say dblp holds two persons; name-variant and orcid-vs-none units say one person; preprint-vs-vor, conf-vs-journal and multi-doi name the asserted work relation), expect_author (the dblp author string with its homonym suffix such as 0001 or 0002), and the expect_doi column. For expect_doi what is withheld is the ASSOCIATION (which DOI the selection tied to which unit and dblp record), not the DOI value: the DOI is the record's own ee link and the blind view shows DOIs by design (RV-P5-07 NIT-7). In selection.tsv, split-assignment.tsv, PROVENANCE.tsv and FETCH-FAILURES.tsv: unit_id (name-variant and ORCID unit IDs such as nv-208-1029-* or ov-* encode the dblp person pid) and criterion. In file paths: the unit grouping. These are selection and verification facts, not match labels, and no module code reads selection.tsv. RV-P5-05 reports that the ER blind view (owner entity-resolution-engineer) already excludes criterion and unit IDs (BlindView.scala:141-143, 237-268), and that dblp homonym suffixes in record content are masked by DblpMasking (same owner). Confirming that every column listed here stays hidden is the responsibility of entity-resolution-engineer. Nothing under datasets/** enforces it. Details: datasets/schemas/er-candidates.md, Labeler visibility."
+  cross_split_check: "RV-P5-02 finding 6. --verify FAILS when an OpenAlex author ID or an ORCID iD occurs in both dev and heldout. IDs come from the OpenAlex work authorships and author records (author id and orcid), from the ORCID values of the author entries of Crossref works (message.items[].author[].ORCID, added by DS-P5-06 for RV-P5-07 MINOR-2), and from the orcid attributes of author and editor elements in dblp excerpts. Not collected: OpenAlex institution IDs, Crossref affiliation or funder identifiers, dblp pid attributes (form in the dump unverified), and every name string. They are normalised to openalex-author:A... and orcid:<bare upper-case iD>, so URL and bare forms compare equal. The offending IDs and their units are listed first. Names are never used. The remedy is a human decision on selection.tsv, never an edit of split-assignment.tsv. Observed on 2026-11-11 before the change: 0 shared IDs in the committed sample, so the stricter check does not break it. Observed on 2026-11-12 with the Crossref ORCIDs included (DS-P5-06): 0 shared IDs, 508 distinct IDs checked, the same count as without them, so every Crossref-asserted ORCID iD in the committed sample was already collected from an OpenAlex record of the same split."
+  limitations:
+    - "Selection used the live dblp SPARQL endpoint and the Crossref API on 2026-11-05, not the pinned snapshots. The record bytes come from the live APIs on the retrieval date in PROVENANCE.tsv, except dblp release excerpts."
+    - "The identifiers in selection.tsv were read through a summarising web-fetch tool. Every stored record is checked against its identifier, and each dblp record also against its selection facts, before it is kept. A transcription error therefore shows up as an entry in FETCH-FAILURES.tsv and never as a wrong record."
+    - "Crossref files keep the API envelope (message.items[0]). The Phase 4 Crossref normalizer reads one bare work per line and needs an envelope-aware reader (hadoop-engineer)."
+    - "Candidate-pair counts depend on the blocking run configuration (maxBlockSize). Unit sizes were chosen so that a name group stays small at the local test value of 4, but no count is observed until the pipeline reads these directories."
+  validation_commands:
+    - "datasets/scripts/validate-manifest.sh --verify"
+    - "datasets/scripts/fetch-samples.sh --verify datasets/er-candidates"
+    - "datasets/scripts/fetch-samples.sh --verify datasets/er-candidates/fixture"
+    - "datasets/scripts/fetch-samples.sh --verify datasets/er-candidates datasets/downloads/dblp/full/dblp-2026-10-03.xml.gz (after the human download)"
+  unverified:
+    - item: "OpenAlex keyless daily budget and per-request cost"
+      reason: "help.openalex.org (last updated 2026-11-03) states that keyless requests are allowed, but gives no per-request cost or keyless budget."
+    - item: "Layout of the real dblp-2026-10-03 release (record start tags at line start, end tags at line end, a '<dblp>' header line, '</dblp>' last) and its encoding declaration"
+      reason: "The release has not been downloaded. The extractor refuses the whole release with release-layout-error if the layout differs; only the fixture has been read. The fixture covers the plausible declarations ISO-8859-1, UTF-8 and US-ASCII and synthetic mdate/publtype/cdate attributes; the real declaration and attribute set are still unknown."
+    - item: "Which of the 120 selection.tsv dblp keys are in dblp-2026-10-03"
+      reason: "The release has not been read. Absent keys are recorded as key-not-in-pinned-release."

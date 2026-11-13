@@ -4,12 +4,25 @@
 #   --dry-run  print the pinned release, URLs, sizes and target paths (no network, no writes)
 #   --verify   offline: validate the manifest entry and committed sample; check any local
 #              release download against the pinned upstream MD5 and gzip integrity
-#   --sample   bounded: dblp.dtd (<=100 KB), the release .md5 file (<=1 KB) and the seed records
-#              https://dblp.org/rec/<key>.xml (<=200 KB each) into datasets/downloads/dblp/sample/
+#   --sample   bounded: dblp.dtd (<=100 KB, https://dblp.org/xml/dblp.dtd) and the release .md5 file
+#              (<=1 KB, drops.dagstuhl.de) into datasets/downloads/dblp/sample/. Per-record dblp XML
+#              (https://dblp.org/rec/<key>.xml) is NOT requested (DS-P5-03): dblp.org robots.txt says
+#              "Disallow: /rec/xml", "Disallow: /*.xml" and "Disallow: /*.json" (read 2026-11-05). dblp
+#              records come only from the pinned release (--full) or the committed sample.
 #   --full     HUMAN ONLY: the pinned dated release (about 1.03 GB) into datasets/downloads/dblp/full/
 #              (git-ignored); requires SCHOLARCHAIN_CONFIRM_FULL_DOWNLOAD=<datasets.dblp.snapshot.id>.
-#              Resumable. A partial file that already matches the pinned MD5 is not re-requested. A
-#              file that fails the MD5 or gzip check is deleted, so the next run starts clean.
+#              Resumable. Connect timeout 30 s; a transfer below 1024 bytes/s for 120 s is a stall
+#              (curl exit 28); no total time limit. A partial file that already matches the pinned
+#              MD5 is not re-requested. On any curl failure, and on HTTP 416 even when curl exits 0,
+#              the .part file is KEPT and a RECOVERY line names it and the shell-escaped manual step
+#              (HTTP 416 / cannot resume: rm the .part by hand). Only a transfer that curl reports
+#              complete but that fails the MD5 or gzip check is deleted; if the MD5 cannot be computed
+#              the .part is kept. A final file left without its sidecar by an interrupted run is
+#              re-checked (MD5 pin, gzip -t) and gets its sidecar without a new download.
+#              Symbolic links are refused (exit 2, before any network access, and again before the
+#              transfer and the rename): datasets/downloads itself, every path component below it, the
+#              release file, its .part, .sha256 and .sha256.tmp. A link is never followed, deleted or
+#              written through (RV-P5-07 MINOR-1). curl runs with -q first, so ~/.curlrc is ignored.
 #
 # All pinned values (URLs, snapshot id, upstream MD5) are read from datasets/dataset-manifest.yaml.
 set -euo pipefail
@@ -33,10 +46,10 @@ case "$DS_MODE" in
     ds_log "release file:    $URL (expected about 1.03 GB, see manifest size.expected)"
     ds_log "upstream md5:    $PIN_MD5 (from $MD5_URL)"
     ds_log "dtd:             $DTD_URL"
-    ds_log "--sample writes: ${DS_OUT#"$DS_ROOT"/}/sample/{dblp.dtd,$FILE.md5,rec/*.xml}"
+    ds_log "--sample writes: ${DS_OUT#"$DS_ROOT"/}/sample/{dblp.dtd,$FILE.md5}"
     ds_log "--full writes:   ${DS_OUT#"$DS_ROOT"/}/full/$FILE (human only)"
-    ds_log "seed records:"
-    ds_seeds dblp rec | sed 's/^/  /' >&2
+    ds_log "--full bounds:   connect timeout ${DS_FULL_CONNECT_TIMEOUT_S} s; stall below ${DS_FULL_STALL_BYTES_PER_S} bytes/s for ${DS_FULL_STALL_TIME_S} s; cap ${DS_FULL_MAX_BYTES} bytes; no total time limit"
+    ds_log "per-record dblp XML is never requested (dblp.org robots.txt disallows /rec/xml and /*.xml)"
     ;;
 
   verify)
@@ -48,8 +61,10 @@ case "$DS_MODE" in
     fi
     if [ -e "$DS_OUT/full/$FILE" ]; then
       ds_need gzip
+      ds_need_md5
       ds_is_current "$DS_OUT/full/$FILE" || ds_die "$FILE does not match its .sha256 sidecar"
-      [ "$(ds_md5 "$DS_OUT/full/$FILE")" = "$PIN_MD5" ] || ds_die "$FILE does not match the pinned upstream MD5"
+      got="$(ds_md5 "$DS_OUT/full/$FILE")" || ds_die "cannot compute the MD5 of $FILE (md5sum or md5 failed)"
+      [ "$got" = "$PIN_MD5" ] || ds_die "$FILE does not match the pinned upstream MD5"
       gzip -t "$DS_OUT/full/$FILE" || ds_die "$FILE fails gzip -t"
       ds_log "full release verified: md5, sha256 sidecar, gzip -t"
     fi
@@ -64,47 +79,20 @@ case "$DS_MODE" in
         DS_FAILURES=$((DS_FAILURES + 1))
       fi
     fi
-    for key in $(ds_seeds dblp rec); do
-      dest="$DS_OUT/sample/rec/$(printf '%s' "$key" | tr '/' '_').xml"
-      if ds_fetch "https://dblp.org/rec/$key.xml" "$dest" 200000 60 "application/xml"; then
-        if ! python3 -I "$DS_PY" check-xml "$dest"; then
-          rm -f "$dest" "$dest.sha256"
-          ds_log "dblp returned a non-XML page for $key (bot protection?). Open https://dblp.org/rec/$key.xml in a browser instead."
-          DS_FAILURES=$((DS_FAILURES + 1))
-        fi
-      fi
-    done
+    # No per-record request: dblp.org robots.txt disallows /rec/xml, /*.xml and /*.json (DS-P5-03).
+    ds_log "per-record dblp XML not requested (robots.txt); seed records stay the committed sample"
     ;;
 
   full)
     ds_require_full_confirmation "$SNAP_ID"
     ds_need gzip
+    ds_need_md5
     dest="$DS_OUT/full/$FILE"
-    if ds_is_current "$dest"; then
-      ds_log "already present and verified: ${dest#"$DS_ROOT"/}"
-    else
-      mkdir -p "$DS_OUT/full"
-      # A complete .part left by an interrupted earlier run (killed after curl, before the checks)
-      # is checked first; resuming it would request a range past the end of the file.
-      if [ -s "$dest.part" ] && [ "$(ds_md5 "$dest.part")" = "$PIN_MD5" ]; then
-        ds_log "partial file already matches the pinned MD5; not downloading again"
-      else
-        ds_log "downloading $URL (about 1.03 GB; resumable)"
-        curl --fail --location --proto '=https' --proto-redir '=https' --max-filesize 2000000000 \
-          -A "$DS_UA" -C - -o "$dest.part" "$URL"
-      fi
-      got="$(ds_md5 "$dest.part")"
-      if [ "$got" != "$PIN_MD5" ]; then
-        rm -f "$dest.part"
-        ds_die "MD5 mismatch: got $got, pinned $PIN_MD5. The corrupt file $dest.part was deleted; re-run the same command to download it again from the start."
-      fi
-      if ! gzip -t "$dest.part"; then
-        rm -f "$dest.part"
-        ds_die "gzip -t failed although the MD5 matched. $dest.part was deleted; re-run to download again, and report this to dataset-engineer if it repeats."
-      fi
-      mv -f "$dest.part" "$dest"
-      ds_sha256 "$dest" > "$dest.sha256"
-    fi
+    # Bounded, resumable transfer plus MD5 / gzip -t / sidecar (lib-datasets.sh ds_full_download).
+    # Every failure prints a RECOVERY line naming the .part path; see RV-P5-02 findings 1 and 2.
+    rc=0
+    ds_full_download "$URL" "$dest" "$PIN_MD5" || rc=$?
+    [ "$rc" -eq 0 ] || ds_die "the full download did not complete (exit $rc); follow the RECOVERY or ERROR line above" "$rc"
     ds_log "size bytes: $(wc -c < "$dest" | tr -d ' ')"
     ds_log "sha256:     $(cat "$dest.sha256")"
     ds_log "Record these as size.observed.bytes and integrity.our_sha256 in the manifest (dataset-engineer work order)."
