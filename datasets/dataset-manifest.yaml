@@ -7,7 +7,7 @@
 # Validate with: datasets/scripts/validate-manifest.sh --verify
 manifest_version: "1.0.0"
 owning_agent: dataset-engineer
-last_reviewed: "2026-10-29"
+last_reviewed: "2026-11-12"
 raw_prefix_template: "s3://{raw_bucket}/raw/{dataset}/snapshot_date={snapshot_date}/"
 raw_bucket_note: "{raw_bucket} is external configuration. No bucket name, account ID, ARN, or endpoint of ScholarChain infrastructure is recorded here. It is resolved through the configuration contract (domain-engineer) and provisioned through Terraform (infra-engineer). Raw prefixes are immutable: a new snapshot always gets a new snapshot_date prefix."
 identity_policy: "A matching author name is never evidence of identity. ORCID iDs asserted by DBLP, OpenAlex, Crossref or ORCID itself are evidence with provenance (who asserted it, when), not ground truth. Match features, policy and thresholds belong to entity-resolution-engineer."
@@ -70,8 +70,9 @@ datasets:
       id: "dblp-2026-10-03"
       date: "2026-10-03"
       date_meaning: "Publication date of the dated monthly release on Dagstuhl DROPS (DOI 10.4230/dblp.xml.2026-10-03). The rolling dblp.org/xml/dblp.xml.gz changes daily and is not used for reproducible runs."
-      retrieval_date: null
-      status: "pending-human-download"
+      retrieval_date: "2026-11-12"
+      status: "downloaded-and-verified"
+      retrieved_by: "The human ran the pinned download (SCHOLARCHAIN_CONFIRM_FULL_DOWNLOAD=dblp-2026-10-03 datasets/scripts/fetch-dblp.sh --full) on 2026-11-12 from the reviewed script checkpoint, commit 5e324bd, then ran datasets/scripts/fetch-dblp.sh --verify (human report decisions-12.md: 110 manifest checks, 0 failures; full archive passed the MD5, SHA-256 sidecar and gzip checks). DS-P5-07 cross-check by dataset-engineer on 2026-11-12: shasum -a 256 of the local archive equals the human-reported value and the .sha256 sidecar, and fetch-dblp.sh --verify passed (110 checks, 0 failures; 'full release verified: md5, sha256 sidecar, gzip -t')."
     retrieval:
       script: "datasets/scripts/fetch-dblp.sh"
       dry_run_command: "datasets/scripts/fetch-dblp.sh --dry-run"
@@ -94,8 +95,11 @@ datasets:
         uncompressed_bytes: "UNVERIFIED: not published on the pages read"
         record_count: "UNVERIFIED: not published on the pages read"
       observed:
-        bytes: null
-        status: "pending-human-download"
+        bytes: 1107081001
+        status: "observed-by-human"
+        file: "datasets/downloads/dblp/full/dblp-2026-10-03.xml.gz (git-ignored)"
+        observed_on: "2026-11-12"
+        source: "Byte count reported by the human from the local file (decisions-12.md). dataset-engineer could not measure the byte count with an allowlisted command in DS-P5-07. Its own SHA-256 of the same file matched the recorded our_sha256, and fetch-dblp.sh --verify matched the MD5 pin. So the bytes measured are the pinned release, but dataset-engineer did not observe the count itself."
     raw_prefix: "s3://{raw_bucket}/raw/dblp/snapshot_date=2026-10-03/"
     integrity:
       method: "Compare the upstream MD5 (release .md5 file) before upload, then compute SHA-256 locally and record it here and as S3 object metadata. Run gzip -t."
@@ -104,7 +108,9 @@ datasets:
         value: "cbd329100ea1bbb2873fa2f6d414ea00"
         source: "https://drops.dagstuhl.de/storage/artifacts/dblp/xml/2026/dblp-2026-10-03.xml.gz.md5"
         transcription_note: "Read twice on 2026-10-29 (release page and .md5 file), identical both times. fetch-dblp.sh --sample re-reads the live .md5 file and fails on any difference."
-      our_sha256: "pending-human-download"
+        local_match: "MATCHED on 2026-11-12: the downloaded archive's MD5 equals this pin (fetch-dblp.sh --verify, run by the human and again by dataset-engineer in DS-P5-07)."
+      our_sha256: "20e45961bec5610dc07b8e932ccd27a2387534cfa12c92a24289fe873aebe969"
+      our_sha256_note: "SHA-256 of datasets/downloads/dblp/full/dblp-2026-10-03.xml.gz (1107081001 bytes), computed on 2026-11-12. Three values are identical: the human report (decisions-12.md), the .sha256 sidecar written by fetch-dblp.sh --full, and dataset-engineer's shasum -a 256 run in DS-P5-07. The manifest validator checks only the format of this field. It does not compare it with the local archive; fetch-dblp.sh --verify compares the archive with its sidecar and the MD5 pin. See validation_commands for the manual check."
       etag_policy: "S3 ETags are not used as content hashes (multipart uploads produce non-MD5 ETags). Integrity is the recorded SHA-256 plus the upstream MD5."
     schema_version: "dblp-raw/1.0.0"
     upstream_schema_version: "dblp.dtd, latest change 'DTD changes of June 28, 2023' (https://dblp.org/xml/CHANGES.txt)"
@@ -157,14 +163,24 @@ datasets:
       - "datasets/scripts/fetch-dblp.sh --verify"
       - "gzip -t datasets/downloads/dblp/full/dblp-2026-10-03.xml.gz"
       - "shasum -a 256 datasets/downloads/dblp/full/dblp-2026-10-03.xml.gz"
+      - "wc -c < datasets/downloads/dblp/full/dblp-2026-10-03.xml.gz"
+    validation_command_notes:
+      - command: "shasum -a 256 datasets/downloads/dblp/full/dblp-2026-10-03.xml.gz"
+        expect: "20e45961bec5610dc07b8e932ccd27a2387534cfa12c92a24289fe873aebe969"
+        expect_field: "integrity.our_sha256"
+        check: "Manual. Compare the printed hash with expect. The manifest validator checks only the format of integrity.our_sha256, not the local file."
+      - command: "wc -c < datasets/downloads/dblp/full/dblp-2026-10-03.xml.gz"
+        expect: "1107081001"
+        expect_field: "size.observed.bytes"
+        check: "Manual. Compare the printed byte count with expect. The value was observed by the human (decisions-12.md), not by dataset-engineer, and the manifest validator does not measure the local file."
     owning_agent: dataset-engineer
     samples:
       - "datasets/samples/dblp/dblp-sample.xml"
     unverified:
       - item: "format.encoding"
         reason: "The XML declaration of the full dump was not read; only the DTD and listings were fetched. An attempt to read https://dblp.org/xml/README.txt for an encoding statement on 2026-11-05 (DS-P5-04) did not complete (tool usage limit). The extractor fixture therefore tests the plausible declarations ISO-8859-1, UTF-8 and US-ASCII; the real one is still unknown."
-      - item: "exact compressed byte size of dblp-2026-10-03.xml.gz"
-        reason: "Only the display value 1.03 GB is published on the pages read, so fetch-dblp.sh --full cannot prove that a .part file is complete and never deletes one after a failed transfer (retrieval.full_failure_behavior)."
+      - item: "exact compressed byte size of dblp-2026-10-03.xml.gz (upstream-published value)"
+        reason: "Only the display value 1.03 GB is published on the pages read, so fetch-dblp.sh --full cannot prove that a .part file is complete and never deletes one after a failed transfer (retrieval.full_failure_behavior). The local file that matches the MD5 pin measures 1107081001 bytes (size.observed, reported by the human on 2026-11-12). That is our observation; upstream has not published the size."
       - item: "size.expected.uncompressed_bytes and record_count"
         reason: "Not stated on any official page read on 2026-10-29."
       - item: "source_identifiers.orcid attribute value form"
@@ -592,7 +608,7 @@ er_candidates:
     meaning: "Offsets and lengths are bytes of the decompressed release stream. The excerpt file equals the header range, then the record range, then the footer range. The same ranges and the .gz SHA-256 are repeated in the PROVENANCE.tsv request_url cell as 'release:<file> sha256=<gz sha256> header=<offset>+<length> record=<offset>+<length> footer=<offset>+<length>', and the excerpt SHA-256 is the PROVENANCE.tsv sha256 cell."
     checks: "--verify checks offline that every dblp ledger row has a range row, that the ranges are ordered and add up to the file size, that the SHA-256 values agree, and that the file slices follow the header/record/footer rule. The --verify run with the release path also re-checks the release MD5 and sidecar and compares the release bytes at every recorded offset with the stored file."
     write_order: "RV-P5-02 finding 4 (DS-P5-04): file + ranges row + PROVENANCE row are all-or-nothing from the next run's point of view. 1. the excerpt bytes are written to <file>.part (fsync) and re-hashed; on a mismatch the .part is removed, no row is written and the record fails with excerpt-write-failed; 2. os.replace to <file>; 3. the ranges row is written by an atomic rewrite of DBLP-RELEASE-RANGES.tsv (temporary file + rename), replacing any uncommitted row for the same file; 4. the PROVENANCE.tsv row is appended LAST and is the commit point. --sample counts a dblp record as present only when its PROVENANCE row, its ranges row and the file agree. Without a PROVENANCE row, a leftover file, .part or ranges row is reported as RECOVER and replaced by re-extraction (deterministic bytes of the pinned release). A PROVENANCE row that disagrees with the ranges row or the file is reported as excerpt-state-inconsistent with the manual repair step and never counted as present. A PROVENANCE or ranges line torn by an interrupted append (no trailing newline and fewer tab-separated columns than a row) is dropped with a REPAIRED message before reading, and the record is re-extracted or re-fetched. A last line without a trailing newline that has a full row's columns (possibly a complete hand-edited row) is never dropped: --sample stops with exit 2 before any fetch or extraction, the file is unchanged, and the message names the manual repair (RV-P5-03 N1). The release is hashed and scanned in one pass, and no excerpt is written before both digests match (RV-P5-02 nit 11). --verify fails on every one of these states (torn last line, file or .part without a PROVENANCE row, ranges row without a PROVENANCE row, PROVENANCE row without a consistent ranges row)."
-    state: "No dblp excerpt exists yet (the release has not been downloaded), so the file is not present."
+    state: "The pinned release was downloaded by the human and verified on 2026-11-12 (datasets.dblp.snapshot). The file is written only by the human-run extraction (retrieval.sample_command); until that run it is not present. --verify reports the current state."
   missing_record_policy: "Records are never substituted. A selection.tsv dblp key absent from dblp-2026-10-03 is recorded in FETCH-FAILURES.tsv with reason key-not-in-pinned-release. No other release, mirror, SPARQL result or API record replaces it, and the pin is not changed to improve coverage (human instruction, decisions-03). selection.tsv and split-assignment.tsv membership is unchanged; the unit stays in its split with fewer records. Keys suspected to be absent because they are from 2025-2026 (DS-P5-02): journals/tjs/CamaraCB26, journals/comcom/RioMSJC26, journals/theoretics/PintoH26, conf/citc/ChatterjeeLV26, journals/bspc/ErenT26 (UNVERIFIED until the release is read)."
   failure_reasons:
     - "release-missing: the pinned release file does not exist (whole dblp step refused)"
@@ -690,11 +706,11 @@ er_candidates:
     - "datasets/scripts/validate-manifest.sh --verify"
     - "datasets/scripts/fetch-samples.sh --verify datasets/er-candidates"
     - "datasets/scripts/fetch-samples.sh --verify datasets/er-candidates/fixture"
-    - "datasets/scripts/fetch-samples.sh --verify datasets/er-candidates datasets/downloads/dblp/full/dblp-2026-10-03.xml.gz (after the human download)"
+    - "datasets/scripts/fetch-samples.sh --verify datasets/er-candidates datasets/downloads/dblp/full/dblp-2026-10-03.xml.gz"
   unverified:
     - item: "OpenAlex keyless daily budget and per-request cost"
       reason: "help.openalex.org (last updated 2026-11-03) states that keyless requests are allowed, but gives no per-request cost or keyless budget."
     - item: "Layout of the real dblp-2026-10-03 release (record start tags at line start, end tags at line end, a '<dblp>' header line, '</dblp>' last) and its encoding declaration"
-      reason: "The release has not been downloaded. The extractor refuses the whole release with release-layout-error if the layout differs; only the fixture has been read. The fixture covers the plausible declarations ISO-8859-1, UTF-8 and US-ASCII and synthetic mdate/publtype/cdate attributes; the real declaration and attribute set are still unknown."
+      reason: "The release was downloaded and verified on 2026-11-12, but its records have not yet been read by the extractor. The extractor refuses the whole release with release-layout-error if the layout differs; only the fixture has been read. The fixture covers the plausible declarations ISO-8859-1, UTF-8 and US-ASCII and synthetic mdate/publtype/cdate attributes; the real declaration and attribute set are still unknown."
     - item: "Which of the 120 selection.tsv dblp keys are in dblp-2026-10-03"
       reason: "The release has not been read. Absent keys are recorded as key-not-in-pinned-release."
