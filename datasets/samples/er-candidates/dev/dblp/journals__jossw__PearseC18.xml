@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<article mdate="2020-05-25" key="journals/jossw/PearseC18" publtype="software">
+<author orcid="0000-0002-6241-3164">Will Pearse</author>
+<author orcid="0000-0003-1444-9135">Scott Chamberlain</author>
+<title>Suppdata: Downloading Supplementary Data from Published Manuscripts.</title>
+<pages>721</pages>
+<year>2018</year>
+<volume>3</volume>
+<journal>J. Open Source Softw.</journal>
+<number>25</number>
+<ee type="oa">https://doi.org/10.21105/joss.00721</ee>
+<ee>https://www.wikidata.org/entity/Q57809255</ee>
+<url>db/journals/jossw/jossw3.html#PearseC18</url>
+</article></dblp>

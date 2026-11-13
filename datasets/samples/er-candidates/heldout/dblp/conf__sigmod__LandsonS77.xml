@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2021-08-12" key="conf/sigmod/LandsonS77">
+<author>Barry M. Landson</author>
+<author>Robert G. Sargent</author>
+<title>A Comparison of Sequential and Associate Computing of Priority Queues.</title>
+<pages>77-78</pages>
+<cdrom>sigmodR/09-2/P077.pdf</cdrom>
+<year>1977</year>
+<crossref>conf/sigmod/77nnp</crossref>
+<booktitle>Computer Architecture for Non-Numeric Processing</booktitle>
+<url>db/conf/sigmod/nnp77.html#LandsonS77</url>
+<ee>https://doi.org/10.1145/800180.810255</ee>
+<ee>https://doi.org/10.1145/965641.810255</ee>
+</inproceedings></dblp>

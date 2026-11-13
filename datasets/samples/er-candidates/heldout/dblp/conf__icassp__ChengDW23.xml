@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2025-12-13" key="conf/icassp/ChengDW23">
+<author orcid="0000-0002-5585-4957">Wen Cheng 0001</author>
+<author>Shichen Dong</author>
+<author>Wei Wang 0002</author>
+<title>W2KPE: Keyphrase Extraction with Word-Word Relation.</title>
+<pages>1-2</pages>
+<year>2023</year>
+<booktitle>ICASSP</booktitle>
+<ee>https://doi.org/10.1109/ICASSP49357.2023.10096850</ee>
+<crossref>conf/icassp/2023</crossref>
+<url>db/conf/icassp/icassp2023.html#ChengDW23</url>
+</inproceedings></dblp>

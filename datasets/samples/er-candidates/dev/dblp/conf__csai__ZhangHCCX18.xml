@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2019-11-08" key="conf/csai/ZhangHCCX18">
+<author>Zi-Xuan Zhang</author>
+<author>Wen-ning Hao</author>
+<author>Gang Chen</author>
+<author>Jun-Yue Chen 0001</author>
+<author>You-Wei Xu</author>
+<title>An Extension of MIC for Multivariate Correlation Analysis Based on Interaction Information.</title>
+<pages>399-403</pages>
+<year>2018</year>
+<booktitle>CSAI/ICIMT</booktitle>
+<ee>https://doi.org/10.1145/3297156.3297162</ee>
+<crossref>conf/csai/2018</crossref>
+<url>db/conf/csai/csai2018.html#ZhangHCCX18</url>
+</inproceedings>
+</dblp>

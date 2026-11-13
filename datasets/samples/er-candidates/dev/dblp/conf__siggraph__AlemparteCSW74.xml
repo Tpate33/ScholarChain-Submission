@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2025-01-19" key="conf/siggraph/AlemparteCSW74">
+<author>M. Alemparte</author>
+<author>D. Chheda</author>
+<author>D. Seeley</author>
+<author>W. Walker</author>
+<title>Interacting with discrete simulation using on line graphic animation.</title>
+<pages>47</pages>
+<year>1974</year>
+<booktitle>SIGGRAPH</booktitle>
+<ee>https://doi.org/10.1145/563182.563213</ee>
+<ee>https://www.wikidata.org/entity/Q130958873</ee>
+<crossref>conf/siggraph/1974</crossref>
+<url>db/conf/siggraph/siggraph1974.html#AlemparteCSW74</url>
+</inproceedings>
+</dblp>

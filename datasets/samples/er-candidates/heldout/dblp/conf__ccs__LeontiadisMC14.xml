@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2024-08-04" key="conf/ccs/LeontiadisMC14">
+<author>Nektarios Leontiadis</author>
+<author orcid="0000-0002-8771-8191">Tyler Moore 0001</author>
+<author orcid="0000-0002-2506-8031">Nicolas Christin</author>
+<title>A Nearly Four-Year Longitudinal Study of Search-Engine Poisoning.</title>
+<pages>930-941</pages>
+<year>2014</year>
+<booktitle>CCS</booktitle>
+<ee>https://doi.org/10.1145/2660267.2660332</ee>
+<crossref>conf/ccs/2014</crossref>
+<url>db/conf/ccs/ccs2014.html#LeontiadisMC14</url>
+</inproceedings>
+</dblp>

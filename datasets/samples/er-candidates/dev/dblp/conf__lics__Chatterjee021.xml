@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2021-07-09" key="conf/lics/Chatterjee021">
+<author>Krishnendu Chatterjee</author>
+<author>Laurent Doyen 0001</author>
+<title>Stochastic Processes with Expected Stopping Time.</title>
+<pages>1-13</pages>
+<year>2021</year>
+<booktitle>LICS</booktitle>
+<ee>https://doi.org/10.1109/LICS52264.2021.9470595</ee>
+<crossref>conf/lics/2021</crossref>
+<url>db/conf/lics/lics2021.html#Chatterjee021</url>
+</inproceedings>
+</dblp>

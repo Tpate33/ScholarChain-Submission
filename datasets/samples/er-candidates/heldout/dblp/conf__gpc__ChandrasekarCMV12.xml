@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2017-05-26" key="conf/gpc/ChandrasekarCMV12">
+<author>Ashok Chandrasekar</author>
+<author>Karthik Chandrasekar 0002</author>
+<author>Malairaja Mahadevan</author>
+<author>P. Varalakshmi</author>
+<title>QoS Monitoring and Dynamic Trust Establishment in the Cloud.</title>
+<pages>289-301</pages>
+<year>2012</year>
+<booktitle>GPC</booktitle>
+<ee>https://doi.org/10.1007/978-3-642-30767-6_25</ee>
+<crossref>conf/gpc/2012</crossref>
+<url>db/conf/gpc/gpc2012.html#ChandrasekarCMV12</url>
+</inproceedings></dblp>

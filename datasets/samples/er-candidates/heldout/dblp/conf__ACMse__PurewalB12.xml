@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2025-01-19" key="conf/ACMse/PurewalB12">
+<author>Tarsem S. Purewal Jr.</author>
+<author>David Brown</author>
+<title>Social network programming with JavaScript and Spotter.</title>
+<pages>347-348</pages>
+<year>2012</year>
+<booktitle>ACM Southeast Regional Conference</booktitle>
+<ee>https://doi.org/10.1145/2184512.2184598</ee>
+<ee>https://www.wikidata.org/entity/Q131116193</ee>
+<crossref>conf/ACMse/2012</crossref>
+<url>db/conf/ACMse/ACMse2012.html#PurewalB12</url>
+</inproceedings>
+</dblp>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2018-11-02" key="conf/icassp/ZibettiMB08">
+<author orcid="0000-0003-2856-3625">Marcelo Victor W&uuml;st Zibetti</author>
+<author>Joceli Mayer</author>
+<author>Ferm&iacute;n S. V. Baz&aacute;n</author>
+<title>Determining the parameters in regularized super-resolution reconstruction.</title>
+<pages>853-856</pages>
+<year>2008</year>
+<booktitle>ICASSP</booktitle>
+<ee>https://doi.org/10.1109/ICASSP.2008.4517744</ee>
+<crossref>conf/icassp/2008</crossref>
+<url>db/conf/icassp/icassp2008.html#ZibettiMB08</url>
+</inproceedings></dblp>

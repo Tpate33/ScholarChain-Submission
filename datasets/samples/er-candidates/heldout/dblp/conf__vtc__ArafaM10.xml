@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2025-10-14" key="conf/vtc/ArafaM10">
+<author orcid="0000-0003-2533-4122">Ahmed Arafa</author>
+<author orcid="0000-0002-9825-3238">Geoffrey G. Messier</author>
+<title>A Gaussian Model for Dead-Reckoning Mobile Sensor Position Error.</title>
+<pages>1-5</pages>
+<year>2010</year>
+<booktitle>VTC Fall</booktitle>
+<ee>https://doi.org/10.1109/VETECF.2010.5594098</ee>
+<crossref>conf/vtc/2010f</crossref>
+<url>db/conf/vtc/vtc2010f.html#ArafaM10</url>
+</inproceedings>
+</dblp>

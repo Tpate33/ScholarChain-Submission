@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2026-02-01" key="conf/aaai/YuanBZLD23">
+<author orcid="0000-0001-5829-8952">Zhaolin Yuan</author>
+<author>Xiaojuan Ban</author>
+<author>Zixuan Zhang</author>
+<author orcid="0000-0001-5163-3797">Xiaorui Li</author>
+<author orcid="0000-0001-6165-4196">Hong-Ning Dai</author>
+<title>ODE-RSSM: Learning Stochastic Recurrent State Space Model from Irregularly Sampled Data.</title>
+<pages>11060-11068</pages>
+<year>2023</year>
+<booktitle>AAAI</booktitle>
+<ee type="oa">https://doi.org/10.1609/aaai.v37i9.26310</ee>
+<crossref>conf/aaai/2023</crossref>
+<url>db/conf/aaai/aaai2023.html#YuanBZLD23</url>
+</inproceedings>
+</dblp>

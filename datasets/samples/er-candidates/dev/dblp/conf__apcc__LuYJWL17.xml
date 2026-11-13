@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2025-03-03" key="conf/apcc/LuYJWL17">
+<author>Xintong Lu</author>
+<author>Xi Yang 0003</author>
+<author>Shi Jin 0002</author>
+<author orcid="0000-0001-5952-232X">Chao-Kai Wen</author>
+<author>Wen-Jun Lu</author>
+<title>TDD-based massive MIMO system with multi-antenna user equipments.</title>
+<pages>1-6</pages>
+<year>2017</year>
+<booktitle>APCC</booktitle>
+<ee>https://doi.org/10.23919/APCC.2017.8304054</ee>
+<crossref>conf/apcc/2017</crossref>
+<url>db/conf/apcc/apcc2017.html#LuYJWL17</url>
+</inproceedings>
+</dblp>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2022-01-24" key="conf/icbk/OhnoK21">
+<author>Kentaro Ohno</author>
+<author>Atsutoshi Kumagai</author>
+<title>Recurrent Neural Networks for Learning Long-term Temporal Dependencies with Reanalysis of Time Scale Representation.</title>
+<pages>182-189</pages>
+<year>2021</year>
+<booktitle>ICBK</booktitle>
+<ee>https://doi.org/10.1109/ICKG52313.2021.00033</ee>
+<crossref>conf/icbk/2021</crossref>
+<url>db/conf/icbk/icbk2021.html#OhnoK21</url>
+</inproceedings>
+</dblp>

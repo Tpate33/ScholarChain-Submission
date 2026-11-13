@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2021-11-18" key="conf/icassp/ZhuXN11">
+<author>Hong Pan 0001</author>
+<author>Yaping Zhu</author>
+<author>Liang-Zheng Xia</author>
+<author>Truong Q. Nguyen</author>
+<title>Combining generic and class-specific codebooks for object categorization and detection.</title>
+<pages>2264-2267</pages>
+<year>2011</year>
+<booktitle>ICASSP</booktitle>
+<ee>https://doi.org/10.1109/ICASSP.2011.5946933</ee>
+<crossref>conf/icassp/2011</crossref>
+<url>db/conf/icassp/icassp2011.html#ZhuXN11</url>
+</inproceedings></dblp>

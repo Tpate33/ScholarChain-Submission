@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2026-02-17" key="conf/focs/GolowichG25">
+<author>Louis Golowich</author>
+<author>Venkatesan Guruswami</author>
+<title>Near-Asymptotically-Good Quantum Codes with Transversal CCZ Gates and Sublinear-Weight Parity-Checks.</title>
+<booktitle>FOCS</booktitle>
+<year>2025</year>
+<pages>1561-1569</pages>
+<crossref>conf/focs/2025</crossref>
+<ee>https://doi.org/10.1109/FOCS63196.2025.00082</ee>
+<url>db/conf/focs/focs2025.html#GolowichG25</url>
+<stream>streams/conf/focs</stream>
+</inproceedings>
+</dblp>

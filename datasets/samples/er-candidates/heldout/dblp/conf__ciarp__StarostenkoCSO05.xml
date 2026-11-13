@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2021-04-13" key="conf/ciarp/StarostenkoCSO05">
+<author>Oleg Starostenko</author>
+<author>Alberto Ch&aacute;vez-Arag&oacute;n</author>
+<author orcid="0000-0001-7728-7087">J. Alfredo S&aacute;nchez 0001</author>
+<author>Yulia Ostr&oacute;vskaya</author>
+<title>A Hybrid Approach for Image Retrieval with Ontological Content-Based Indexing.</title>
+<pages>997-1004</pages>
+<year>2005</year>
+<crossref>conf/ciarp/2005</crossref>
+<booktitle>CIARP</booktitle>
+<ee type="oa">https://doi.org/10.1007/11578079_102</ee>
+<url>db/conf/ciarp/ciarp2005.html#StarostenkoCSO05</url>
+</inproceedings></dblp>

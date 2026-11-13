@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2024-03-01" key="conf/iasam/ZarkabSP23">
+<author>Muhammad Zarkab</author>
+<author>Bhim Singh 0001</author>
+<author>Bijaya K. Panigrahi</author>
+<title>Active Power Decoupling in Cascaded H-Bridge Converter Using Secondary-Stage Isolated DC-DC Converters.</title>
+<pages>1-6</pages>
+<year>2023</year>
+<booktitle>IAS</booktitle>
+<ee>https://doi.org/10.1109/IAS54024.2023.10406364</ee>
+<crossref>conf/iasam/2023</crossref>
+<url>db/conf/iasam/ias2023.html#ZarkabSP23</url>
+</inproceedings>
+</dblp>

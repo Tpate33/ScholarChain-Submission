@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2024-09-03" key="conf/europar/SongKEPC03">
+<author>Wenbin Song</author>
+<author>Andy J. Keane</author>
+<author>Murat Hakki Eres</author>
+<author>Graeme E. Pound</author>
+<author>Simon J. Cox 0001</author>
+<title>Two Dimensional Airfoil Optimisation Using CFD in a Grid Computing Environment.</title>
+<pages>525-532</pages>
+<ee>https://doi.org/10.1007/978-3-540-45209-6_75</ee>
+<year>2003</year>
+<crossref>conf/europar/2003</crossref>
+<booktitle>Euro-Par</booktitle>
+<url>db/conf/europar/europar2003.html#SongKEPC03</url>
+</inproceedings>
+</dblp>

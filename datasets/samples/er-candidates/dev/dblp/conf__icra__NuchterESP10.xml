@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2018-11-02" key="conf/icra/NuchterESP10">
+<author orcid="0000-0003-3870-783X">Andreas N&uuml;chter</author>
+<author>Jan Elseberg</author>
+<author>Peter Schneider</author>
+<author>Dietrich Paulus</author>
+<title>Linearization of rotations for globally consistent n-scan matching.</title>
+<pages>1373-1379</pages>
+<year>2010</year>
+<booktitle>ICRA</booktitle>
+<ee>https://doi.org/10.1109/ROBOT.2010.5509306</ee>
+<crossref>conf/icra/2010</crossref>
+<url>db/conf/icra/icra2010.html#NuchterESP10</url>
+</inproceedings></dblp>

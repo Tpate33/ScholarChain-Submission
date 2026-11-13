@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2023-03-24" key="conf/wsc/McKayR89">
+<author>Kenneth N. McKay</author>
+<author>Michael Rooks</author>
+<title>WATMIMS JIT/KANBAN benchmark summary and recommendations.</title>
+<pages>773-783</pages>
+<year>1989</year>
+<crossref>conf/wsc/1989</crossref>
+<booktitle>WSC</booktitle>
+<ee>https://doi.org/10.1145/76738.76835</ee>
+<ee>https://doi.org/10.1109/WSC.1989.718753</ee>
+<ee>https://doi.ieeecomputersociety.org/10.1109/WSC.1989.718753</ee>
+<url>db/conf/wsc/wsc1989.html#McKayR89</url>
+</inproceedings></dblp>

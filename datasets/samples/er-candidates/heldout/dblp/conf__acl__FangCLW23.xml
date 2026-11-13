@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2023-09-05" key="conf/acl/FangCLW23">
+<author>Xuanjie Fang</author>
+<author>Sijie Cheng</author>
+<author>Yang Liu 0165</author>
+<author>Wei Wang 0009</author>
+<title>Modeling Adversarial Attack on Pre-trained Language Models as Sequential Decision Making.</title>
+<pages>7322-7336</pages>
+<year>2023</year>
+<booktitle>ACL (Findings)</booktitle>
+<ee type="oa">https://doi.org/10.18653/v1/2023.findings-acl.461</ee>
+<ee type="oa">https://aclanthology.org/2023.findings-acl.461</ee>
+<crossref>conf/acl/2023f</crossref>
+<url>db/conf/acl/acl2023f.html#FangCLW23</url>
+</inproceedings>
+</dblp>

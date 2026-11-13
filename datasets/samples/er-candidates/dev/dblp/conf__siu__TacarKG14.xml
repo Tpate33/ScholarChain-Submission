@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2025-04-01" key="conf/siu/TacarKG14">
+<author orcid="0000-0002-4689-8579">Beyda Tacar</author>
+<author>Turgay Kaya</author>
+<author orcid="0000-0002-9652-2625">Arif G&uuml;lten</author>
+<title>Control of robotic hand simulator via human hand motion analysis based on EMG.</title>
+<pages>389-392</pages>
+<year>2014</year>
+<booktitle>SIU</booktitle>
+<ee>https://doi.org/10.1109/SIU.2014.6830247</ee>
+<crossref>conf/siu/2014</crossref>
+<url>db/conf/siu/siu2014.html#TacarKG14</url>
+</inproceedings>
+</dblp>

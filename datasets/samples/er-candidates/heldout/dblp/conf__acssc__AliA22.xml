@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2023-04-11" key="conf/acssc/AliA22">
+<author>Abdulmoneam Ali</author>
+<author>Ahmed Arafa 0001</author>
+<title>Heirarchical Federated Learning in Delay Sensitive Communication Networks.</title>
+<pages>1180-1184</pages>
+<year>2022</year>
+<booktitle>IEEECONF</booktitle>
+<ee>https://doi.org/10.1109/IEEECONF56349.2022.10052096</ee>
+<crossref>conf/acssc/2022</crossref>
+<url>db/conf/acssc/acssc2022.html#AliA22</url>
+</inproceedings>
+</dblp>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<article mdate="2026-06-25" key="journals/comcom/RioMSJC26">
+<author orcid="0000-0002-6832-4381">Alberto del R&iacute;o</author>
+<author>Alejandro Mu&ntilde;iz</author>
+<author>Javier Serrano 0003</author>
+<author orcid="0000-0002-7382-4276">David Jim&eacute;nez</author>
+<author>Luis M. Contreras 0001</author>
+<title>Adaptive QoE optimization in non-stationary networks: Integrating PPO and digital twins for video streaming.</title>
+<year>2026</year>
+<pages>108520</pages>
+<volume>252</volume>
+<journal>Comput. Commun.</journal>
+<ee type="oa">https://doi.org/10.1016/j.comcom.2026.108520</ee>
+<url>db/journals/comcom/comcom252.html#RioMSJC26</url>
+<stream>streams/journals/comcom</stream>
+</article>
+</dblp>

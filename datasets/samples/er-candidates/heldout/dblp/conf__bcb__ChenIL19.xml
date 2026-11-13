@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2020-07-11" key="conf/bcb/ChenIL19">
+<author>Huiyuan Chen</author>
+<author>Sudha K. Iyengar</author>
+<author>Jing Li 0002</author>
+<title>Large-scale Analysis of Drug Combinations by Integrating Multiple Heterogeneous Information Networks.</title>
+<pages>67-76</pages>
+<year>2019</year>
+<booktitle>BCB</booktitle>
+<ee>https://doi.org/10.1145/3307339.3342142</ee>
+<crossref>conf/bcb/2019</crossref>
+<url>db/conf/bcb/bcb2019.html#ChenIL19</url>
+</inproceedings>
+</dblp>

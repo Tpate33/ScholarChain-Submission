@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2021-03-24" key="conf/sigcse/CulikR83">
+<author>Karel Cul&iacute;k II</author>
+<author>Mateen M. Rizki</author>
+<title>Logic versus mathematics in computer science education.</title>
+<pages>14-20</pages>
+<year>1983</year>
+<booktitle>SIGCSE</booktitle>
+<ee>https://doi.org/10.1145/800038.801005</ee>
+<ee>https://doi.org/10.1145/952978.801005</ee>
+<crossref>conf/sigcse/1983</crossref>
+<url>db/conf/sigcse/sigcse1983.html#CulikR83</url>
+</inproceedings>
+</dblp>

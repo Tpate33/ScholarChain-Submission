@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2024-10-06" key="conf/ccs/0001MMBS22">
+<author>Jiayuan Ye 0001</author>
+<author orcid="0000-0003-1493-2055">Aadyaa Maddi</author>
+<author>Sasi Kumar Murakonda</author>
+<author orcid="0000-0002-3066-7354">Vincent Bindschaedler</author>
+<author>Reza Shokri</author>
+<title>Enhanced Membership Inference Attacks against Machine Learning Models.</title>
+<pages>3093-3106</pages>
+<year>2022</year>
+<booktitle>CCS</booktitle>
+<ee>https://doi.org/10.1145/3548606.3560675</ee>
+<crossref>conf/ccs/2022</crossref>
+<url>db/conf/ccs/ccs2022.html#0001MMBS22</url>
+</inproceedings>
+</dblp>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2026-08-12" key="conf/citc/ChatterjeeLV26">
+<author>Rohit Chatterjee</author>
+<author>Yunqi Li 0006</author>
+<author>Prashant Nalini Vasudevan</author>
+<title>Weak Zero-Knowledge and One-Way Functions.</title>
+<pages>5:1-5:21</pages>
+<year>2026</year>
+<booktitle>ITC</booktitle>
+<ee type="oa">https://doi.org/10.4230/LIPIcs.ITC.2026.5</ee>
+<crossref>conf/citc/2026</crossref>
+<url>db/conf/citc/citc2026.html#ChatterjeeLV26</url>
+</inproceedings></dblp>

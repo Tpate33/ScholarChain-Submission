@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2024-10-06" key="conf/acl/SmithD18">
+<author>Rui Dong</author>
+<author orcid="0000-0002-6636-6940">David Smith</author>
+<title>Multi-Input Attention for Unsupervised OCR Correction.</title>
+<pages>2363-2372</pages>
+<year>2018</year>
+<booktitle>ACL (1)</booktitle>
+<ee type="oa">https://aclanthology.org/P18-1220/</ee>
+<ee type="oa">https://doi.org/10.18653/v1/P18-1220</ee>
+<crossref>conf/acl/2018-1</crossref>
+<url>db/conf/acl/acl2018-1.html#SmithD18</url>
+</inproceedings>
+</dblp>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2024-04-12" key="conf/sigdial/MehriE21a">
+<author>Shikib Mehri</author>
+<author>Maxine Esk&eacute;nazi</author>
+<title>Schema-Guided Paradigm for Zero-Shot Dialog.</title>
+<pages>499-508</pages>
+<year>2021</year>
+<booktitle>SIGDIAL</booktitle>
+<ee type="oa">https://doi.org/10.18653/v1/2021.sigdial-1.52</ee>
+<ee type="oa">https://aclanthology.org/2021.sigdial-1.52</ee>
+<crossref>conf/sigdial/2021</crossref>
+<url>db/conf/sigdial/sigdial2021.html#MehriE21a</url>
+</inproceedings>
+</dblp>

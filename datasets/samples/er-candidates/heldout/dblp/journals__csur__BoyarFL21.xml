@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<article mdate="2022-11-23" key="journals/csur/BoyarFL21">
+<author orcid="0000-0002-0725-8341">Joan Boyar</author>
+<author orcid="0000-0003-3054-2997">Lene M. Favrholdt</author>
+<author orcid="0000-0003-0560-3794">Kim S. Larsen</author>
+<title>Relative Worst-order Analysis: A Survey.</title>
+<pages>8:1-8:21</pages>
+<year>2022</year>
+<volume>54</volume>
+<journal>ACM Comput. Surv.</journal>
+<number>1</number>
+<ee>https://doi.org/10.1145/3425910</ee>
+<url>db/journals/csur/csur54.html#BoyarFL21</url>
+</article></dblp>

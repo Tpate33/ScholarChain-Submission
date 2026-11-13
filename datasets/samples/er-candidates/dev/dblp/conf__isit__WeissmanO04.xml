@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2019-03-12" key="conf/isit/WeissmanO04">
+<author>Tsachy Weissman</author>
+<author>Erik Ordentlich</author>
+<title>The empirical distribution of rate-constrained source codes.</title>
+<pages>464</pages>
+<year>2004</year>
+<booktitle>ISIT</booktitle>
+<ee>https://doi.org/10.1109/ISIT.2004.1365500</ee>
+<crossref>conf/isit/2004</crossref>
+<url>db/conf/isit/isit2004.html#WeissmanO04</url>
+</inproceedings>
+</dblp>

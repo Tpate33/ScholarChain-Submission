@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2021-10-14" key="conf/sagt/BiloGM19">
+<author orcid="0000-0001-7848-4904">Vittorio Bil&ograve;</author>
+<author>Laurent Gourv&egrave;s</author>
+<author>J&eacute;r&ocirc;me Monnot</author>
+<title>On a Simple Hedonic Game with Graph-Restricted Communication.</title>
+<pages>252-265</pages>
+<year>2019</year>
+<booktitle>SAGT</booktitle>
+<ee>https://doi.org/10.1007/978-3-030-30473-7_17</ee>
+<crossref>conf/sagt/2019</crossref>
+<url>db/conf/sagt/sagt2019.html#BiloGM19</url>
+</inproceedings></dblp>

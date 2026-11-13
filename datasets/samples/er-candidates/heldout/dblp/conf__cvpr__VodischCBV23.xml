@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2024-10-06" key="conf/cvpr/VodischCBV23">
+<author>Niclas V&ouml;disch</author>
+<author orcid="0000-0001-6662-5810">Daniele Cattaneo 0001</author>
+<author>Wolfram Burgard</author>
+<author>Abhinav Valada</author>
+<title>CoVIO: Online Continual Learning for Visual-Inertial Odometry.</title>
+<pages>2464-2473</pages>
+<year>2023</year>
+<booktitle>CVPR Workshops</booktitle>
+<ee>https://doi.org/10.1109/CVPRW59228.2023.00245</ee>
+<crossref>conf/cvpr/2023w</crossref>
+<url>db/conf/cvpr/cvprw2023.html#VodischCBV23</url>
+</inproceedings>
+</dblp>

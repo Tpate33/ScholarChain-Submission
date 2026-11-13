@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2018-11-06" key="conf/dac/0001AG12">
+<author>Karthik Chandrasekar 0001</author>
+<author orcid="0000-0003-2949-2080">Benny Akesson</author>
+<author>Kees Goossens</author>
+<title>Run-time power-down strategies for real-time SDRAM memory controllers.</title>
+<pages>988-993</pages>
+<year>2012</year>
+<booktitle>DAC</booktitle>
+<ee>https://doi.org/10.1145/2228360.2228538</ee>
+<crossref>conf/dac/2012</crossref>
+<url>db/conf/dac/dac2012.html#0001AG12</url>
+</inproceedings></dblp>

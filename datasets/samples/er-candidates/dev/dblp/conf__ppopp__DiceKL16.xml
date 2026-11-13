@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2022-06-12" key="conf/ppopp/DiceKL16">
+<author>Dave Dice</author>
+<author>Alex Kogan</author>
+<author>Yossi Lev</author>
+<title>Refined transactional lock elision.</title>
+<pages>19:1-19:12</pages>
+<year>2016</year>
+<booktitle>PPoPP</booktitle>
+<ee>https://doi.org/10.1145/2851141.2851162</ee>
+<ee>https://doi.org/10.1145/3016078.2851162</ee>
+<crossref>conf/ppopp/2016</crossref>
+<url>db/conf/ppopp/ppopp2016.html#DiceKL16</url>
+</inproceedings></dblp>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2026-03-24" key="conf/europar/DiehlMBGK23">
+<author orcid="0000-0003-3922-8419">Patrick Diehl</author>
+<author>Max Morris</author>
+<author orcid="0000-0002-7979-2906">Steven R. Brandt</author>
+<author>Nikunj Gupta</author>
+<author orcid="0000-0002-8712-2806">Hartmut Kaiser</author>
+<title>Benchmarking the Parallel 1D Heat Equation Solver in Chapel, Charm++, C++, HPX, Go, Julia, Python, Rust, Swift, and Java.</title>
+<pages>127-138</pages>
+<year>2023</year>
+<booktitle>Euro-Par Workshops</booktitle>
+<ee>https://doi.org/10.1007/978-3-031-48803-0_11</ee>
+<crossref>conf/europar/2023w2</crossref>
+<url>db/conf/europar/europar2023w2.html#DiehlMBGK23</url>
+</inproceedings>
+</dblp>

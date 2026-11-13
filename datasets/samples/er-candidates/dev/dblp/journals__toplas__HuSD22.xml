@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<article mdate="2026-09-10" key="journals/toplas/HuSD22">
+<author orcid="0000-0002-4249-3726">Qinheping Hu</author>
+<author orcid="0000-0003-1714-9656">Rishabh Singh 0001</author>
+<author orcid="0000-0001-9625-4037">Loris D'Antoni</author>
+<title>Solving Program Sketches with Large Integer Values.</title>
+<pages>9:1-9:28</pages>
+<year>2022</year>
+<volume>44</volume>
+<journal>ACM Trans. Program. Lang. Syst.</journal>
+<number>2</number>
+<ee>https://doi.org/10.1145/3532849</ee>
+<url>db/journals/toplas/toplas44.html#HuSD22</url>
+</article>
+</dblp>

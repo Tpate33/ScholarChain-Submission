@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<article mdate="2025-05-31" key="journals/csur/DeldjooNM21">
+<author orcid="0000-0002-6767-358X">Yashar Deldjoo</author>
+<author>Tommaso Di Noia</author>
+<author orcid="0009-0003-8429-3487">Felice Antonio Merra</author>
+<title>A Survey on Adversarial Recommender Systems: From Attack/Defense Strategies to Generative Adversarial Networks.</title>
+<pages>35:1-35:38</pages>
+<year>2022</year>
+<volume>54</volume>
+<journal>ACM Comput. Surv.</journal>
+<number>2</number>
+<ee>https://doi.org/10.1145/3439729</ee>
+<ee>https://www.wikidata.org/entity/Q131164001</ee>
+<url>db/journals/csur/csur54.html#DeldjooNM21</url>
+</article>
+</dblp>

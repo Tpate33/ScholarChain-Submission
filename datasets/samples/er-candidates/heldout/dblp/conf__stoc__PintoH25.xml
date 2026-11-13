@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2025-11-02" key="conf/stoc/PintoH25">
+<author orcid="0009-0003-2346-8423">Renato Ferreira Pinto Jr.</author>
+<author orcid="0000-0003-0259-9355">Nathaniel Harms</author>
+<title>Testing Support Size More Efficiently Than Learning Histograms.</title>
+<pages>995-1006</pages>
+<year>2025</year>
+<booktitle>STOC</booktitle>
+<ee>https://doi.org/10.1145/3717823.3718134</ee>
+<ee>https://www.wikidata.org/entity/Q135685401</ee>
+<crossref>conf/stoc/2025</crossref>
+<url>db/conf/stoc/stoc2025.html#PintoH25</url>
+</inproceedings>
+</dblp>

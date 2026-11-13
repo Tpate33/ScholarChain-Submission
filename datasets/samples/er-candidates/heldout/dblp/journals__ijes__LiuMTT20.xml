@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<article mdate="2025-10-27" key="journals/ijes/LiuMTT20">
+<author>Yang Liu 0001</author>
+<author orcid="0000-0003-4351-6923">Lin Meng 0001</author>
+<author>Ittetsu Taniguchi</author>
+<author>Hiroyuki Tomiyama</author>
+<title>A branch-and-bound approach to scheduling of data-parallel tasks on multi-core architectures.</title>
+<pages>125-135</pages>
+<year>2020</year>
+<volume>12</volume>
+<journal>Int. J. Embed. Syst.</journal>
+<number>1</number>
+<ee>https://doi.org/10.1504/IJES.2020.105286</ee>
+<url>db/journals/ijes/ijes12.html#LiuMTT20</url>
+</article>
+</dblp>

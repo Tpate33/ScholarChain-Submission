@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2023-07-07" key="conf/iccS/CamaraCB23">
+<author orcid="0000-0003-2176-8273">Jes&uacute;s C&aacute;mara</author>
+<author orcid="0000-0002-8763-756X">Javier Cuenca 0001</author>
+<author orcid="0000-0003-3908-4451">Murilo Boratto</author>
+<title>Improving the Performance of Task-Based Linear Algebra Software with Autotuning Techniques on Heterogeneous Architectures.</title>
+<pages>668-682</pages>
+<year>2023</year>
+<booktitle>ICCS (1)</booktitle>
+<ee>https://doi.org/10.1007/978-3-031-35995-8_47</ee>
+<crossref>conf/iccS/2023</crossref>
+<url>db/conf/iccS/iccS2023-1.html#CamaraCB23</url>
+</inproceedings></dblp>

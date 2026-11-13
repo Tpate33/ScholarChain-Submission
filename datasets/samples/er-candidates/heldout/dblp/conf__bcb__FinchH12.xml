@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2018-11-06" key="conf/bcb/FinchH12">
+<author>Craig A. Finch</author>
+<author>James J. Hickman</author>
+<title>A continuum hard-sphere model of protein adsorption.</title>
+<pages>573-575</pages>
+<year>2012</year>
+<booktitle>BCB</booktitle>
+<ee>https://doi.org/10.1145/2382936.2383025</ee>
+<crossref>conf/bcb/2012</crossref>
+<url>db/conf/bcb/bcb2012.html#FinchH12</url>
+</inproceedings></dblp>

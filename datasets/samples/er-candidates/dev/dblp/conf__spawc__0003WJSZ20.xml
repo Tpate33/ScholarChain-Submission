@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2025-03-03" key="conf/spawc/0003WJSZ20">
+<author orcid="0000-0003-1445-1745">Xi Yang 0003</author>
+<author orcid="0000-0001-5952-232X">Chao-Kai Wen</author>
+<author>Shi Jin 0002</author>
+<author orcid="0000-0002-0521-3107">A. Lee Swindlehurst</author>
+<author>Jing Zhang 0031</author>
+<title>Joint Channel Estimation and Localization for Cooperative Millimeter Wave Systems.</title>
+<pages>1-5</pages>
+<year>2020</year>
+<booktitle>SPAWC</booktitle>
+<ee>https://doi.org/10.1109/SPAWC48557.2020.9154215</ee>
+<ee>https://www.wikidata.org/entity/Q118186699</ee>
+<crossref>conf/spawc/2020</crossref>
+<url>db/conf/spawc/spawc2020.html#0003WJSZ20</url>
+</inproceedings>
+</dblp>

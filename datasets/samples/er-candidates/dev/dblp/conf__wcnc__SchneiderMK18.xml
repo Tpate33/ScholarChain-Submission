@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2023-03-07" key="conf/wcnc/SchneiderMK18">
+<author>Peter Schneider 0001</author>
+<author>Christian Mannweiler</author>
+<author>Sylvaine Kerboeuf</author>
+<title>Providing strong 5G mobile network slice isolation for highly sensitive third-party services.</title>
+<pages>1-6</pages>
+<year>2018</year>
+<booktitle>WCNC</booktitle>
+<ee>https://doi.org/10.1109/WCNC.2018.8377166</ee>
+<crossref>conf/wcnc/2018</crossref>
+<url>db/conf/wcnc/wcnc2018.html#SchneiderMK18</url>
+</inproceedings>
+</dblp>

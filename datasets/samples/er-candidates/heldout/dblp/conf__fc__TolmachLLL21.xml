@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2023-06-26" key="conf/fc/TolmachLLL21">
+<author>Palina Tolmach</author>
+<author>Yi Li 0008</author>
+<author>Shang-Wei Lin 0001</author>
+<author orcid="0000-0001-7300-9215">Yang Liu 0003</author>
+<title>Formal Analysis of Composable DeFi Protocols.</title>
+<pages>149-161</pages>
+<year>2021</year>
+<booktitle>Financial Cryptography Workshops</booktitle>
+<ee>https://doi.org/10.1007/978-3-662-63958-0_13</ee>
+<crossref>conf/fc/2021w</crossref>
+<url>db/conf/fc/fc2021w.html#TolmachLLL21</url>
+</inproceedings></dblp>

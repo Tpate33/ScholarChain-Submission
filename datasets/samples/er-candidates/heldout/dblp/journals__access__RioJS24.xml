@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<article mdate="2024-11-06" key="journals/access/RioJS24">
+<author orcid="0000-0002-6832-4381">Alberto del R&iacute;o</author>
+<author orcid="0000-0002-7382-4276">David Jim&eacute;nez</author>
+<author orcid="0000-0003-2111-187X">Javier Serrano 0003</author>
+<title>Comparative Analysis of A3C and PPO Algorithms in Reinforcement Learning: A Survey on General Environments.</title>
+<pages>146795-146806</pages>
+<year>2024</year>
+<volume>12</volume>
+<journal>IEEE Access</journal>
+<ee type="oa">https://doi.org/10.1109/ACCESS.2024.3472473</ee>
+<url>db/journals/access/access12.html#RioJS24</url>
+<stream>streams/journals/access</stream>
+</article>
+</dblp>

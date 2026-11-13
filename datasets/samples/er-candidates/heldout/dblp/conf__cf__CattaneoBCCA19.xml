@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2025-01-19" key="conf/cf/CattaneoBCCA19">
+<author orcid="0000-0003-1453-3257">Daniele Cattaneo 0002</author>
+<author>Antonio Di Bello</author>
+<author orcid="0000-0001-7742-9233">Michele Chiari</author>
+<author orcid="0000-0002-5579-5942">Stefano Cherubin</author>
+<author>Giovanni Agosta</author>
+<title>Fixed point exploitation via compiler analyses and transformations: POSTER.</title>
+<pages>292-294</pages>
+<year>2019</year>
+<booktitle>CF</booktitle>
+<ee>https://doi.org/10.1145/3310273.3323424</ee>
+<ee>https://www.wikidata.org/entity/Q130839113</ee>
+<crossref>conf/cf/2019</crossref>
+<url>db/conf/cf/cf2019.html#CattaneoBCCA19</url>
+</inproceedings>
+</dblp>

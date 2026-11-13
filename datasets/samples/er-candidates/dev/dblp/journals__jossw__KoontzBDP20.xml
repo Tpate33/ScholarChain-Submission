@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<article mdate="2022-08-16" key="journals/jossw/KoontzBDP20" publtype="software">
+<author orcid="0000-0002-6103-5894">Austin Koontz</author>
+<author>Benjamin Brandt</author>
+<author>Curtis E. Dyreson</author>
+<author orcid="0000-0002-6241-3164">William D. Pearse</author>
+<title>SymbiotaR2: An R Package for Accessing Symbiota2 Data.</title>
+<pages>2917</pages>
+<year>2020</year>
+<volume>5</volume>
+<journal>J. Open Source Softw.</journal>
+<number>55</number>
+<ee type="oa">https://doi.org/10.21105/joss.02917</ee>
+<ee>https://www.wikidata.org/entity/Q111899681</ee>
+<url>db/journals/jossw/jossw5.html#KoontzBDP20</url>
+</article></dblp>

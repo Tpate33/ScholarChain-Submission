@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2022-03-08" key="conf/cdc/JiaHJYW02">
+<author>Li-Juan Jia</author>
+<author>Takeshi Hanada</author>
+<author>Chun-Zhi Jin</author>
+<author>Zi-Jiang Yang</author>
+<author>Kiyoshi Wada</author>
+<title>On the relationship between BELS and IV methods.</title>
+<pages>3440-3445</pages>
+<year>2002</year>
+<booktitle>CDC</booktitle>
+<ee>https://doi.org/10.1109/CDC.2002.1184407</ee>
+<crossref>conf/cdc/2002</crossref>
+<url>db/conf/cdc/cdc2002.html#JiaHJYW02</url>
+</inproceedings>
+</dblp>

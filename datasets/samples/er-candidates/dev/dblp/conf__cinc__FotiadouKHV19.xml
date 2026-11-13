@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2024-08-04" key="conf/cinc/FotiadouKHV19">
+<author>Eleni Fotiadou</author>
+<author>Tomasz K. Konopczynski</author>
+<author>J&uuml;rgen Hesser</author>
+<author orcid="0000-0002-2392-6098">Rik Vullings</author>
+<title>Deep Convolutional Encoder-Decoder Framework for Fetal ECG Signal Denoising.</title>
+<pages>1-4</pages>
+<year>2019</year>
+<booktitle>CinC</booktitle>
+<ee>https://doi.org/10.22489/CinC.2019.015</ee>
+<ee type="archive">https://doi.org/10.23919/CinC49843.2019.9005722</ee>
+<crossref>conf/cinc/2019</crossref>
+<url>db/conf/cinc/cinc2019.html#FotiadouKHV19</url>
+</inproceedings>
+</dblp>

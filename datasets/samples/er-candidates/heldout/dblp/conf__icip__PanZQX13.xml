@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2026-04-15" key="conf/icip/PanZQX13">
+<author orcid="0000-0002-0539-7997">Hong Pan 0001</author>
+<author>Yaping Zhu</author>
+<author orcid="0000-0001-6631-1651">A. K. Qin 0001</author>
+<author>Liangzheng Xia</author>
+<title>Mining heterogeneous class-specific codebook for categorical object detection and classification.</title>
+<pages>3132-3136</pages>
+<year>2013</year>
+<booktitle>ICIP</booktitle>
+<ee>https://doi.org/10.1109/ICIP.2013.6738645</ee>
+<crossref>conf/icip/2013</crossref>
+<url>db/conf/icip/icip2013.html#PanZQX13</url>
+</inproceedings>
+</dblp>

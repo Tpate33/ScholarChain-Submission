@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2025-08-13" key="conf/icassp/HuCLLZ24">
+<author orcid="0000-0001-7278-9977">Zhikai Hu</author>
+<author>Yiu-Ming Cheung</author>
+<author>Mengke Li 0001</author>
+<author>Weichao Lan</author>
+<author>Donglin Zhang 0001</author>
+<title>Key Points Centered Sparse Hashing for Cross-Modal Retrieval.</title>
+<pages>8431-8435</pages>
+<year>2024</year>
+<booktitle>ICASSP</booktitle>
+<ee>https://doi.org/10.1109/ICASSP48485.2024.10446586</ee>
+<crossref>conf/icassp/2024</crossref>
+<url>db/conf/icassp/icassp2024.html#HuCLLZ24</url>
+</inproceedings>
+</dblp>

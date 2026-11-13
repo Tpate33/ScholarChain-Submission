@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2023-09-30" key="conf/espmm/DaissSDKP22">
+<author orcid="0000-0002-0989-5985">Gregor Dai&szlig;</author>
+<author>Srinivas Yadav Singanaboina</author>
+<author>Patrick Diehl</author>
+<author orcid="0000-0002-8712-2806">Hartmut Kaiser</author>
+<author>Dirk Pfl&uuml;ger</author>
+<title>From Merging Frameworks to Merging Stars: Experiences using HPX, Kokkos and SIMD Types.</title>
+<pages>10-19</pages>
+<year>2022</year>
+<booktitle>ESPM2@SC</booktitle>
+<ee>https://doi.org/10.1109/ESPM256814.2022.00007</ee>
+<crossref>conf/espmm/2022</crossref>
+<url>db/conf/espmm/espmm2022.html#DaissSDKP22</url>
+</inproceedings></dblp>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2023-03-23" key="conf/cso/WangB09">
+<author>Guoqiang Wang</author>
+<author>Yanqin Bai</author>
+<title>A Primal-Dual Interior-Point Algorithm for Convex Quadratic Optimization Based on a Parametric Kernel Function.</title>
+<pages>748-752</pages>
+<year>2009</year>
+<booktitle>CSO (2)</booktitle>
+<ee>https://doi.org/10.1109/CSO.2009.155</ee>
+<ee>https://doi.ieeecomputersociety.org/10.1109/CSO.2009.155</ee>
+<crossref>conf/cso/2009-2</crossref>
+<url>db/conf/cso/cso2009-2.html#WangB09</url>
+</inproceedings></dblp>

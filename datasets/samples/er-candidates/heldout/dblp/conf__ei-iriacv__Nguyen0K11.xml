@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2023-08-19" key="conf/ei-iriacv/Nguyen0K11">
+<author>Xuan Tuong Nguyen</author>
+<author>Thomas M&uuml;ller 0001</author>
+<author orcid="0000-0003-4840-076X">Alois Knoll</author>
+<title>Robust pedestrian detection and tracking from a moving vehicle.</title>
+<pages>78780H</pages>
+<year>2011</year>
+<booktitle>Intelligent Robots and Computer Vision: Algorithms and Techniques</booktitle>
+<ee>https://doi.org/10.1117/12.871994</ee>
+<crossref>conf/ei-iriacv/2011</crossref>
+<url>db/conf/ei-iriacv/ei-iriacv2011.html#Nguyen0K11</url>
+</inproceedings></dblp>

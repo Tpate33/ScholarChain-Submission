@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2023-09-04" key="conf/aaai/ZengCZ023">
+<author>Ailing Zeng</author>
+<author>Muxi Chen</author>
+<author>Lei Zhang 0001</author>
+<author>Qiang Xu 0001</author>
+<title>Are Transformers Effective for Time Series Forecasting?</title>
+<pages>11121-11128</pages>
+<year>2023</year>
+<booktitle>AAAI</booktitle>
+<ee type="oa">https://doi.org/10.1609/aaai.v37i9.26317</ee>
+<crossref>conf/aaai/2023</crossref>
+<url>db/conf/aaai/aaai2023.html#ZengCZ023</url>
+</inproceedings></dblp>

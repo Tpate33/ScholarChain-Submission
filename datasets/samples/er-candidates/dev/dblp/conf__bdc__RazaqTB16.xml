@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2019-12-27" key="conf/bdc/RazaqTB16">
+<author orcid="0000-0001-7025-5381">Abdul Razaq 0001</author>
+<author orcid="0000-0002-0605-6238">Huaglory Tianfield</author>
+<author>Peter Barrie</author>
+<title>A big data analytics based approach to anomaly detection.</title>
+<pages>187-193</pages>
+<year>2016</year>
+<booktitle>BDCAT</booktitle>
+<ee>https://doi.org/10.1145/3006299.3006317</ee>
+<crossref>conf/bdc/2016</crossref>
+<url>db/conf/bdc/bdcat2016.html#RazaqTB16</url>
+</inproceedings></dblp>

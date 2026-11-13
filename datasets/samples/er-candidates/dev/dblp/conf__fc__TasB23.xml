@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE dblp SYSTEM "dblp-2023-06-28.dtd">
+<dblp>
+<inproceedings mdate="2023-12-10" key="conf/fc/TasB23">
+<author orcid="0000-0001-6061-9700">Ertem Nusret Tas</author>
+<author orcid="0000-0003-0820-0421">Dan Boneh</author>
+<title>Cryptoeconomic Security for Data Availability Committees.</title>
+<pages>310-326</pages>
+<year>2023</year>
+<booktitle>FC</booktitle>
+<ee>https://doi.org/10.1007/978-3-031-47751-5_18</ee>
+<crossref>conf/fc/2023-2</crossref>
+<url>db/conf/fc/fc2023-2.html#TasB23</url>
+</inproceedings></dblp>
