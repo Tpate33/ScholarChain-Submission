@@ -18,6 +18,9 @@
 #       runs datasets/scripts/fetch-er-candidates.sh with the same mode (see that script);
 #   datasets/scripts/fetch-samples.sh --verify datasets/er-candidates datasets/downloads/dblp/full/<release>.xml.gz
 #       runs fetch-er-candidates.sh --verify --with-release (the path must be the manifest-pinned release);
+#   datasets/scripts/fetch-samples.sh --dry-run datasets/er-candidates datasets/downloads/dblp/full/<release>.xml.gz
+#       runs fetch-er-candidates.sh --dry-run --with-release: READ-ONLY layout inspection of the pinned release
+#       (escaped bytes, bounded output) and the extraction scanner's verdict per key; writes nothing (DS-P5-09);
 #   datasets/scripts/fetch-samples.sh --verify datasets/er-candidates/fixture
 #       runs fetch-er-candidates.sh --fixture (offline extractor self-test; writes only to a temp dir).
 # This entry point exists because a newly created script has no executable bit until the human sets
@@ -29,16 +32,21 @@ DS_DATASET=all
 # shellcheck source=datasets/scripts/lib-datasets.sh
 . "$(cd "$(dirname "$0")" && pwd)/lib-datasets.sh"
 
-ER_USAGE="usage: fetch-samples.sh (--dry-run | --verify | --sample) datasets/er-candidates | --verify datasets/er-candidates <pinned release path> | --verify datasets/er-candidates/fixture"
+ER_USAGE="usage: fetch-samples.sh (--dry-run | --verify | --sample) datasets/er-candidates | (--verify | --dry-run) datasets/er-candidates <pinned release path> | --verify datasets/er-candidates/fixture"
 if [ "$#" -eq 2 ] && [ "$2" = "datasets/er-candidates/fixture" ]; then
   [ "$1" = "--verify" ] || ds_die "$ER_USAGE" 2
   exec bash "$DS_SCRIPT_DIR/fetch-er-candidates.sh" --fixture
 fi
 if [ "$#" -eq 3 ] && [ "$2" = "datasets/er-candidates" ]; then
-  [ "$1" = "--verify" ] || ds_die "$ER_USAGE" 2
+  case "$1" in
+    --verify|--dry-run) ;;
+    *) ds_die "$ER_USAGE" 2 ;;
+  esac
   pinned="datasets/downloads/dblp/full/$(basename "$(ds_manifest_get datasets.dblp.official_source.download_url)")"
   [ "$3" = "$pinned" ] || ds_die "the release path must be the manifest-pinned $pinned (got $3)" 2
-  exec bash "$DS_SCRIPT_DIR/fetch-er-candidates.sh" --verify --with-release
+  # --verify: re-read every recorded byte range from the release. --dry-run: read-only layout inspection of the
+  # release and the extraction scanner's verdict per selected key (DS-P5-09); writes nothing.
+  exec bash "$DS_SCRIPT_DIR/fetch-er-candidates.sh" "$1" --with-release
 fi
 if [ "$#" -eq 2 ] && [ "$2" = "datasets/er-candidates" ]; then
   case "$1" in

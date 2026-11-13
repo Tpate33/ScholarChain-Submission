@@ -1,0 +1,292 @@
+# ScholarChain ER candidate selection (work order DS-P5-01). Owner: dataset-engineer. Fixed record list.
+# Columns (tab-separated): unit_id, criterion, source, kind, identifier, expect_doi, expect_author.
+# Every identifier was returned by an official source query on 2026-11-05 (dblp SPARQL endpoint
+# https://sparql.dblp.org/sparql, Crossref REST API); the queries and rules are in
+# datasets/dataset-manifest.yaml (er_candidates.criteria). No entity-resolution policy, score, label,
+# or match outcome was run, read, or consulted to choose or drop any row.
+# expect_doi / expect_author are SELECTION FACTS checked against the extracted dblp record (the record
+# must carry this DOI in an ee element, and an author element with exactly this text). They are not
+# match labels: a shared name is never evidence of identity.
+# kind: dblp/rec = offline excerpt of the pinned release dblp-2026-10-03 by record key (never requested from dblp.org); openalex/work-by-doi and crossref/work-by-doi =
+# lookup by DOI; openalex/authors-of-work = the OpenAlex author records of that work's authorships.
+unit_id	criterion	source	kind	identifier	expect_doi	expect_author
+hr-jiayuan-ye	homonym-rare	dblp	rec	conf/ccs/0001MMBS22	10.1145/3548606.3560675	Jiayuan Ye 0001
+hr-jiayuan-ye	homonym-rare	openalex	work-by-doi	10.1145/3548606.3560675	-	-
+hr-jiayuan-ye	homonym-rare	dblp	rec	journals/ijcritis/YangYZL12	10.1504/IJCIS.2012.049043	Jiayuan Ye 0002
+hr-jiayuan-ye	homonym-rare	openalex	work-by-doi	10.1504/ijcis.2012.049043	-	-
+hr-abdul-razaq	homonym-rare	dblp	rec	conf/bdc/RazaqTB16	10.1145/3006299.3006317	Abdul Razaq 0001
+hr-abdul-razaq	homonym-rare	openalex	work-by-doi	10.1145/3006299.3006317	-	-
+hr-abdul-razaq	homonym-rare	dblp	rec	journals/access/AlghazzawiSFRB20	10.1109/ACCESS.2020.3035590	Abdul Razaq 0002
+hr-abdul-razaq	homonym-rare	openalex	work-by-doi	10.1109/access.2020.3035590	-	-
+hr-tyler-moore	homonym-rare	dblp	rec	conf/ccs/LeontiadisMC14	10.1145/2660267.2660332	Tyler Moore 0001
+hr-tyler-moore	homonym-rare	openalex	work-by-doi	10.1145/2660267.2660332	-	-
+hr-tyler-moore	homonym-rare	dblp	rec	conf/uc/DeatonYMG17	10.1007/978-3-319-58187-3_10	Tyler Moore 0002
+hr-tyler-moore	homonym-rare	openalex	work-by-doi	10.1007/978-3-319-58187-3_10	-	-
+hr-juan-carlos-ruiz-garcia	homonym-rare	dblp	rec	conf/armor/BustosFAR12	10.1145/2222436.2222439	Juan-Carlos Ruiz-Garcia 0001
+hr-juan-carlos-ruiz-garcia	homonym-rare	openalex	work-by-doi	10.1145/2222436.2222439	-	-
+hr-juan-carlos-ruiz-garcia	homonym-rare	dblp	rec	journals/caee/CobosR21	10.1002/CAE.22316	Juan-Carlos Ruiz-Garcia 0002
+hr-juan-carlos-ruiz-garcia	homonym-rare	openalex	work-by-doi	10.1002/cae.22316	-	-
+hr-karthik-chandrasekar	homonym-rare	dblp	rec	conf/dac/0001AG12	10.1145/2228360.2228538	Karthik Chandrasekar 0001
+hr-karthik-chandrasekar	homonym-rare	openalex	work-by-doi	10.1145/2228360.2228538	-	-
+hr-karthik-chandrasekar	homonym-rare	dblp	rec	conf/gpc/ChandrasekarCMV12	10.1007/978-3-642-30767-6_25	Karthik Chandrasekar 0002
+hr-karthik-chandrasekar	homonym-rare	openalex	work-by-doi	10.1007/978-3-642-30767-6_25	-	-
+hr-ahmed-arafa	homonym-rare	dblp	rec	conf/vtc/ArafaM10	10.1109/VETECF.2010.5594098	Ahmed Arafa
+hr-ahmed-arafa	homonym-rare	openalex	work-by-doi	10.1109/vetecf.2010.5594098	-	-
+hr-ahmed-arafa	homonym-rare	dblp	rec	conf/acssc/AliA22	10.1109/IEEECONF56349.2022.10052096	Ahmed Arafa 0001
+hr-ahmed-arafa	homonym-rare	openalex	work-by-doi	10.1109/ieeeconf56349.2022.10052096	-	-
+hr-daniele-cattaneo	homonym-rare	dblp	rec	conf/cvpr/VodischCBV23	10.1109/CVPRW59228.2023.00245	Daniele Cattaneo 0001
+hr-daniele-cattaneo	homonym-rare	openalex	work-by-doi	10.1109/cvprw59228.2023.00245	-	-
+hr-daniele-cattaneo	homonym-rare	dblp	rec	conf/cf/CattaneoBCCA19	10.1145/3310273.3323424	Daniele Cattaneo 0002
+hr-daniele-cattaneo	homonym-rare	openalex	work-by-doi	10.1145/3310273.3323424	-	-
+hea-wei-wang	homonym-east-asian	dblp	rec	conf/icassp/ChengDW23	10.1109/ICASSP49357.2023.10096850	Wei Wang 0002
+hea-wei-wang	homonym-east-asian	openalex	work-by-doi	10.1109/icassp49357.2023.10096850	-	-
+hea-wei-wang	homonym-east-asian	dblp	rec	conf/acl/FangCLW23	10.18653/V1/2023.FINDINGS-ACL.461	Wei Wang 0009
+hea-wei-wang	homonym-east-asian	openalex	work-by-doi	10.18653/v1/2023.findings-acl.461	-	-
+hea-lei-zhang	homonym-east-asian	dblp	rec	conf/aaai/ZengCZ023	10.1609/AAAI.V37I9.26317	Lei Zhang 0001
+hea-lei-zhang	homonym-east-asian	openalex	work-by-doi	10.1609/aaai.v37i9.26317	-	-
+hea-lei-zhang	homonym-east-asian	dblp	rec	conf/dasc/Guo0CT19	10.1109/DASC/PICOM/CBDCOM/CYBERSCITECH.2019.00104	Lei Zhang 0005
+hea-lei-zhang	homonym-east-asian	openalex	work-by-doi	10.1109/dasc/picom/cbdcom/cyberscitech.2019.00104	-	-
+hea-yang-liu	homonym-east-asian	dblp	rec	journals/ijes/LiuMTT20	10.1504/IJES.2020.105286	Yang Liu 0001
+hea-yang-liu	homonym-east-asian	openalex	work-by-doi	10.1504/ijes.2020.105286	-	-
+hea-yang-liu	homonym-east-asian	dblp	rec	conf/fc/TolmachLLL21	10.1007/978-3-662-63958-0_13	Yang Liu 0003
+hea-yang-liu	homonym-east-asian	openalex	work-by-doi	10.1007/978-3-662-63958-0_13	-	-
+hea-jing-li	homonym-east-asian	dblp	rec	conf/itqm/0001XW21	10.1016/J.PROCS.2022.01.159	Jing Li 0001
+hea-jing-li	homonym-east-asian	openalex	work-by-doi	10.1016/j.procs.2022.01.159	-	-
+hea-jing-li	homonym-east-asian	dblp	rec	conf/bcb/ChenIL19	10.1145/3307339.3342142	Jing Li 0002
+hea-jing-li	homonym-east-asian	openalex	work-by-doi	10.1145/3307339.3342142	-	-
+hw-thomas-muller	homonym-western	dblp	rec	conf/ei-iriacv/Nguyen0K11	10.1117/12.871994	Thomas Müller 0001
+hw-thomas-muller	homonym-western	openalex	work-by-doi	10.1117/12.871994	-	-
+hw-thomas-muller	homonym-western	dblp	rec	conf/egpgv/0005BW15	10.2312/PGV.20151152	Thomas Müller 0005
+hw-thomas-muller	homonym-western	openalex	work-by-doi	10.2312/pgv.20151152	-	-
+hw-michael-muller	homonym-western	dblp	rec	conf/bildmed/SarujiMM11	10.1007/978-3-642-19335-4_45	Michael Müller 0001
+hw-michael-muller	homonym-western	openalex	work-by-doi	10.1007/978-3-642-19335-4_45	-	-
+hw-michael-muller	homonym-western	dblp	rec	journals/itor/Krebs0022	10.1111/ITOR.12988	Michael Müller 0004
+hw-michael-muller	homonym-western	openalex	work-by-doi	10.1111/itor.12988	-	-
+hw-david-brown	homonym-western	dblp	rec	conf/ACMse/PurewalB12	10.1145/2184512.2184598	David Brown
+hw-david-brown	homonym-western	openalex	work-by-doi	10.1145/2184512.2184598	-	-
+hw-david-brown	homonym-western	dblp	rec	journals/lalc/BrownSS17	10.1093/LLC/FQW036	David Brown 0003
+hw-david-brown	homonym-western	openalex	work-by-doi	10.1093/llc/fqw036	-	-
+hw-david-smith	homonym-western	dblp	rec	conf/acl/SmithD18	10.18653/V1/P18-1220	David Smith
+hw-david-smith	homonym-western	openalex	work-by-doi	10.18653/v1/p18-1220	-	-
+hw-david-smith	homonym-western	dblp	rec	conf/csndsp/Bobor-OyiboFSY12	10.1109/CSNDSP.2012.6292742	David Smith 0002
+hw-david-smith	homonym-western	openalex	work-by-doi	10.1109/csndsp.2012.6292742	-	-
+hw-peter-schneider	homonym-western	dblp	rec	conf/icra/NuchterESP10	10.1109/ROBOT.2010.5509306	Peter Schneider
+hw-peter-schneider	homonym-western	openalex	work-by-doi	10.1109/robot.2010.5509306	-	-
+hw-peter-schneider	homonym-western	dblp	rec	conf/wcnc/SchneiderMK18	10.1109/WCNC.2018.8377166	Peter Schneider 0001
+hw-peter-schneider	homonym-western	openalex	work-by-doi	10.1109/wcnc.2018.8377166	-	-
+nv-208-1029-kazak	name-variant	dblp	rec	conf/csit/KazakK18	10.1007/978-3-030-01069-0_3	Nihan Kazak
+nv-208-1029-kazak	name-variant	openalex	work-by-doi	10.1007/978-3-030-01069-0_3	-	-
+nv-208-1029-kazak	name-variant	dblp	rec	conf/csit/CercevikK18	10.1109/STC-CSIT.2018.8526619	Nihan Kazak Cercevik
+nv-208-1029-kazak	name-variant	openalex	work-by-doi	10.1109/stc-csit.2018.8526619	-	-
+nv-158-1440-tacar	name-variant	dblp	rec	conf/siu/TacarKG14	10.1109/SIU.2014.6830247	Beyda Tacar
+nv-158-1440-tacar	name-variant	openalex	work-by-doi	10.1109/siu.2014.6830247	-	-
+nv-158-1440-tacar	name-variant	dblp	rec	journals/bspc/ErenT26	10.1016/J.BSPC.2025.108891	Beyda Tasar
+nv-158-1440-tacar	name-variant	openalex	work-by-doi	10.1016/j.bspc.2025.108891	-	-
+nv-80-7843-jia	name-variant	dblp	rec	conf/cdc/JiaHJYW02	10.1109/CDC.2002.1184407	Li-Juan Jia
+nv-80-7843-jia	name-variant	openalex	work-by-doi	10.1109/cdc.2002.1184407	-	-
+nv-80-7843-jia	name-variant	dblp	rec	conf/cdc/JinJYW02	10.1109/CDC.2002.1185038	Lijuan Jia
+nv-80-7843-jia	name-variant	openalex	work-by-doi	10.1109/cdc.2002.1185038	-	-
+nv-00-7375-zhang	name-variant	dblp	rec	conf/csai/ZhangHCCX18	10.1145/3297156.3297162	Zi-Xuan Zhang
+nv-00-7375-zhang	name-variant	openalex	work-by-doi	10.1145/3297156.3297162	-	-
+nv-00-7375-zhang	name-variant	dblp	rec	conf/aaai/YuanBZLD23	10.1609/AAAI.V37I9.26310	Zixuan Zhang
+nv-00-7375-zhang	name-variant	openalex	work-by-doi	10.1609/aaai.v37i9.26310	-	-
+nv-13-193-xia	name-variant	dblp	rec	conf/icassp/ZhuXN11	10.1109/ICASSP.2011.5946933	Liang-Zheng Xia
+nv-13-193-xia	name-variant	openalex	work-by-doi	10.1109/icassp.2011.5946933	-	-
+nv-13-193-xia	name-variant	dblp	rec	conf/icip/PanZQX13	10.1109/ICIP.2013.6738645	Liangzheng Xia
+nv-13-193-xia	name-variant	openalex	work-by-doi	10.1109/icip.2013.6738645	-	-
+nv-167-2023-pearse	name-variant	dblp	rec	journals/jossw/PearseC18	10.21105/JOSS.00721	Will Pearse
+nv-167-2023-pearse	name-variant	openalex	work-by-doi	10.21105/joss.00721	-	-
+nv-167-2023-pearse	name-variant	dblp	rec	journals/jossw/KoontzBDP20	10.21105/JOSS.02917	William D. Pearse
+nv-167-2023-pearse	name-variant	openalex	work-by-doi	10.21105/joss.02917	-	-
+nv-06-7696-bai	name-variant	dblp	rec	journals/amc/WangB09	10.1016/J.AMC.2009.06.034	Yan-Qin Bai
+nv-06-7696-bai	name-variant	openalex	work-by-doi	10.1016/j.amc.2009.06.034	-	-
+nv-06-7696-bai	name-variant	dblp	rec	conf/cso/WangB09	10.1109/CSO.2009.155	Yanqin Bai
+nv-06-7696-bai	name-variant	openalex	work-by-doi	10.1109/cso.2009.155	-	-
+nv-36-8622-bazan	name-variant	dblp	rec	conf/icassp/ZibettiMB08	10.1109/ICASSP.2008.4517744	Fermín S. V. Bazán
+nv-36-8622-bazan	name-variant	openalex	work-by-doi	10.1109/icassp.2008.4517744	-	-
+nv-36-8622-bazan	name-variant	dblp	rec	journals/amc/BazanBF12	10.1016/J.AMC.2012.08.054	Fermín S. Viloche Bazán
+nv-36-8622-bazan	name-variant	openalex	work-by-doi	10.1016/j.amc.2012.08.054	-	-
+nv-368-1587-zarkab	name-variant	dblp	rec	conf/iasam/ZarkabSP23	10.1109/IAS54024.2023.10406364	Muhammad Zarkab
+nv-368-1587-zarkab	name-variant	openalex	work-by-doi	10.1109/ias54024.2023.10406364	-	-
+nv-368-1587-zarkab	name-variant	dblp	rec	conf/iasam/ChakrabortyM0PF23	10.1109/IAS54024.2023.10406431	Muhammad Zarkab Farooqi
+nv-368-1587-zarkab	name-variant	openalex	work-by-doi	10.1109/ias54024.2023.10406431	-	-
+ov-04-4187	orcid-vs-none	dblp	rec	journals/js/Chavez-AragonMP13	10.1155/2013/832963	-
+ov-04-4187	orcid-vs-none	openalex	work-by-doi	10.1155/2013/832963	-	-
+ov-04-4187	orcid-vs-none	dblp	rec	conf/ciarp/StarostenkoCSO05	10.1007/11578079_102	-
+ov-04-4187	orcid-vs-none	openalex	work-by-doi	10.1007/11578079_102	-	-
+ov-05-7040	orcid-vs-none	dblp	rec	journals/eor/GriffithsSEMC19	10.1016/J.EJOR.2018.07.053	-
+ov-05-7040	orcid-vs-none	openalex	work-by-doi	10.1016/j.ejor.2018.07.053	-	-
+ov-05-7040	orcid-vs-none	dblp	rec	conf/europar/SongKEPC03	10.1007/978-3-540-45209-6_75	-
+ov-05-7040	orcid-vs-none	openalex	work-by-doi	10.1007/978-3-540-45209-6_75	-	-
+ov-119-4430	orcid-vs-none	dblp	rec	conf/iccS/CamaraCB23	10.1007/978-3-031-35995-8_47	-
+ov-119-4430	orcid-vs-none	openalex	work-by-doi	10.1007/978-3-031-35995-8_47	-	-
+ov-119-4430	orcid-vs-none	dblp	rec	journals/tjs/CamaraCB26	10.1007/S11227-026-08412-W	-
+ov-119-4430	orcid-vs-none	openalex	work-by-doi	10.1007/s11227-026-08412-w	-	-
+ov-13-1520-3	orcid-vs-none	dblp	rec	conf/spawc/0003WJSZ20	10.1109/SPAWC48557.2020.9154215	-
+ov-13-1520-3	orcid-vs-none	openalex	work-by-doi	10.1109/spawc48557.2020.9154215	-	-
+ov-13-1520-3	orcid-vs-none	dblp	rec	conf/apcc/LuYJWL17	10.23919/APCC.2017.8304054	-
+ov-13-1520-3	orcid-vs-none	openalex	work-by-doi	10.23919/apcc.2017.8304054	-	-
+ov-16-493-1	orcid-vs-none	dblp	rec	conf/mm/0001M0K25	10.1145/3746027.3754588	-
+ov-16-493-1	orcid-vs-none	openalex	work-by-doi	10.1145/3746027.3754588	-	-
+ov-16-493-1	orcid-vs-none	dblp	rec	conf/icassp/HuCLLZ24	10.1109/ICASSP48485.2024.10446586	-
+ov-16-493-1	orcid-vs-none	openalex	work-by-doi	10.1109/icassp48485.2024.10446586	-	-
+ov-187-0682	orcid-vs-none	dblp	rec	conf/europar/DiehlMBGK23	10.1007/978-3-031-48803-0_11	-
+ov-187-0682	orcid-vs-none	openalex	work-by-doi	10.1007/978-3-031-48803-0_11	-	-
+ov-187-0682	orcid-vs-none	dblp	rec	conf/espmm/DaissSDKP22	10.1109/ESPM256814.2022.00007	-
+ov-187-0682	orcid-vs-none	openalex	work-by-doi	10.1109/espm256814.2022.00007	-	-
+ov-216-4888	orcid-vs-none	dblp	rec	journals/access/RioJS24	10.1109/ACCESS.2024.3472473	-
+ov-216-4888	orcid-vs-none	openalex	work-by-doi	10.1109/access.2024.3472473	-	-
+ov-216-4888	orcid-vs-none	dblp	rec	journals/comcom/RioMSJC26	10.1016/J.COMCOM.2026.108520	-
+ov-216-4888	orcid-vs-none	openalex	work-by-doi	10.1016/j.comcom.2026.108520	-	-
+ov-227-2274-2	orcid-vs-none	dblp	rec	journals/tcasII/YaoH24	10.1109/TCSII.2023.3332692	-
+ov-227-2274-2	orcid-vs-none	openalex	work-by-doi	10.1109/tcsii.2023.3332692	-	-
+ov-227-2274-2	orcid-vs-none	dblp	rec	conf/icce-tw/HuangYL24	10.1109/ICCE-TAIWAN62264.2024.10674350	-
+ov-227-2274-2	orcid-vs-none	openalex	work-by-doi	10.1109/icce-taiwan62264.2024.10674350	-	-
+pv-2208-02999	preprint-vs-vor	dblp	rec	journals/corr/abs-2208-02999	10.48550/ARXIV.2208.02999	-
+pv-2208-02999	preprint-vs-vor	openalex	work-by-doi	10.48550/arxiv.2208.02999	-	-
+pv-2208-02999	preprint-vs-vor	dblp	rec	conf/fc/TasB23	10.1007/978-3-031-47751-5_18	-
+pv-2208-02999	preprint-vs-vor	openalex	work-by-doi	10.1007/978-3-031-47751-5_18	-	-
+pv-2111-03282	preprint-vs-vor	dblp	rec	journals/corr/abs-2111-03282	10.48550/ARXIV.2111.03282	-
+pv-2111-03282	preprint-vs-vor	openalex	work-by-doi	10.48550/arxiv.2111.03282	-	-
+pv-2111-03282	preprint-vs-vor	dblp	rec	conf/icbk/OhnoK21	10.1109/ICKG52313.2021.00033	-
+pv-2111-03282	preprint-vs-vor	openalex	work-by-doi	10.1109/ickg52313.2021.00033	-	-
+pv-2106-07056	preprint-vs-vor	dblp	rec	journals/corr/abs-2106-07056	10.48550/ARXIV.2106.07056	-
+pv-2106-07056	preprint-vs-vor	openalex	work-by-doi	10.48550/arxiv.2106.07056	-	-
+pv-2106-07056	preprint-vs-vor	dblp	rec	conf/sigdial/MehriE21a	10.18653/V1/2021.SIGDIAL-1.52	-
+pv-2106-07056	preprint-vs-vor	openalex	work-by-doi	10.18653/v1/2021.sigdial-1.52	-	-
+pv-2510-06798	preprint-vs-vor	dblp	rec	journals/corr/abs-2510-06798	10.48550/ARXIV.2510.06798	-
+pv-2510-06798	preprint-vs-vor	openalex	work-by-doi	10.48550/arxiv.2510.06798	-	-
+pv-2510-06798	preprint-vs-vor	dblp	rec	conf/focs/GolowichG25	10.1109/FOCS63196.2025.00082	-
+pv-2510-06798	preprint-vs-vor	openalex	work-by-doi	10.1109/focs63196.2025.00082	-	-
+pv-2212-05184	preprint-vs-vor	dblp	rec	journals/corr/abs-2212-05184	10.48550/ARXIV.2212.05184	-
+pv-2212-05184	preprint-vs-vor	openalex	work-by-doi	10.48550/arxiv.2212.05184	-	-
+pv-2212-05184	preprint-vs-vor	dblp	rec	conf/bibm/ZandigoharD22	10.1109/BIBM55620.2022.9994949	-
+pv-2212-05184	preprint-vs-vor	openalex	work-by-doi	10.1109/bibm55620.2022.9994949	-	-
+pv-2106-04708	preprint-vs-vor	dblp	rec	journals/corr/abs-2106-04708	10.48550/ARXIV.2106.04708	-
+pv-2106-04708	preprint-vs-vor	openalex	work-by-doi	10.48550/arxiv.2106.04708	-	-
+pv-2106-04708	preprint-vs-vor	dblp	rec	journals/access/TruongSDA21	10.1109/ACCESS.2021.3107189	-
+pv-2106-04708	preprint-vs-vor	openalex	work-by-doi	10.1109/access.2021.3107189	-	-
+pv-2404-02570	preprint-vs-vor	dblp	rec	journals/corr/abs-2404-02570	10.48550/ARXIV.2404.02570	-
+pv-2404-02570	preprint-vs-vor	openalex	work-by-doi	10.48550/arxiv.2404.02570	-	-
+pv-2404-02570	preprint-vs-vor	dblp	rec	conf/semeval/ZhouSPL24	10.18653/V1/2024.SEMEVAL-1.259	-
+pv-2404-02570	preprint-vs-vor	openalex	work-by-doi	10.18653/v1/2024.semeval-1.259	-	-
+pv-2602-16156	preprint-vs-vor	dblp	rec	journals/corr/abs-2602-16156	10.48550/ARXIV.2602.16156	-
+pv-2602-16156	preprint-vs-vor	openalex	work-by-doi	10.48550/arxiv.2602.16156	-	-
+pv-2602-16156	preprint-vs-vor	dblp	rec	conf/citc/ChatterjeeLV26	10.4230/LIPICS.ITC.2026.5	-
+pv-2602-16156	preprint-vs-vor	openalex	work-by-doi	10.4230/lipics.itc.2026.5	-	-
+rt-10-1155-2023-9869061	retraction	openalex	work-by-doi	10.1155/2023/9869061	-	-
+rt-10-1155-2023-9869061	retraction	crossref	work-by-doi	10.1155/2023/9869061	-	-
+rt-10-1155-2023-9869061	retraction	openalex	work-by-doi	10.1155/2022/3897180	-	-
+rt-10-1155-2023-9869061	retraction	crossref	work-by-doi	10.1155/2022/3897180	-	-
+rt-10-1155-2023-9842735	retraction	openalex	work-by-doi	10.1155/2023/9842735	-	-
+rt-10-1155-2023-9842735	retraction	crossref	work-by-doi	10.1155/2023/9842735	-	-
+rt-10-1155-2023-9842735	retraction	openalex	work-by-doi	10.1155/2021/4239750	-	-
+rt-10-1155-2023-9842735	retraction	crossref	work-by-doi	10.1155/2021/4239750	-	-
+rt-10-1109-ic3i56241-2022-10703616	retraction	openalex	work-by-doi	10.1109/ic3i56241.2022.10703616	-	-
+rt-10-1109-ic3i56241-2022-10703616	retraction	crossref	work-by-doi	10.1109/ic3i56241.2022.10703616	-	-
+rt-10-1109-ic3i56241-2022-10703616	retraction	openalex	work-by-doi	10.1109/ic3i56241.2022.10073087	-	-
+rt-10-1109-ic3i56241-2022-10703616	retraction	crossref	work-by-doi	10.1109/ic3i56241.2022.10073087	-	-
+st-editorial-2020	same-title	dblp	rec	journals/et/Agrawal20c	10.1007/S10836-020-05900-6	-
+st-editorial-2020	same-title	openalex	work-by-doi	10.1007/s10836-020-05900-6	-	-
+st-editorial-2020	same-title	dblp	rec	journals/oclc/TammaroM20	10.1108/DLP-05-2020-050	-
+st-editorial-2020	same-title	openalex	work-by-doi	10.1108/dlp-05-2020-050	-	-
+st-guest-editorial-2020	same-title	dblp	rec	journals/imm/Angrisani20	10.1109/MIM.2020.9289064	-
+st-guest-editorial-2020	same-title	openalex	work-by-doi	10.1109/mim.2020.9289064	-	-
+st-guest-editorial-2020	same-title	dblp	rec	journals/ojcands/Wang20	10.1109/OJCAS.2020.3014819	-
+st-guest-editorial-2020	same-title	openalex	work-by-doi	10.1109/ojcas.2020.3014819	-	-
+st-introduction-2020	same-title	dblp	rec	conf/clarin/JongS19	10.3384/ECP2020172001	-
+st-introduction-2020	same-title	openalex	work-by-doi	10.3384/ecp2020172001	-	-
+st-introduction-2020	same-title	dblp	rec	journals/ijns/KimiskidisS20	10.1142/S0129065720030082	-
+st-introduction-2020	same-title	openalex	work-by-doi	10.1142/s0129065720030082	-	-
+st-preface-2020	same-title	dblp	rec	journals/jikm/Thabtah20	10.1142/S0219649220020013	-
+st-preface-2020	same-title	openalex	work-by-doi	10.1142/s0219649220020013	-	-
+st-preface-2020	same-title	dblp	rec	journals/nc/PozoC20	10.1007/S11047-018-9680-3	-
+st-preface-2020	same-title	openalex	work-by-doi	10.1007/s11047-018-9680-3	-	-
+md-sigmod-landsons77	multi-doi	dblp	rec	conf/sigmod/LandsonS77	10.1145/800180.810255	-
+md-sigmod-landsons77	multi-doi	openalex	work-by-doi	10.1145/800180.810255	-	-
+md-sigmod-landsons77	multi-doi	openalex	work-by-doi	10.1145/965641.810255	-	-
+md-sigmod-landsons77	multi-doi	crossref	work-by-doi	10.1145/965641.810255	-	-
+md-ppopp-dicekl16	multi-doi	dblp	rec	conf/ppopp/DiceKL16	10.1145/2851141.2851162	-
+md-ppopp-dicekl16	multi-doi	openalex	work-by-doi	10.1145/2851141.2851162	-	-
+md-ppopp-dicekl16	multi-doi	openalex	work-by-doi	10.1145/3016078.2851162	-	-
+md-ppopp-dicekl16	multi-doi	crossref	work-by-doi	10.1145/3016078.2851162	-	-
+md-sigcse-culikr83	multi-doi	dblp	rec	conf/sigcse/CulikR83	10.1145/800038.801005	-
+md-sigcse-culikr83	multi-doi	openalex	work-by-doi	10.1145/800038.801005	-	-
+md-sigcse-culikr83	multi-doi	openalex	work-by-doi	10.1145/952978.801005	-	-
+md-sigcse-culikr83	multi-doi	crossref	work-by-doi	10.1145/952978.801005	-	-
+md-wsc-mckayr89	multi-doi	dblp	rec	conf/wsc/McKayR89	10.1109/WSC.1989.718753	-
+md-wsc-mckayr89	multi-doi	openalex	work-by-doi	10.1109/wsc.1989.718753	-	-
+md-wsc-mckayr89	multi-doi	openalex	work-by-doi	10.1145/76738.76835	-	-
+md-wsc-mckayr89	multi-doi	crossref	work-by-doi	10.1145/76738.76835	-	-
+md-cinc-fotiadoukhv19	multi-doi	dblp	rec	conf/cinc/FotiadouKHV19	10.22489/CINC.2019.015	-
+md-cinc-fotiadoukhv19	multi-doi	openalex	work-by-doi	10.22489/cinc.2019.015	-	-
+md-cinc-fotiadoukhv19	multi-doi	openalex	work-by-doi	10.23919/cinc49843.2019.9005722	-	-
+md-cinc-fotiadoukhv19	multi-doi	crossref	work-by-doi	10.23919/cinc49843.2019.9005722	-	-
+md-cdm-behtoeika20	multi-doi	dblp	rec	journals/cdm/BehtoeiKA20	10.11575/CDM.V15I3.68174	-
+md-cdm-behtoeika20	multi-doi	openalex	work-by-doi	10.11575/cdm.v15i3.68174	-	-
+md-cdm-behtoeika20	multi-doi	openalex	work-by-doi	10.55016/ojs/cdm.v15i3.68174	-	-
+md-cdm-behtoeika20	multi-doi	crossref	work-by-doi	10.55016/ojs/cdm.v15i3.68174	-	-
+cj-pst-wuw06	conf-vs-journal	dblp	rec	conf/pst/WuW06	10.1145/1501434.1501447	-
+cj-pst-wuw06	conf-vs-journal	openalex	work-by-doi	10.1145/1501434.1501447	-	-
+cj-pst-wuw06	conf-vs-journal	dblp	rec	journals/ijisec/WuW07	10.1007/S10207-007-0027-9	-
+cj-pst-wuw06	conf-vs-journal	openalex	work-by-doi	10.1007/s10207-007-0027-9	-	-
+cj-sagt-bilogm19	conf-vs-journal	dblp	rec	conf/sagt/BiloGM19	10.1007/978-3-030-30473-7_17	-
+cj-sagt-bilogm19	conf-vs-journal	openalex	work-by-doi	10.1007/978-3-030-30473-7_17	-	-
+cj-sagt-bilogm19	conf-vs-journal	dblp	rec	journals/jair/BiloGM25	10.1613/JAIR.1.14956	-
+cj-sagt-bilogm19	conf-vs-journal	openalex	work-by-doi	10.1613/jair.1.14956	-	-
+cj-sew-margarias06	conf-vs-journal	dblp	rec	conf/sew/MargariaS06	10.1109/SEW.2006.29	-
+cj-sew-margarias06	conf-vs-journal	openalex	work-by-doi	10.1109/sew.2006.29	-	-
+cj-sew-margarias06	conf-vs-journal	dblp	rec	journals/computer/MargariaS06	10.1109/MC.2006.355	-
+cj-sew-margarias06	conf-vs-journal	openalex	work-by-doi	10.1109/mc.2006.355	-	-
+cj-lics-chatterjee021	conf-vs-journal	dblp	rec	conf/lics/Chatterjee021	10.1109/LICS52264.2021.9470595	-
+cj-lics-chatterjee021	conf-vs-journal	openalex	work-by-doi	10.1109/lics52264.2021.9470595	-	-
+cj-lics-chatterjee021	conf-vs-journal	dblp	rec	journals/lmcs/ChatterjeeD24	10.46298/LMCS-20(4:11)2024	-
+cj-lics-chatterjee021	conf-vs-journal	openalex	work-by-doi	10.46298/lmcs-20(4:11)2024	-	-
+cj-bcb-finchh12	conf-vs-journal	dblp	rec	conf/bcb/FinchH12	10.1145/2382936.2383025	-
+cj-bcb-finchh12	conf-vs-journal	openalex	work-by-doi	10.1145/2382936.2383025	-	-
+cj-bcb-finchh12	conf-vs-journal	dblp	rec	journals/jcphy/FinchCH13	10.1016/J.JCP.2012.07.034	-
+cj-bcb-finchh12	conf-vs-journal	openalex	work-by-doi	10.1016/j.jcp.2012.07.034	-	-
+cj-isit-weissmano04	conf-vs-journal	dblp	rec	conf/isit/WeissmanO04	10.1109/ISIT.2004.1365500	-
+cj-isit-weissmano04	conf-vs-journal	openalex	work-by-doi	10.1109/isit.2004.1365500	-	-
+cj-isit-weissmano04	conf-vs-journal	dblp	rec	journals/tit/WeissmanO05	10.1109/TIT.2005.856982	-
+cj-isit-weissmano04	conf-vs-journal	openalex	work-by-doi	10.1109/tit.2005.856982	-	-
+cj-siggraph-alemparte74	conf-vs-journal	dblp	rec	conf/siggraph/AlemparteCSW74	10.1145/563182.563213	-
+cj-siggraph-alemparte74	conf-vs-journal	openalex	work-by-doi	10.1145/563182.563213	-	-
+cj-siggraph-alemparte74	conf-vs-journal	dblp	rec	journals/cg/AlemparteCSW75	10.1016/0097-8493(75)90045-X	-
+cj-siggraph-alemparte74	conf-vs-journal	openalex	work-by-doi	10.1016/0097-8493(75)90045-x	-	-
+cj-stoc-pintoh25	conf-vs-journal	dblp	rec	conf/stoc/PintoH25	10.1145/3717823.3718134	-
+cj-stoc-pintoh25	conf-vs-journal	openalex	work-by-doi	10.1145/3717823.3718134	-	-
+cj-stoc-pintoh25	conf-vs-journal	dblp	rec	journals/theoretics/PintoH26	10.46298/THEORETICS.26.10	-
+cj-stoc-pintoh25	conf-vs-journal	openalex	work-by-doi	10.46298/theoretics.26.10	-	-
+or-csur-ajaykumarsh22	ordinary	dblp	rec	journals/csur/AjaykumarSH22	10.1145/3466819	-
+or-csur-ajaykumarsh22	ordinary	openalex	work-by-doi	10.1145/3466819	-	-
+or-csur-ajaykumarsh22	ordinary	crossref	work-by-doi	10.1145/3466819	-	-
+or-csur-ajaykumarsh22	ordinary	openalex	authors-of-work	10.1145/3466819	-	-
+or-jss-zolduoarratils22	ordinary	dblp	rec	journals/jss/ZolduoarratiLS22	10.1016/J.JSS.2022.111427	-
+or-jss-zolduoarratils22	ordinary	openalex	work-by-doi	10.1016/j.jss.2022.111427	-	-
+or-jss-zolduoarratils22	ordinary	crossref	work-by-doi	10.1016/j.jss.2022.111427	-	-
+or-jss-zolduoarratils22	ordinary	openalex	authors-of-work	10.1016/j.jss.2022.111427	-	-
+or-csur-siqueirad22	ordinary	dblp	rec	journals/csur/SiqueiraD22	10.1145/3478680	-
+or-csur-siqueirad22	ordinary	openalex	work-by-doi	10.1145/3478680	-	-
+or-csur-siqueirad22	ordinary	crossref	work-by-doi	10.1145/3478680	-	-
+or-csur-siqueirad22	ordinary	openalex	authors-of-work	10.1145/3478680	-	-
+or-csur-boyarfl21	ordinary	dblp	rec	journals/csur/BoyarFL21	10.1145/3425910	-
+or-csur-boyarfl21	ordinary	openalex	work-by-doi	10.1145/3425910	-	-
+or-csur-boyarfl21	ordinary	crossref	work-by-doi	10.1145/3425910	-	-
+or-csur-boyarfl21	ordinary	openalex	authors-of-work	10.1145/3425910	-	-
+or-jss-garbams22	ordinary	dblp	rec	journals/jss/GarbaMS22	10.1016/J.JSS.2021.111120	-
+or-jss-garbams22	ordinary	openalex	work-by-doi	10.1016/j.jss.2021.111120	-	-
+or-jss-garbams22	ordinary	crossref	work-by-doi	10.1016/j.jss.2021.111120	-	-
+or-jss-garbams22	ordinary	openalex	authors-of-work	10.1016/j.jss.2021.111120	-	-
+or-toplas-husd22	ordinary	dblp	rec	journals/toplas/HuSD22	10.1145/3532849	-
+or-toplas-husd22	ordinary	openalex	work-by-doi	10.1145/3532849	-	-
+or-toplas-husd22	ordinary	crossref	work-by-doi	10.1145/3532849	-	-
+or-toplas-husd22	ordinary	openalex	authors-of-work	10.1145/3532849	-	-
+or-tkde-huanghx22	ordinary	dblp	rec	journals/tkde/HuangHX22	10.1109/TKDE.2020.3027950	-
+or-tkde-huanghx22	ordinary	openalex	work-by-doi	10.1109/tkde.2020.3027950	-	-
+or-tkde-huanghx22	ordinary	crossref	work-by-doi	10.1109/tkde.2020.3027950	-	-
+or-tkde-huanghx22	ordinary	openalex	authors-of-work	10.1109/tkde.2020.3027950	-	-
+or-csur-deldjoonm21	ordinary	dblp	rec	journals/csur/DeldjooNM21	10.1145/3439729	-
+or-csur-deldjoonm21	ordinary	openalex	work-by-doi	10.1145/3439729	-	-
+or-csur-deldjoonm21	ordinary	crossref	work-by-doi	10.1145/3439729	-	-
+or-csur-deldjoonm21	ordinary	openalex	authors-of-work	10.1145/3439729	-	-

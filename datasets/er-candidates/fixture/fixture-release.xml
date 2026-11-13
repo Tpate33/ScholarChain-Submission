@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<!-- ScholarChain FIXTURE for the offline dblp release extractor (work order DS-P5-03). Owner: dataset-engineer. NOT a dblp release and NOT a sample: it is never extracted into datasets/samples/. The four records are copied unchanged from datasets/samples/dblp/dblp-sample.xml (SPARQL-derived transcription, see that file). It mimics the release layout assumed by the extractor: header lines through a line "<dblp>", each record starting at the beginning of a line and ending with its end tag at the end of a line, and "</dblp>" as the last line. dblp metadata: CC0 1.0 (secondary licence ODC-BY 1.0), Schloss Dagstuhl, https://dblp.org/xml/README.txt -->
+<!DOCTYPE dblp SYSTEM "dblp.dtd">
+<dblp>
+<article key="journals/tocs/CorbettDEFFFGGHHHKKLLMMNQRRSSTWW13">
+<author>James C. Corbett</author>
+<author>Jeffrey Dean</author>
+<author>Michael Epstein</author>
+<author>Andrew Fikes</author>
+<author>Christopher Frost 0001</author>
+<author>J. J. Furman</author>
+<author>Sanjay Ghemawat</author>
+<author>Andrey Gubarev</author>
+<author>Christopher Heiser</author>
+<author>Peter Hochschild</author>
+<author>Wilson C. Hsieh</author>
+<author>Sebastian Kanthak</author>
+<author>Eugene Kogan</author>
+<author>Hongyi Li</author>
+<author>Alexander Lloyd</author>
+<author>Sergey Melnik 0001</author>
+<author>David Mwaura</author>
+<author>David Nagle</author>
+<author>Sean Quinlan</author>
+<author>Rajesh Rao</author>
+<author>Lindsay Rolig</author>
+<author>Yasushi Saito</author>
+<author>Michal Szymaniak</author>
+<author>Christopher Taylor</author>
+<author>Ruth Wang</author>
+<author>Dale Woodford</author>
+<title>Spanner: Google's Globally Distributed Database.</title>
+<pages>8</pages>
+<year>2013</year>
+<volume>31</volume>
+<journal>ACM Trans. Comput. Syst.</journal>
+<number>3</number>
+<ee>https://doi.org/10.1145/2491245</ee>
+</article>
+<article key="journals/cacm/PopperMP21">
+<author orcid="0000-0002-2814-962X">Christina P&ouml;pper</author>
+<author orcid="0000-0001-6899-0651">Michail Maniatakos</author>
+<author orcid="0000-0003-1909-0336">Roberto Di Pietro</author>
+<title>Cyber security research in the Arab region: a blooming ecosystem with global ambitions.</title>
+<pages>96-101</pages>
+<year>2021</year>
+<volume>64</volume>
+<journal>Commun. ACM</journal>
+<number>4</number>
+<ee>https://doi.org/10.1145/3447741</ee>
+</article>
+<article key="journals/cacm/Varajao21">
+<author orcid="0000-0002-4303-3908">Jo&atilde;o Varaj&atilde;o</author>
+<title>Software development in disruptive times.</title>
+<pages>32-35</pages>
+<year>2021</year>
+<volume>64</volume>
+<journal>Commun. ACM</journal>
+<number>10</number>
+<ee>https://doi.org/10.1145/3453932</ee>
+</article>
+<inproceedings key="conf/osdi/ChangDGHWBCFG06">
+<author>Fay Chang</author>
+<author>Jeffrey Dean</author>
+<author>Sanjay Ghemawat</author>
+<author>Wilson C. Hsieh</author>
+<author>Deborah A. Wallach</author>
+<author>Michael Burrows</author>
+<author>Tushar Chandra</author>
+<author>Andrew Fikes</author>
+<author>Robert Gruber</author>
+<title>Bigtable: A Distributed Storage System for Structured Data (Awarded Best Paper!).</title>
+<pages>205-218</pages>
+<year>2006</year>
+<booktitle>OSDI</booktitle>
+<ee>http://www.usenix.org/events/osdi06/tech/chang.html</ee>
+<crossref>conf/osdi/2006</crossref>
+</inproceedings>
+</dblp>

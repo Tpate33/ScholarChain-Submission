@@ -8,6 +8,9 @@
 #   --verify --with-release   as --verify, and also re-read every recorded dblp byte range from the local
 #                             pinned release datasets/downloads/dblp/full/<release>.xml.gz (still offline;
 #                             the release MD5 must equal the manifest pin and its sha256 sidecar must match)
+#   --dry-run --with-release  READ-ONLY inspection of the local pinned release (DS-P5-09): the same MD5 / sidecar
+#                             gate, then the record-boundary layout (escaped bytes, bounded output) and the
+#                             extraction scanner's verdict for every selected dblp key. Writes nothing, no network
 #   --fixture                 offline self-test of the dblp release extractor on the committed fixture
 #                             datasets/er-candidates/fixture/fixture-release.xml (gzipped into a temporary
 #                             directory; writes nothing to the repository; no network)
@@ -43,12 +46,16 @@ DS_DATASET=er-candidates
 . "$(cd "$(dirname "$0")" && pwd)/lib-datasets.sh"
 
 usage() {
-  echo "usage: datasets/scripts/fetch-er-candidates.sh (--dry-run | --verify [--with-release] | --fixture | --sample)" >&2
+  echo "usage: datasets/scripts/fetch-er-candidates.sh (--dry-run [--with-release] | --verify [--with-release] | --fixture | --sample)" >&2
 }
 
 if [ "$#" -eq 2 ] && [ "$1" = "--verify" ] && [ "$2" = "--with-release" ]; then
   ds_need python3
   exec python3 -I "$DS_PY" er-verify "$DS_ROOT" --with-release
+fi
+if [ "$#" -eq 2 ] && [ "$1" = "--dry-run" ] && [ "$2" = "--with-release" ]; then
+  ds_need python3
+  exec python3 -I "$DS_PY" er-inspect "$DS_ROOT"
 fi
 [ "$#" -eq 1 ] || { usage; ds_die "exactly one mode flag is required; nothing is fetched by default" 2; }
 ds_need python3

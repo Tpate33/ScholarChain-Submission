@@ -15,6 +15,9 @@ Subcommands
                                           re-reads every recorded dblp byte range from the local pinned release
   er-fixture <repo_root>                  offline self-test of the dblp release extractor on the committed
                                           fixture (datasets/er-candidates/fixture/); writes only to a temp dir
+  er-inspect <repo_root>                  read-only: verify and read the local pinned dblp release once and print
+                                          its record-boundary layout (escaped bytes, bounded) and the extraction
+                                          scanner's verdict per selected key; writes nothing (DS-P5-09)
 
 The manifest is written in a strict YAML subset that this module parses itself:
 block mappings ("key: value" / "key:" + deeper block), block lists ("- value", "- key: value"),
@@ -333,6 +336,7 @@ class Report:
     def fail(self, what, why):
         self.checks += 1
         self.failures += 1
+        self.failed = getattr(self, 'failed', []) + ['FAIL %s: %s' % (what, why)]
         print('FAIL %s: %s' % (what, why))
 
     def check(self, cond, what, why):
@@ -943,8 +947,15 @@ def er_curl(url, tmp, cap, accept):
 # "fetch-dblp.sh --full" (MD5 checked against the manifest pin, sha256 sidecar written). Construction
 # rule of one excerpt file, all bytes of the DECOMPRESSED release stream, unmodified:
 #   header = bytes [0, H): every line up to and including the first line whose stripped text is "<dblp>"
-#   record = bytes [R, R+L): the record's lines, from the line that STARTS with "<type key=..." to the
-#            line that ENDS with "</type>"
+#   record = bytes [R, R+L): from the "<" of the record's start tag "<type ... key=...>" through the ">" of its
+#            first end tag "</type>", plus the line terminator directly after that end tag if there is one.
+#            The start tag must be (a) at the start of its line, or (b) directly preceded on its line by exactly
+#            one record end tag "</type2>" and nothing else (the previous record ends on the same line;
+#            observed for 4942406 of 12998506 records of dblp-2026-10-03, e.g.
+#            '</inproceedings><inproceedings mdate="2018-11-06" key="conf/dac/0001AG12">'; DS-P5-09), or (c) directly after the end tag of the previous
+#            wanted record on the same line. After the end tag the line must end, or the next record's start
+#            tag must follow directly. Between the start tag and the end tag no other record start tag may
+#            occur. Anything else is refused (release-layout-error); nothing is guessed.
 #   footer = bytes [F, F+N): the last non-blank line of the stream, which must be "</dblp>"
 #   file   = header + record + footer
 # Every range is written to DBLP-RELEASE-RANGES.tsv together with the release id, MD5 and the sha256 of
@@ -963,6 +974,12 @@ ER_RANGE_INT_COLS = ER_RANGES_COLS[6:13]
 ER_DBLP_TYPES = rb'(article|inproceedings|proceedings|book|incollection|phdthesis|mastersthesis|www|data)'
 ER_DBLP_START = re.compile(rb'^<' + ER_DBLP_TYPES + rb'\s[^>]*\bkey="([^"]+)"')
 ER_DBLP_ANY_START = re.compile(rb'<' + ER_DBLP_TYPES + rb'\s[^>]*\bkey="([^"]+)"')
+# Any record start tag, with or without a key attribute ("<booktitle>" is not one: the type name must be followed by
+# white space or ">"), and any record end tag. Record elements never nest in dblp.xml and field text cannot hold a
+# literal "<", so these tags are the record boundaries.
+ER_DBLP_OPEN_TAG = re.compile(rb'<' + ER_DBLP_TYPES + rb'[\s>]')
+ER_DBLP_END_TAG = re.compile(rb'</' + ER_DBLP_TYPES + rb'>')
+ER_LINE_ENDS = (b'', b'\n', b'\r\n')
 ER_HEADER_MAX = 65536
 MD5_RE = re.compile(r'^[0-9a-f]{32}$')
 
@@ -1063,60 +1080,127 @@ def er_dblp_read_release(path, pin_md5, consume=None, shown=None):
     return got_sha, got_md5, result
 
 
-def er_dblp_scan(f, keys):
-    """One streaming pass over the decompressed release stream f (a binary file object).
-    -> (header_bytes, (footer_offset, footer_bytes), {key: (record_offset, record_bytes)}).
-    Raises ErReleaseError (release-layout-error) when the layout rule above does not hold for the release
-    or for a wanted key. Keys that are simply absent are not an error here."""
+def er_escape(b, limit=240, tail=False):
+    """Printable, unambiguous rendering of raw bytes for diagnostics: printable ASCII except backslash as is,
+    every other byte as \\xNN (so a newline is \\x0a). At most `limit` bytes are shown (the last ones when
+    tail=True); the number of omitted bytes is stated."""
+    cut = b[-limit:] if tail else b[:limit]
+    s = ''.join(chr(c) if 0x20 <= c < 0x7f and c != 0x5c else '\\x%02x' % c for c in cut)
+    more = len(b) - len(cut)
+    if more <= 0:
+        return s
+    return ('[%d earlier bytes omitted]' % more + s) if tail else (s + '[%d more bytes omitted]' % more)
+
+
+class _DblpScanner:
+    """Streaming record-boundary scanner over the decompressed release (rule in the comment above ER_DBLP_RELEASE_ID).
+    feed(line) is called once per line in stream order; finish() returns
+    (header_bytes, (footer_offset, footer_bytes), {key: (record_offset, record_bytes)}).
+    Both raise ErReleaseError (release-layout-error) when the rule does not hold for the release or for a wanted
+    key. Keys that are simply absent are not an error here. Records that are not wanted are never cut, but a
+    wanted key is found wherever its start tag sits on a line (also after another record on the same line), so a
+    wanted record can never be reported absent because of where its tag sits (DS-P5-09)."""
+
+    def __init__(self, keys):
+        self.keys = keys
+        self.header = bytearray()
+        self.in_header = True
+        self.found = {}
+        self.layout = {}            # key -> (start class, end class), for diagnostics
+        self.cur = None             # [type, key, record offset, [chunks], start class]
+        self.off = 0
+        self.last = None
+
+    @staticmethod
     def bad(msg):
         raise ErReleaseError('release-layout-error: %s. No dblp record was written.' % msg)
-    header, found, cur, off, in_header, last = bytearray(), {}, None, 0, True, None
+
+    def feed(self, line):
+        off = self.off
+        if self.in_header:
+            self.header += line
+            if line.strip() == b'<dblp>':
+                self.in_header = False
+            elif len(self.header) > ER_HEADER_MAX:
+                self.bad('no "<dblp>" line in the first %d bytes' % ER_HEADER_MAX)
+        elif self.cur is not None or b'key="' in line:
+            self._records(line, off)
+        if line.strip():
+            self.last = (off, line)
+        self.off = off + len(line)
+
+    def _records(self, line, off):
+        pos, boundary, chunk = 0, None, 0
+        while True:
+            if self.cur is None:
+                if line.find(b'key="', pos) < 0:
+                    return
+                m = ER_DBLP_ANY_START.search(line, pos)
+                if m is None:
+                    return
+                k = m.group(2).decode('utf-8', 'replace')
+                if k not in self.keys:
+                    pos = m.end()
+                    continue
+                s = m.start()
+                if s == 0:
+                    cls = 'line-start'
+                elif s == boundary:
+                    cls = 'after-wanted-record'
+                elif ER_DBLP_END_TAG.fullmatch(line, 0, s):
+                    cls = 'after-end-tag'
+                else:
+                    self.bad('the record tag of key %s is not at the start of a line and is not directly preceded by '
+                             'exactly one record end tag (line at offset %d, tag at offset %d; bytes before the tag on '
+                             'its line: "%s")' % (k, off, off + s, er_escape(line[:s], 120, tail=True)))
+                if k in self.found:
+                    self.bad('key %s occurs twice (offsets %d and %d)' % (k, self.found[k][0], off + s))
+                self.cur = [m.group(1), k, off + s, [], cls]
+                pos, chunk = m.end(), s
+            typ, k = self.cur[0], self.cur[1]
+            end_tag = b'</' + typ + b'>'
+            e = line.find(end_tag, pos)
+            if ER_DBLP_OPEN_TAG.search(line, pos, e if e >= 0 else len(line)):
+                self.bad('record %s (offset %d) has no end tag before the next record' % (k, self.cur[2]))
+            if e < 0:
+                self.cur[3].append(line[chunk:])
+                return
+            e += len(end_tag)
+            if line[e:] in ER_LINE_ENDS:
+                stop, ecls = len(line), 'line-end'
+            elif ER_DBLP_OPEN_TAG.match(line, e):
+                stop, ecls = e, 'before-next-record'
+            else:
+                self.bad('text follows %s on the end line of record %s (offset %d): "%s"'
+                         % (end_tag.decode('ascii'), k, off + e, er_escape(line[e:], 80)))
+            self.cur[3].append(line[chunk:stop])
+            self.found[k] = (self.cur[2], b''.join(self.cur[3]))
+            self.layout[k] = (self.cur[4], ecls)
+            self.cur = None
+            if stop == len(line):
+                return
+            pos = boundary = chunk = e
+
+    def finish(self):
+        if self.in_header:
+            self.bad('no "<dblp>" line')
+        if self.cur is not None:
+            self.bad('record %s (offset %d) is not closed before the end of the stream' % (self.cur[1], self.cur[2]))
+        if self.last is None or self.last[1].strip() != b'</dblp>':
+            self.bad('the last non-blank line is not "</dblp>"')
+        return bytes(self.header), self.last, self.found
+
+
+def er_dblp_scan(f, keys):
+    """One streaming pass over the decompressed release stream f (a binary file object) with _DblpScanner.
+    -> (header_bytes, (footer_offset, footer_bytes), {key: (record_offset, record_bytes)}). Raises ErReleaseError."""
+    sc = _DblpScanner(keys)
     try:
         for line in f:
-            if in_header:
-                header += line
-                if line.strip() == b'<dblp>':
-                    in_header = False
-                elif len(header) > ER_HEADER_MAX:
-                    bad('no "<dblp>" line in the first %d bytes' % ER_HEADER_MAX)
-            elif cur is None:
-                if b'key="' in line:
-                    m = ER_DBLP_START.match(line)
-                    if m:
-                        k = m.group(2).decode('utf-8', 'replace')
-                        if k in keys:
-                            if k in found:
-                                bad('key %s occurs twice (offsets %d and %d)' % (k, found[k][0], off))
-                            cur = [m.group(1), k, off, [line]]
-                    else:
-                        for m2 in ER_DBLP_ANY_START.finditer(line):
-                            k2 = m2.group(2).decode('utf-8', 'replace')
-                            if k2 in keys:
-                                bad('the record tag of key %s is not at the start of a line (line at offset %d)'
-                                    % (k2, off))
-            else:
-                if ER_DBLP_ANY_START.search(line):
-                    bad('record %s (offset %d) has no end tag before the next record' % (cur[1], cur[2]))
-                cur[3].append(line)
-            if cur is not None:
-                end = b'</' + cur[0] + b'>'
-                if end in line:
-                    if not line.rstrip(b'\r\n').endswith(end):
-                        bad('text follows %s on the end line of record %s' % (end.decode('ascii'), cur[1]))
-                    found[cur[1]] = (cur[2], b''.join(cur[3]))
-                    cur = None
-            if line.strip():
-                last = (off, line)
-            off += len(line)
+            sc.feed(line)
     except (OSError, EOFError, zlib.error) as e:
-        bad('cannot decompress the release (%s)' % e)
-    if in_header:
-        bad('no "<dblp>" line')
-    if cur is not None:
-        bad('record %s (offset %d) is not closed before the end of the stream' % (cur[1], cur[2]))
-    if last is None or last[1].strip() != b'</dblp>':
-        bad('the last non-blank line is not "</dblp>"')
-    return bytes(header), last, found
+        sc.bad('cannot decompress the release (%s)' % e)
+    return sc.finish()
 
 
 def er_range_url(rng):
@@ -1407,8 +1491,12 @@ def er_dblp_row_problems(root, rel, row, g, pin):
         problems.append('PROVENANCE request_url does not state the same ranges')
     if not problems:
         hl = data[:H].rstrip(b'\r\n').rsplit(b'\n', 1)[-1].strip()
-        m = ER_DBLP_START.match(data[H:H + L])
-        if hl != b'<dblp>' or not m or m.group(2).decode('utf-8', 'replace') != g['record_key'] \
+        rec = data[H:H + L]
+        m = ER_DBLP_START.match(rec)
+        # The record slice starts with its start tag and ends with its own end tag, optionally followed by one
+        # line terminator (DS-P5-09: a record may end mid-line, directly before the next record's start tag).
+        end_ok = bool(m) and any(rec.endswith(b'</' + m.group(1) + b'>' + t) for t in ER_LINE_ENDS)
+        if hl != b'<dblp>' or not m or m.group(2).decode('utf-8', 'replace') != g['record_key'] or not end_ok \
                 or data[H + L:].strip() != b'</dblp>':
             problems.append('file slices do not follow the header/record/footer rule')
     return problems
@@ -1903,6 +1991,180 @@ def cmd_er_verify(root, with_release=False):
     return 1 if rep.failures else 0
 
 
+# --------------------------------------------------------------------------- read-only release inspection
+#
+# Work order DS-P5-09. "fetch-samples.sh --dry-run datasets/er-candidates <pinned release>" reads the local pinned
+# release once (same one-pass MD5 + SHA-256 gate as extraction; nothing is printed about its content unless both
+# digests match) and prints the record-boundary layout: escaped header and tail bytes, how record start and end tags
+# sit on their lines across the WHOLE release, escaped byte windows around the first wanted records whose start tag
+# is not at the start of a line, and the verdict of the extraction scanner for every selected dblp key, with the
+# in-memory excerpt content check. It writes NOTHING (no excerpt, no ledger, no FETCH-FAILURES.tsv) and makes no
+# network request. Output is bounded: at most ER_INSPECT_EXAMPLES examples per class, ER_INSPECT_WATCH windows.
+ER_INSPECT_EXAMPLES = 3
+ER_INSPECT_WATCH = 3
+
+
+def cmd_er_inspect(root):
+    print('er-inspect: READ-ONLY inspection of the pinned dblp release (DS-P5-09). Writes nothing, no network.')
+    try:
+        pin = er_dblp_pin(root)
+    except ErReleaseError as e:
+        print('ERROR dblp release: %s' % e)
+        return 1
+    _, direct, _, errors = er_plan(root)
+    if errors:
+        for e in errors:
+            print('ERROR selection: %s' % e)
+        return 2
+    items = [it for it in direct if it['source'] == 'dblp']
+    keys = {it['ident'] for it in items}
+    st = {k: 0 for k in ('lines', 'bytes', 'key_lines', 'key_lines_no_tag', 'starts', 'start_line', 'start_after_end',
+                         'start_other', 'multi_start_lines', 'ends', 'end_eol', 'end_before_start', 'end_other')}
+    ex = {'start_other': [], 'multi_start_lines': [], 'end_other': [], 'start_after_end': [], 'key_lines_no_tag': []}
+    watch, tail, scan_err = [], [], []
+    sc = _DblpScanner(keys)
+
+    def note(cls, text):
+        if len(ex[cls]) < ER_INSPECT_EXAMPLES:
+            ex[cls].append(text)
+
+    def consume(f):
+        prev, prev_off, open_w = b'', 0, None
+        try:
+            for line in f:
+                off = st['bytes']
+                if not scan_err:
+                    try:
+                        sc.feed(line)
+                    except ErReleaseError as e:
+                        scan_err.append(str(e))
+                if not sc.in_header and b'key="' in line:
+                    st['key_lines'] += 1
+                    ms = list(ER_DBLP_ANY_START.finditer(line))
+                    if not ms:
+                        st['key_lines_no_tag'] += 1
+                        note('key_lines_no_tag', 'line at offset %d: "%s"' % (off, er_escape(line, 200)))
+                    if len(ms) > 1:
+                        st['multi_start_lines'] += 1
+                        note('multi_start_lines', 'line at offset %d (%d start tags): "%s"' % (off, len(ms), er_escape(line, 240)))
+                    for m in ms:
+                        st['starts'] += 1
+                        s = m.start()
+                        if s == 0:
+                            st['start_line'] += 1
+                        elif ER_DBLP_END_TAG.fullmatch(line, 0, s):
+                            st['start_after_end'] += 1
+                            note('start_after_end', 'tag at offset %d: "%s"' % (off + s, er_escape(line, 200)))
+                        else:
+                            st['start_other'] += 1
+                            note('start_other', 'tag at offset %d, bytes before it on its line: "%s"'
+                                 % (off + s, er_escape(line[:s], 200, tail=True)))
+                        k = m.group(2).decode('utf-8', 'replace')
+                        if k in keys and s != 0 and len(watch) < ER_INSPECT_WATCH and open_w is None:
+                            watch.append({'key': k, 'line_off': off, 'tag_off': off + s, 'prev_off': prev_off,
+                                          'prev': prev, 'before': line[:s], 'from_tag': line[s:], 'end': None})
+                            open_w = (len(watch) - 1, b'</' + m.group(1) + b'>', s)
+                if not sc.in_header:
+                    for m in ER_DBLP_END_TAG.finditer(line):
+                        st['ends'] += 1
+                        if line[m.end():] in ER_LINE_ENDS:
+                            st['end_eol'] += 1
+                        elif ER_DBLP_OPEN_TAG.match(line, m.end()):
+                            st['end_before_start'] += 1
+                        else:
+                            st['end_other'] += 1
+                            note('end_other', 'end tag at offset %d, bytes after it: "%s"'
+                                 % (off + m.start(), er_escape(line[m.end():], 200)))
+                if open_w is not None:
+                    i, tag, frm = open_w
+                    e = line.find(tag, frm)
+                    if e >= 0:
+                        watch[i]['end'] = (off, off + e, line)
+                        open_w = None
+                    else:
+                        open_w = (i, tag, 0)
+                if line.strip():
+                    tail.append((off, line))
+                    del tail[:-3]
+                prev, prev_off = line, off
+                st['lines'] += 1
+                st['bytes'] += len(line)
+        except (OSError, EOFError, zlib.error) as e:
+            raise ErReleaseError('release-layout-error: cannot decompress the release (%s)' % e)
+        if not scan_err:
+            try:
+                return sc.finish()
+            except ErReleaseError as e:
+                scan_err.append(str(e))
+        return None
+
+    try:
+        gz_sha, md5, scan = er_dblp_read_release(os.path.join(root, pin['rel']), pin['md5'], consume, shown=pin['rel'])
+    except ErReleaseError as e:
+        print('ERROR dblp release: %s' % e)
+        return 1
+    print('INFO inspect: %s md5 %s (equals the pin) sha256 %s (equals its sidecar); hashed and read in one pass'
+          % (pin['rel'], md5, gz_sha))
+    print('INFO inspect: decompressed stream: %d bytes, %d lines' % (st['bytes'], st['lines']))
+    print('INFO inspect: header (bytes 0+%d): "%s"' % (len(sc.header), er_escape(bytes(sc.header), 600)))
+    for off, line in tail:
+        print('INFO inspect: last non-blank line at offset %d: "%s"' % (off, er_escape(line, 200)))
+    print('INFO inspect: lines after the header holding key=": %d; of those without a complete record start tag: %d'
+          % (st['key_lines'], st['key_lines_no_tag']))
+    print('INFO inspect: record start tags with a key: %d; at the start of their line: %d; directly after exactly one '
+          'record end tag on the same line: %d; after any other bytes: %d; lines holding 2 or more start tags: %d'
+          % (st['starts'], st['start_line'], st['start_after_end'], st['start_other'], st['multi_start_lines']))
+    print('INFO inspect: record end tags: %d; followed by the line end: %d; followed directly by a record start tag: '
+          '%d; followed by other bytes: %d' % (st['ends'], st['end_eol'], st['end_before_start'], st['end_other']))
+    for cls in ('start_after_end', 'start_other', 'multi_start_lines', 'end_other', 'key_lines_no_tag'):
+        for t in ex[cls]:
+            print('INFO inspect: example %s: %s' % (cls, t))
+    for w in watch:
+        print('INFO inspect: wanted key %s: start tag NOT at line start; line at offset %d, tag at offset %d'
+              % (w['key'], w['line_off'], w['tag_off']))
+        print('INFO inspect:   previous line (offset %d): "%s"' % (w['prev_off'], er_escape(w['prev'], 200, tail=True)))
+        print('INFO inspect:   bytes before the tag on its line (offset %d): "%s"'
+              % (w['line_off'], er_escape(w['before'], 200, tail=True)))
+        print('INFO inspect:   bytes from the tag (offset %d): "%s"' % (w['tag_off'], er_escape(w['from_tag'], 300)))
+        if w['end']:
+            lo, eo, line = w['end']
+            print('INFO inspect:   end tag at offset %d, its line (offset %d): "%s"' % (eo, lo, er_escape(line, 300)))
+    if scan_err:
+        print('SCANNER %s' % scan_err[0])
+        print('er-inspect: the extraction scanner REFUSES this release; --sample would write no dblp record')
+        return 1
+    results = er_dblp_excerpts(scan, gz_sha, md5, pin, items)
+    counts, total, classes, not_ok, ok_lines = {}, 0, {}, [], []
+    for it, ok, reason in results:
+        if ok is None:
+            tok = reason.split(':', 1)[0]
+            counts[tok] = counts.get(tok, 0) + 1
+            not_ok.append('SCANNER %s %s: %s' % (it['split'], it['ident'], reason))
+        else:
+            counts['ok'] = counts.get('ok', 0) + 1
+            total += len(ok[0])
+            g = ok[2]
+            cls = sc.layout.get(it['ident'], ('?', '?'))
+            classes[cls] = classes.get(cls, 0) + 1
+            ok_lines.append('SCANNER %s %s: ok, record %d+%d (start %s, end %s), excerpt %d bytes'
+                            % (it['split'], it['ident'], g['record_offset'], g['record_length'], cls[0], cls[1],
+                               g['excerpt_bytes']))
+    try:
+        in_ledger = sum(int(r['bytes']) for r in er_read_ledger(root).values())
+    except ValueError:
+        in_ledger = -1
+    print('SCANNER start/end classes of the cut records: %s'
+          % ', '.join('%s/%s %d' % (a, b, n) for (a, b), n in sorted(classes.items())))
+    for ln in not_ok:
+        print(ln)
+    for ln in ok_lines:
+        print(ln)
+    print('er-inspect: scanner accepts the release layout; %d dblp keys: %s; excerpt bytes %d, bytes already in '
+          'PROVENANCE.tsv %d, budget %d (nothing was written)'
+          % (len(items), ', '.join('%s %d' % kv for kv in sorted(counts.items())), total, in_ledger, ER_MAX_TOTAL_BYTES))
+    return 0
+
+
 # --------------------------------------------------------------------------- dblp extractor fixture
 #
 # Offline self-test of the release extractor (DS-P5-03). The committed fixture-release.xml holds the four
@@ -2239,6 +2501,173 @@ def _er_fixture_layouts(rep, raw, tmp):
             rep.check(ok, 'fixture realistic %s: bytes that contradict the declaration fail excerpt-check-failed for '
                       'that record only, nothing written for it' % name, 'extracted %d, reasons %r' % (n, reasons))
             print('INFO fixture realistic %s: reason: %s' % (name, reasons.get(pop['ident'])))
+
+
+_ER_FX_JOIN = re.compile(rb'(</' + ER_DBLP_TYPES + rb'>)\n(?=<' + ER_DBLP_TYPES + rb'[\s>])')
+
+
+def _fx_shared_lines(raw):
+    """DS-P5-09 regression layout: the realistic fixture (mdate/publtype/cdate attributes, unwanted records between
+    wanted ones) with every record end tag that is followed by the next record's start tag on the next line joined
+    to it, so each record starts directly after the previous record's end tag on the same line. Only "\\n" bytes
+    between a record end tag and a record start tag are removed; no record byte is changed."""
+    return _ER_FX_JOIN.sub(rb'\1', _fx_realistic(raw, b'<?xml version="1.0" encoding="ISO-8859-1"?>', b'P\xf6pper'))
+
+
+def _fx_tag_span(raw, key):
+    """Independent record span (not via _DblpScanner): from the "<" of the start tag that holds key="..." to the end
+    of its first end tag, plus the "\\n" directly after it if there is one."""
+    k = raw.index(b'key="' + key.encode('ascii') + b'"')
+    s = raw.rindex(b'<', 0, k)
+    tag = re.match(rb'<([a-z]+)', raw[s:]).group(1)
+    e = raw.index(b'</' + tag + b'>', k) + len(tag) + 3
+    return s, e + 1 if raw[e:e + 1] == b'\n' else e
+
+
+def _er_fixture_shared_lines(rep, root, raw, tmp):
+    """DS-P5-09: the release-layout-error of 2026-11-13 (a wanted start tag directly after the previous record's
+    end tag on the same line). The positive layout is extracted with exact offsets; ambiguous layouts still fail
+    closed with release-layout-error and write nothing."""
+    _FX_PINNED_URL[0] = load_manifest(root)['datasets']['dblp']['official_source']['download_url']
+    items = _fx_items()
+    cv = _fx_shared_lines(raw)
+    h_end = cv.index(b'\n<dblp>\n') + len(b'\n<dblp>\n')
+    f_off = cv.rindex(b'</dblp>')
+    # Precondition: the previous rule (wanted start tag at the start of a line) refuses this layout.
+    not_at_start = [it['ident'] for it in items[:4] if cv[_fx_tag_span(cv, it['ident'])[0] - 1:][:1] != b'\n']
+    unjoined = _fx_realistic(raw, b'<?xml version="1.0" encoding="ISO-8859-1"?>', b'P\xf6pper')
+    rep.check(len(not_at_start) == 4 and len(cv) == len(unjoined) - 8 and cv.replace(b'\n', b'') == unjoined.replace(b'\n', b''),
+              'fixture shared-lines: all 4 wanted start tags sit directly after a record end tag on the same line, '
+              'the layout the previous line-start rule refused ("not at the start of a line"); the variant differs '
+              'from the realistic layout only by 8 removed newlines between records',
+              'not at line start: %r, lengths %d vs %d' % (not_at_start, len(cv), len(unjoined)))
+    d = os.path.join(tmp, 'shared-lines')
+    p, m = _fx_release(os.path.join(d, 'release'), 'fixture-release.xml.gz', cv)
+    pin = _fx_pin(m)
+    wr = os.path.join(d, 'out')
+    (n, fails), _, _ = _fx_quiet(er_dblp_step, wr, p, pin, items, {})
+    reasons = {f[0]['ident']: f[1] for f in fails}
+    rng = er_read_ranges(wr)
+    bad = []
+    for it in items[:4]:
+        g = rng.get(it['rel'])
+        s, e = _fx_tag_span(cv, it['ident'])
+        want = cv[:h_end] + cv[s:e] + cv[f_off:]
+        data = open(os.path.join(wr, it['rel']), 'rb').read() if os.path.isfile(os.path.join(wr, it['rel'])) else b''
+        if g is None or (g['header_offset'], g['header_length'], g['record_offset'], g['record_length'],
+                         g['footer_offset'], g['footer_length']) != (0, h_end, s, e - s, f_off, len(cv) - f_off) \
+                or data != want or g['excerpt_sha256'] != hashlib.sha256(want).hexdigest():
+            bad.append(it['ident'])
+            continue
+        try:
+            er_check_content(it, data)
+        except ValueError as ex:
+            bad.append('%s: %s' % (it['ident'], ex))
+    ends = [cv[_fx_tag_span(cv, it['ident'])[1] - 1:][:1] for it in items[:4]]
+    rep.check(n == 4 and list(reasons) == [ER_FIXTURE_ABSENT_KEY]
+              and reasons[ER_FIXTURE_ABSENT_KEY].startswith('key-not-in-pinned-release:') and not bad
+              and ends == [b'>', b'>', b'>', b'\n'],
+              'fixture shared-lines: 4 records extracted; each record range runs from the "<" of its start tag to its end '
+              'tag (3 end directly before the next record, the last with its newline), offsets equal an independent '
+              'search, file = header+record+footer, selection facts present; the absent key fails alone',
+              'extracted %d, reasons %r, bad %r, ends %r' % (n, reasons, bad, ends))
+    sc = _DblpScanner({it['ident'] for it in items})
+    for line in io.BytesIO(cv):
+        sc.feed(line)
+    sc.finish()
+    want_cls = {items[0]['ident']: ('after-end-tag', 'before-next-record'),
+                items[1]['ident']: ('after-end-tag', 'before-next-record'),
+                items[2]['ident']: ('after-wanted-record', 'before-next-record'),
+                items[3]['ident']: ('after-end-tag', 'line-end')}
+    rep.check(sc.layout == want_cls, 'fixture shared-lines: start/end classes per record (after an unwanted record, '
+              'directly after the previous WANTED record, end before the next record, end at the line end)',
+              'got %r' % sc.layout)
+    r_off, r_rel = Report(), Report()
+    er_check_ranges_offline(r_off, wr, er_read_ledger(wr), rng, pin)
+    er_check_ranges_release(r_rel, wr, rng, p, pin)
+    rep.check(r_off.failures == 0 and r_off.checks == 8 and r_rel.failures == 0 and r_rel.checks >= 9,
+              'fixture shared-lines: offline range check (%d checks) and --with-release byte comparison (%d checks) pass'
+              % (r_off.checks, r_rel.checks), 'offline %d failures, release %d failures' % (r_off.failures, r_rel.failures))
+    # The offline slice rule refuses a record slice that does not end with its own end tag (one byte cut off).
+    g0 = dict(rng[items[1]['rel']])
+    row0 = er_read_ledger(wr)[items[1]['rel']]
+    cut = os.path.join(d, 'cut')
+    data0 = open(os.path.join(wr, items[1]['rel']), 'rb').read()
+    shrunk = data0[:g0['header_length'] + g0['record_length'] - 1] + data0[g0['header_length'] + g0['record_length']:]
+    os.makedirs(os.path.dirname(os.path.join(cut, items[1]['rel'])))
+    with open(os.path.join(cut, items[1]['rel']), 'wb') as f:
+        f.write(shrunk)
+    g0.update(record_length=g0['record_length'] - 1, excerpt_bytes=len(shrunk),
+              excerpt_sha256=hashlib.sha256(shrunk).hexdigest())
+    row0 = dict(row0, bytes=str(len(shrunk)), sha256=g0['excerpt_sha256'], request_url=er_range_url(g0))
+    probs = er_dblp_row_problems(cut, items[1]['rel'], row0, g0, pin)
+    rep.check(probs == ['file slices do not follow the header/record/footer rule'],
+              'fixture shared-lines: a self-consistent row whose record slice lacks the last byte of its end tag fails '
+              'the offline slice rule', 'problems %r' % probs)
+
+    # End to end: er_fetch on a throw-away root, then er-verify and --verify --with-release.
+    r = _fx_root(tmp, 'shared-lines-fetch', cv)
+    rc, out, _ = _fx_quiet(er_fetch, r, 'sample')
+    led, rng2, fl = _fx_state(r)
+    v = _fx_verify(r)
+    rc_w, wout, _ = _fx_quiet(cmd_er_verify, r, True)
+    rep.check(rc == 1 and len(led) == 4 and len(rng2) == 4 and [x['identifier'] for x in fl] == [ER_FIXTURE_ABSENT_KEY]
+              and v.failures == 0 and rc_w == 0 and wout.count('equals release bytes') == 4,
+              'fixture shared-lines er_fetch: 4 excerpts committed, one FETCH-FAILURES row (absent key), er-verify passes, '
+              '--verify --with-release compares all 4 with the release bytes',
+              'rc %r, ledger %d, failures %r, verify %d, with-release rc %r' % (rc, len(led), fl, v.failures, rc_w))
+
+    # The read-only inspection (fetch-samples.sh --dry-run datasets/er-candidates <release>) writes nothing.
+    r = _fx_root(tmp, 'shared-lines-inspect', cv)
+    before = sorted(os.path.relpath(os.path.join(dp, fn), r) for dp, _, fns in os.walk(r) for fn in fns)
+    rc, out, _ = _fx_quiet(cmd_er_inspect, r)
+    after = sorted(os.path.relpath(os.path.join(dp, fn), r) for dp, _, fns in os.walk(r) for fn in fns)
+    rep.check(rc == 0 and before == after and 'scanner accepts the release layout' in out
+              and 'key-not-in-pinned-release 1, ok 4' in out and 'start tag NOT at line start' in out
+              and 'record start tags with a key: 9; at the start of their line: 1; directly after exactly one record end '
+                  'tag on the same line: 7; after any other bytes: 1; lines holding 2 or more start tags: 1' in out
+              and '\\x0a' in out,
+              'fixture er-inspect (shared-lines): exit 0, escaped byte windows printed, layout counts reported, scanner '
+              'verdict ok 4 + key-not-in-pinned-release 1, no file written or changed',
+              'rc %r, written %r, out %r' % (rc, sorted(set(after) - set(before)), out[-600:]))
+    print('INFO fixture er-inspect: %s' % [ln for ln in out.split('\n') if ln.startswith('INFO inspect: record start')][:1])
+    bad_cv = cv.replace(b'</www><article mdate="2021-03-29"', b'</www>\n<note>x</note><article mdate="2021-03-29"', 1)
+    r = _fx_root(tmp, 'shared-lines-inspect-bad', bad_cv)
+    rc, out, _ = _fx_quiet(cmd_er_inspect, r)
+    rep.check(rc == 1 and 'SCANNER release-layout-error' in out and 'REFUSES this release' in out
+              and not os.path.exists(os.path.join(r, ER_SAMPLES_REL)),
+              'fixture er-inspect (ambiguous layout): exit 1, the scanner refusal is printed, nothing written',
+              'rc %r, out %r' % (rc, out[-400:]))
+
+    # Ambiguous or unexpected layouts still fail closed for the whole release, writing nothing.
+    pop_start = b'</www><article mdate="2021-03-29"'
+    chang_tag = b'<inproceedings mdate="2017-05-25" key="conf/osdi/ChangDGHWBCFG06">'
+    pop_end_var = b'</article><article key="journals/cacm/Varajao21"'
+    negatives = [
+        ('start-after-field-text', cv.replace(pop_start, b'</www>\n<note>stray</note><article mdate="2021-03-29"', 1),
+         'not directly preceded by exactly one record end tag'),
+        ('start-after-two-end-tags', cv.replace(pop_start, b'</www></www><article mdate="2021-03-29"', 1),
+         'not directly preceded by exactly one record end tag'),
+        ('start-after-space', cv.replace(pop_start, b'</www> <article mdate="2021-03-29"', 1),
+         'not directly preceded by exactly one record end tag'),
+        ('start-after-unwanted-record-on-line',
+         cv.replace(pop_start, b'</www>\n<article mdate="2021-01-01" key="journals/fixture/OneLine1"><title>One.</title>'
+                               b'</article><article mdate="2021-03-29"', 1),
+         'not directly preceded by exactly one record end tag'),
+        ('start-tag-inside-open-record', cv.replace(chang_tag, chang_tag + b'<www key="homepages/fixture/1">', 1),
+         'no end tag before the next record'),
+        ('text-between-end-and-next-start', cv.replace(pop_end_var, b'</article>x<article key="journals/cacm/Varajao21"', 1),
+         'text follows'),
+        ('end-tag-then-dblp-end-on-line', cv.replace(b'</inproceedings>\n</dblp>', b'</inproceedings></dblp>', 1),
+         'text follows'),
+    ]
+    for name, var, needle in negatives:
+        if not rep.check(var != cv, 'fixture shared-lines %s: variant differs from the positive layout' % name,
+                         'replacement did not apply'):
+            continue
+        dn = os.path.join(tmp, 'shared-' + name)
+        pv, mv = _fx_release(os.path.join(dn, 'release'), 'fixture-release.xml.gz', var)
+        _fx_expect_refusal(rep, dn, pv, _fx_pin(mv), 'shared-lines ' + name, 'release-layout-error', needle)
 
 
 def _er_fixture_budget_and_names(rep, raw, tmp):
@@ -2956,6 +3385,28 @@ def _er_fixture_full_wrapper(rep, tmp, real_run):
 
 
 def cmd_er_fixture(root):
+    """Runs the fixture with its log captured, then prints the summary and every FAIL line FIRST, the full log, and
+    the summary again last, so a console that truncates long output still shows the result (DS-P5-09)."""
+    buf = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buf):
+            rep = _cmd_er_fixture_run(root)
+    except BaseException:
+        print(buf.getvalue(), end='')
+        print('er-fixture: ABORTED by an unexpected exception (traceback below); this is a failure')
+        raise
+    summary = ('er-fixture: %d checks, %d failures (temporary directory removed; repository not written)'
+               % (rep.checks, rep.failures))
+    print(summary)
+    for ln in getattr(rep, 'failed', []):
+        print('SUMMARY ' + ln)
+    print('---- full fixture log ----')
+    print(buf.getvalue(), end='')
+    print(summary)
+    return 1 if rep.failures else 0
+
+
+def _cmd_er_fixture_run(root):
     rep = Report()
     src = os.path.join(root, ER_FIXTURE_XML_REL)
     if rep.check(os.path.isfile(src), 'fixture: %s exists' % ER_FIXTURE_XML_REL, 'missing'):
@@ -2974,6 +3425,7 @@ def cmd_er_fixture(root):
             with tempfile.TemporaryDirectory(prefix='scholarchain-er-fixture-') as tmp:
                 _er_fixture_cases(rep, root, raw, tmp)
                 _er_fixture_layouts(rep, raw, tmp)
+                _er_fixture_shared_lines(rep, root, raw, tmp)
                 _er_fixture_budget_and_names(rep, raw, tmp)
                 _er_fixture_orchestration(rep, root, raw, tmp)
                 _er_fixture_crossref_split(rep, root, raw, tmp)
@@ -2984,9 +3436,7 @@ def cmd_er_fixture(root):
             g['er_curl'], subprocess.run = saved
         rep.check(not calls, 'fixture: no network call was attempted (er_curl and subprocess.run trapped)',
                   '%d attempted' % len(calls))
-    print('er-fixture: %d checks, %d failures (temporary directory removed; repository not written)'
-          % (rep.checks, rep.failures))
-    return 1 if rep.failures else 0
+    return rep
 
 
 # --------------------------------------------------------------------------- other subcommands
@@ -3056,6 +3506,8 @@ def main(argv):
         return cmd_er_verify(argv[1], True)
     if len(argv) == 2 and argv[0] == 'er-fixture':
         return cmd_er_fixture(argv[1])
+    if len(argv) == 2 and argv[0] == 'er-inspect':
+        return cmd_er_inspect(argv[1])
     print(__doc__, file=sys.stderr)
     return 2
 

@@ -1,0 +1,77 @@
+# ScholarChain ER candidate split assignment (work order DS-P5-01). Owner: dataset-engineer.
+# Written by datasets/scripts/fetch-er-candidates.sh --sample BEFORE any record is fetched, and
+# recomputed by --verify. Rule: key = sha256("scholarchain-er-split.v1|" + unit_id) as lowercase hex.
+# Within each criterion, units are ranked by key; the first ceil(3n/5) are heldout, the rest dev.
+# A selection unit (name group or work cluster) is never divided between the two sets.
+# Policy development may use only dev. Human gold labels for evaluation come only from heldout.
+unit_id	criterion	split	rank_in_criterion	split_key_sha256
+hr-juan-carlos-ruiz-garcia	homonym-rare	heldout	1	3e9cbd4e99760847bd1d1bb1ddae088254d22dcb796ad85bffdcb9dd2825de4c
+hr-tyler-moore	homonym-rare	heldout	2	5762785d2e082dd1bd6ad015a3abaceca0c75792980d730ea2532f67fd8f4f9a
+hr-karthik-chandrasekar	homonym-rare	heldout	3	6e025a542b4312c2a2950b787933baef4857472713d68084593c8bb764b45246
+hr-ahmed-arafa	homonym-rare	heldout	4	8d63557c27ec00d3a6d8b5c734bce64a2d3894c10cc3a38d52103d0553c2a3fc
+hr-daniele-cattaneo	homonym-rare	heldout	5	aa03673fa296b0f761d1e757c824bead630663de79b9dbb33aed028093b9f5d3
+hr-jiayuan-ye	homonym-rare	dev	6	d65f859c7fa356f153a3e56cabbcf08c0d09a851bb98bfa8b97233628d2ec6b0
+hr-abdul-razaq	homonym-rare	dev	7	fa1cccf32b99bc2d03e17b5776eb4bcb0cc08f12c452174ac6981e703494137b
+hea-yang-liu	homonym-east-asian	heldout	1	02f0af569a3c257a66bf6f840294b19346bccbc496d8dc2b6d4d823d8c8a6c61
+hea-jing-li	homonym-east-asian	heldout	2	202696e8b6679e49a2832fb5bd390cc527033ce1567ba3006cd0da7f4190acd0
+hea-wei-wang	homonym-east-asian	heldout	3	6da34999cd0ab513ae3813a5ef303090648b66cc5aa704f1e365b45a7dc6f69a
+hea-lei-zhang	homonym-east-asian	dev	4	ae4165512dc31dac0898f2cc44b7f485701f0c8d281b222ae43086f6ec2de967
+hw-david-brown	homonym-western	heldout	1	3d3dce8934d391579439fa7f08246d49386f3cad8ed366c32a746fa21cd31b24
+hw-david-smith	homonym-western	heldout	2	a9ed2cb808f4ffb49f688f01e1893ddd25fa7867aa34b98e5ba53778566002ed
+hw-thomas-muller	homonym-western	heldout	3	aa20be47691515eadc31da1b0145307dbf42f04afb9f7ed0658eea5adddbd440
+hw-peter-schneider	homonym-western	dev	4	b53d481dac9d95437fd71efdbd064390b1ad30c5777fef996faf3eeb3b7746e7
+hw-michael-muller	homonym-western	dev	5	dfeae840eceeea6d3474ad40f33a2afcfab80447ffe1e7734928a4828acbc23e
+nv-06-7696-bai	name-variant	heldout	1	0354bd8887a04ba72795bc12c800610327fb28ccbf1c6e8806c8af424c5bef87
+nv-80-7843-jia	name-variant	heldout	2	048f62c4ba6c4432e9ee73b56cc1ae4d67f811fc7d4e604594d76dc2f3149a30
+nv-368-1587-zarkab	name-variant	heldout	3	1c03301fba0f6a5af406d90c529c3597b28dc7d58caf808dcfd027547749f9df
+nv-208-1029-kazak	name-variant	heldout	4	1cc5fa794b74f94eeff964b045a525811612c2dba712b83bd33d020a56d5f24e
+nv-36-8622-bazan	name-variant	heldout	5	250c9fffa8fe8f770651de0b2dc61655bc926a584ede367cbc8db98e775288fb
+nv-13-193-xia	name-variant	heldout	6	53f137cc92790818eef9e9acedf8800f960c04005ea78587581af47ae2771083
+nv-167-2023-pearse	name-variant	dev	7	561b57f7fe4a1fc83f29d340a954a0163861331057ebb1aabe490a688ddd9aec
+nv-00-7375-zhang	name-variant	dev	8	79122e189e05acf8741f9a75c90dcd6eed8eedc9eb0f16251d2fd45a2f4479f1
+nv-158-1440-tacar	name-variant	dev	9	d7f89d0c8a892ef91793187859e266da9da528d87ef8f522c93d677155d1789e
+ov-216-4888	orcid-vs-none	heldout	1	0186f42bd11fc17511c2e80249ef97834ec4a99fabe2386c29513042008a4152
+ov-16-493-1	orcid-vs-none	heldout	2	0e646b51be070d6a3b05415fa1b2d79983ee370c0de30a8acfaa378456986606
+ov-05-7040	orcid-vs-none	heldout	3	314b3db7034a23e04389ba7cb5fc63fe3a09047cf3b8811d7b507cadd1df0927
+ov-04-4187	orcid-vs-none	heldout	4	45423611ef0853cca23e663d6bb1b330a314e6373455c695999bdf16bbbef8d3
+ov-119-4430	orcid-vs-none	heldout	5	b109f433f2f9e97d131f017a528ecb5f579070a98801b4b86c6c918f56074c2a
+ov-13-1520-3	orcid-vs-none	dev	6	b7d574e60beda21b973f9cf9dfd37a5bdb2fa7191d408f1304a327c6fc05f25e
+ov-227-2274-2	orcid-vs-none	dev	7	cac3df0a0be33aacf6cdadca60b4d06ea183c56a73b98da83835bb1676ec8a92
+ov-187-0682	orcid-vs-none	dev	8	d11947631bb70d3986a8eff2bfaee1a716cf9d9f786b88d95eb635f22bc2b261
+pv-2602-16156	preprint-vs-vor	heldout	1	21e84b7498db7fa26d0874a1b4d187f0f3df686ab134e25f82adb8cc05c694be
+pv-2111-03282	preprint-vs-vor	heldout	2	2909867a69f6ff2107a71690c01aee2937f5646e91a59870a8227e32adfdbc1e
+pv-2212-05184	preprint-vs-vor	heldout	3	355f201347755a880895090e3a35416f595ea7dce34e73889b577c4460b81603
+pv-2404-02570	preprint-vs-vor	heldout	4	3e6e939e403f533ccbbae0f9ee22e2d7640d385aa4dd6896ba7b5e5f770d0b5d
+pv-2510-06798	preprint-vs-vor	heldout	5	5a9aa65e9420bd998f86feb5dffed2c3cd18a58ce98a2ee4b19c413c2df3501d
+pv-2208-02999	preprint-vs-vor	dev	6	c0c28ecc0a40c777c4cf8edbca4ac3d33fd58bb9a2dc600554084c5dfa0a6c94
+pv-2106-04708	preprint-vs-vor	dev	7	ce83f607908f69e64688a1406b8b1377e1781bad55103b1f723ecd6a9212918a
+pv-2106-07056	preprint-vs-vor	dev	8	d3220cb282d0297b255cd0a8de44948d28eb8972b9e834fdb1b660c0632604a5
+rt-10-1155-2023-9842735	retraction	heldout	1	1dbbf55a311ef32b0c7f95c87a5aa9b74beddd09c27baeb3a951995ceabc2d72
+rt-10-1109-ic3i56241-2022-10703616	retraction	heldout	2	2a1c56c96cf7dafeb1a38392d6a17c3e32db6cc26dda0f7b2433efce0f98a2f3
+rt-10-1155-2023-9869061	retraction	dev	3	884aba82247abe1a40435e6c1b8c514a3c094517ed4e3063cb6929968d385e69
+st-editorial-2020	same-title	heldout	1	58a08b6de3fd14184dd7739dffcf38339d7c1ff5fa0ce752e3a04305d49d8735
+st-guest-editorial-2020	same-title	heldout	2	799f7610250ca5a77b7031764796c9e7a9a9f27c3660aefe097e2c6855e60b64
+st-introduction-2020	same-title	heldout	3	857e5f49d44914835e0a9dd1639d384796aee1e594b387ff2ce374028f231c3d
+st-preface-2020	same-title	dev	4	a0782786042511de61679ce376fde27f9edfbd591738915413011697be387967
+md-cdm-behtoeika20	multi-doi	heldout	1	09e1bb67b677f684184ef3689a9bc639904eafdf1df41b85e5f05959f41ee61e
+md-sigcse-culikr83	multi-doi	heldout	2	1000420d95fa1916087145917d977345f86835094793964c99a0b5cf2bb0ade4
+md-wsc-mckayr89	multi-doi	heldout	3	46ee185ec279df61462fbd85de661b4b5f81da0ac3746e0d681e20c82b97cebc
+md-sigmod-landsons77	multi-doi	heldout	4	82c834a3b4666fb620f2dfe7716ab3482ec60098b530e254707b0a39c972eb20
+md-ppopp-dicekl16	multi-doi	dev	5	9b9096d073f2b714bd50e8897ef2848c9bfaa9883164c2b92f5d00b955339558
+md-cinc-fotiadoukhv19	multi-doi	dev	6	af565e3dde4d154dbd81575df0abc881e91f6172c156f55c0877275d2d5e3ab4
+cj-pst-wuw06	conf-vs-journal	heldout	1	0bbd2469cdcb1d38cdc3e389579f5097e7eaed4ddef60c916974b1ad16844c5d
+cj-stoc-pintoh25	conf-vs-journal	heldout	2	3685d7cc42e6c0b3e227e94165af532d57016321d107be4533e771c1a0eb9c38
+cj-bcb-finchh12	conf-vs-journal	heldout	3	425ac3583493db2f05748498e53ed69d72d89eb90300e26ce59c4e4c69d13e51
+cj-sagt-bilogm19	conf-vs-journal	heldout	4	6000a6cf0e85075efafbc640ace8e6446a46f7db78b6da94b38f7a58fa754844
+cj-sew-margarias06	conf-vs-journal	heldout	5	787d41655f8787db56b47ffd55bfc2d71b2e470170fd28993b7768842e1060b3
+cj-lics-chatterjee021	conf-vs-journal	dev	6	d7494a277562196b685505a7f09d433e30fbc19cda5c096b9f051abb8cf265db
+cj-isit-weissmano04	conf-vs-journal	dev	7	f48c0861c751844d6a4524abeaad0525beec3275e38128d6e0da901f2420daa6
+cj-siggraph-alemparte74	conf-vs-journal	dev	8	f76ff1b10b469125b5efd50b19347b6db9588fa65ee638b3b37823c1d8e44624
+or-jss-garbams22	ordinary	heldout	1	25cd014b9de37751183ba37d4bc1998781f41aeedbe2b33a791bd786ad374a7c
+or-csur-siqueirad22	ordinary	heldout	2	275e012810c385bdd1fff1a6760f308cda88338a07ba7d864d44c6581bdbbc78
+or-jss-zolduoarratils22	ordinary	heldout	3	41e7d04b7833a4bd61537481006ec9312862c02670e34d10446d564372f00038
+or-csur-boyarfl21	ordinary	heldout	4	4c3a31d370e38582655ce89b00995ca67f6ba1f15f97a25a6bf5bd038363a353
+or-csur-deldjoonm21	ordinary	heldout	5	9401e0e9c8444dfc20639f8d6533c1fced13c7455d5c67ac0b56468e4ee872b8
+or-tkde-huanghx22	ordinary	dev	6	daf746baec68b30fc7f7ec6844dc6f618032d0034081b02ec921d23c3b3482df
+or-csur-ajaykumarsh22	ordinary	dev	7	ebd709501992f37745c88a539d640c54b89933140e321e71f447eb0e7360f8e1
+or-toplas-husd22	ordinary	dev	8	f5a82edb1b4a718ff693703613ea67002d2dee4c0f666b0b672f82c2a1649f27
