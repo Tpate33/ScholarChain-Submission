@@ -407,11 +407,102 @@ object OpenAlexNormalizer {
  * `container-title[0]`. Also `type` (recordType), `container-title[0]` (venueName, kept even
  * without a valid ISSN), `volume`, `issue`, and `page`. Abstracts, references, links, and licences
  * are dropped.
+ *
+ * A line is either one bare work object (the public data file shape) or one REST API envelope
+ * holding exactly one work (the ER candidate samples, schema note `er-candidates-raw/1.0.0`):
+ * `{"status":"ok","message-type":"work-list","message":{...,"items":[<work>]}}` or
+ * `{"status":"ok","message-type":"work","message":<work>}`. See [[CrossrefNormalizer.unwrap]].
  */
 object CrossrefNormalizer {
 
+  /** Top-level keys that make a line a REST API envelope (a bare work has none of them). */
+  val EnvelopeKeys: Vector[String] = Vector("status", "message-type", "message")
+
+  /**
+   * The work object of one parsed line. A line with any of [[EnvelopeKeys]] is an envelope and must
+   * have `status` "ok" and either `message-type` "work-list" with exactly one object in
+   * `message.items`, or `message-type` "work" with an object `message`. Anything else is a problem
+   * (the line is rejected, never guessed): a missing envelope field is `missing-field`, a wrong
+   * status, message type or item count is `malformed-field`, an empty item list is `missing-key`
+   * (no work, so no DOI), and a non-object item is `malformed-json`. A line without envelope keys
+   * is returned unchanged (bare work).
+   */
+  def unwrap(v: ujson.Value): Either[Problem, ujson.Value] = {
+    val obj = v match {
+      case o: ujson.Obj => o.value
+      case _ => scala.collection.mutable.LinkedHashMap.empty[String, ujson.Value]
+    }
+    if (!EnvelopeKeys.exists(obj.contains)) Right(v)
+    else {
+      def missing(what: String) =
+        Left(Problem.of(RejectReason.MissingField, s"Crossref envelope: $what is missing"))
+      def asObject(x: ujson.Value, what: String): Either[Problem, ujson.Value] = x match {
+        case o: ujson.Obj => Right(o)
+        case _ =>
+          Left(Problem.of(RejectReason.MalformedJson, s"Crossref envelope: $what is not an object"))
+      }
+      val status = obj.get("status") match {
+        case None | Some(ujson.Null) => missing("status")
+        case Some(ujson.Str("ok")) => Right(())
+        case Some(other) =>
+          Left(
+            Problem.of(
+              RejectReason.MalformedField,
+              s"Crossref envelope: status is ${ujson.write(other)}, expected \"ok\""
+            )
+          )
+      }
+      val message = obj.get("message").filter(_ != ujson.Null) match {
+        case None => missing("message")
+        case Some(m) => asObject(m, "message")
+      }
+      for {
+        _ <- status
+        m <- message
+        work <- obj.get("message-type") match {
+          case None | Some(ujson.Null) => missing("message-type")
+          case Some(ujson.Str("work")) => Right(m)
+          case Some(ujson.Str("work-list")) =>
+            Js.field(m, "items") match {
+              case None => missing("message.items")
+              case Some(a: ujson.Arr) if a.value.isEmpty =>
+                Left(
+                  Problem.of(
+                    RejectReason.MissingKey,
+                    "Crossref work-list envelope: message.items is empty (no work, no DOI)"
+                  )
+                )
+              case Some(a: ujson.Arr) if a.value.size > 1 =>
+                Left(
+                  Problem.of(
+                    RejectReason.MalformedField,
+                    s"Crossref work-list envelope: message.items holds ${a.value.size} works; " +
+                      "exactly one per line is expected"
+                  )
+                )
+              case Some(a: ujson.Arr) => asObject(a.value.head, "message.items[0]")
+              case Some(_) =>
+                Left(
+                  Problem.of(
+                    RejectReason.MalformedField,
+                    "Crossref work-list envelope: message.items is not an array"
+                  )
+                )
+            }
+          case Some(other) =>
+            Left(
+              Problem.of(
+                RejectReason.MalformedField,
+                s"Crossref envelope: message-type ${ujson.write(other)} is not \"work-list\" or \"work\""
+              )
+            )
+        }
+      } yield work
+    }
+  }
+
   def workLine(line: String, run: RunContext): Outcome =
-    Js.parse(line) match {
+    Js.parse(line).flatMap(unwrap) match {
       case Left(p) => Outcome.Rejected(None, Vector(p))
       case Right(v) =>
         Js.str(v, "DOI") match {

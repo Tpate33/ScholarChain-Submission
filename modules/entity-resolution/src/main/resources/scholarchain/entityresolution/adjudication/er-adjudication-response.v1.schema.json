@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "er-adjudication-response.v1",
+  "title": "ScholarChain entity-resolution adjudication response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "candidateId", "decision", "evidence", "reasonCodes"],
+  "properties": {
+    "schemaVersion": { "const": "er-adjudication-response.v1" },
+    "candidateId": { "type": "string", "pattern": "^mcand:[0-9a-f]{64}$" },
+    "decision": { "enum": ["accept", "reject", "abstain"] },
+    "evidence": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true,
+      "maxItems": 16
+    },
+    "reasonCodes": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "affiliation-consistent",
+          "affiliation-inconsistent",
+          "coauthors-overlap",
+          "coauthors-disjoint",
+          "different-publication",
+          "insufficient-evidence",
+          "names-consistent",
+          "names-inconsistent",
+          "same-publication",
+          "title-consistent",
+          "title-inconsistent",
+          "venue-consistent",
+          "venue-inconsistent",
+          "year-consistent",
+          "year-inconsistent"
+        ]
+      },
+      "uniqueItems": true,
+      "maxItems": 6
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "decision": { "enum": ["accept", "reject"] } } },
+      "then": { "properties": { "evidence": { "minItems": 1 } } }
+    }
+  ]
+}

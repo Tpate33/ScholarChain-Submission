@@ -71,7 +71,12 @@ final case class ConfigKey(path: String, kind: ValueKind) {
   val envName: String = ConfigKeys.envNameOf(path)
 }
 
-/** The frozen key table of configuration schema `scholarchain.config.v1`. */
+/**
+ * The frozen key table of configuration schema `scholarchain.config.v2`. History: v2 (Phase 5) adds
+ * the required keys `entityResolution.llmBandLower`, `entityResolution.llmBandUpper`, and
+ * `entityResolution.promptVersion`; `scholarchain.config.v1` files are rejected (they lack those
+ * keys, and no deployed configuration used v1).
+ */
 object ConfigKeys {
   val EnvPrefix = "SCHOLARCHAIN_CFG_"
 
@@ -114,6 +119,9 @@ object ConfigKeys {
     ConfigKey("entityResolution.policyVersion", Token),
     ConfigKey("entityResolution.acceptThreshold", Probability),
     ConfigKey("entityResolution.rejectThreshold", Probability),
+    ConfigKey("entityResolution.llmBandLower", Probability),
+    ConfigKey("entityResolution.llmBandUpper", Probability),
+    ConfigKey("entityResolution.promptVersion", Token),
     ConfigKey("runtime.maxPathHops", PositiveInt),
     ConfigKey("runtime.retrievalTopK", PositiveInt),
     ConfigKey("runtime.defaultWindow", Window)
@@ -179,7 +187,10 @@ object ConfigKeys {
 object ConfigLoader {
   val FilesEnvVar = "SCHOLARCHAIN_CONFIG_FILES"
   val SchemaVersionKey = "configSchemaVersion"
-  val SupportedSchemaVersions: Vector[String] = Vector("scholarchain.config.v1")
+  val SupportedSchemaVersions: Vector[String] = Vector("scholarchain.config.v2")
+
+  /** Superseded config schema versions, rejected like any unsupported version. */
+  val RetiredSchemaVersions: Vector[String] = Vector("scholarchain.config.v1")
 
   /** Loader-internal value tree, built by walking a parsed HOCON `ConfigValue` tree. */
   private enum Raw {
@@ -572,7 +583,10 @@ object ConfigLoader {
       entityResolution = EntityResolutionConfig(
         policyVersion = token("entityResolution.policyVersion"),
         acceptThreshold = probability("entityResolution.acceptThreshold"),
-        rejectThreshold = probability("entityResolution.rejectThreshold")
+        rejectThreshold = probability("entityResolution.rejectThreshold"),
+        llmBandLower = probability("entityResolution.llmBandLower"),
+        llmBandUpper = probability("entityResolution.llmBandUpper"),
+        promptVersion = token("entityResolution.promptVersion")
       ),
       runtime = RuntimeConfig(
         maxPathHops = positiveInt("runtime.maxPathHops"),
@@ -580,14 +594,11 @@ object ConfigLoader {
         defaultWindow = window("runtime.defaultWindow")
       )
     )
-    if (
-      errors.isEmpty && config.entityResolution.rejectThreshold > config.entityResolution.acceptThreshold
-    )
-      errors += ConfigError.InvalidValue(
-        "entityResolution.rejectThreshold",
-        "resolved configuration",
-        "must not exceed entityResolution.acceptThreshold"
-      )
+    // Cross-key rules (reject < llmBandLower < llmBandUpper < accept) once every key is valid.
+    if (errors.isEmpty)
+      EntityResolutionConfig.problems(config.entityResolution).foreach { case (key, reason) =>
+        errors += ConfigError.InvalidValue(key, "resolved configuration", reason)
+      }
     if (errors.nonEmpty) Left(errors.toVector) else Right(config)
   }
 }

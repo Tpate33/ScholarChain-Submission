@@ -605,6 +605,10 @@ def validate(root, only=None):
                       'real ScholarChain bucket names are external configuration')
         if 'arn:aws:' in s:
             rep.fail('manifest: no ARNs', 'found an ARN; account-bound identifiers are external configuration')
+    if only is None:
+        # DE-P5-04: run first so the derived API snapshot identifiers head the (long) output.
+        er0 = m.get('er_candidates')
+        er_validate_api_snapshots(root, rep, er0 if isinstance(er0, dict) else {})
     dsets = m.get('datasets')
     if not rep.check(isinstance(dsets, dict) and dsets, 'manifest: datasets is a non-empty mapping', 'no datasets'):
         return rep
@@ -711,6 +715,146 @@ def er_read_tsv(path):
                 continue
             out.append((n, line.split('\t')))
     return out
+
+
+# Work order DE-P5-04 (decision D13 option D). The OpenAlex and Crossref records of the ER set come from
+# the live APIs, not from a bulk snapshot, so their snapshot identifier is derived from the API retrieval
+# date in PROVENANCE.tsv: <source>-api-<YYYY-MM-DD>. The manifest records it under
+# er_candidates.api_snapshots.<source>; validation fails when the recorded token, date or row count
+# disagrees with the ledger, or when one source's rows span more than one retrieval date (one token
+# cannot then describe them). dblp is not listed: its excerpts carry the release pin datasets.dblp.snapshot.id.
+ER_API_SNAPSHOT_SOURCES = ('openalex', 'crossref')
+ER_API_SNAPSHOT_FIELDS = ('source', 'snapshot_id', 'retrieval_date', 'ledger_rows', 'derived_from')
+ER_TS_RE = re.compile(r'^([0-9]{4}-[0-9]{2}-[0-9]{2})T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$')
+
+
+def er_api_snapshot_observed(rows):
+    """rows: [(line, cols)] from er_read_tsv(PROVENANCE.tsv) -> ({source: {date: rows}}, errors)"""
+    obs, errors = {}, []
+    i_src, i_ts = ER_LEDGER_COLS.index('source'), ER_LEDGER_COLS.index('retrieved_at_utc')
+    for n, cols in rows:
+        if cols and cols[0] == 'file':
+            continue
+        if len(cols) != len(ER_LEDGER_COLS):
+            errors.append('line %d: expected %d columns, got %d' % (n, len(ER_LEDGER_COLS), len(cols)))
+            continue
+        src = cols[i_src]
+        if src not in ER_API_SNAPSHOT_SOURCES:
+            continue
+        m = ER_TS_RE.match(cols[i_ts])
+        if not m:
+            errors.append('line %d: retrieved_at_utc %r is not YYYY-MM-DDTHH:MM:SSZ' % (n, cols[i_ts]))
+            continue
+        per = obs.setdefault(src, {})
+        per[m.group(1)] = per.get(m.group(1), 0) + 1
+    return obs, errors
+
+
+def er_api_snapshot_checks(er, rows):
+    """-> [(cond, what, why)] comparing er_candidates.api_snapshots with the ledger rows."""
+    out = []
+    obs, errors = er_api_snapshot_observed(rows)
+    out.append((not errors, 'er-api-snapshot: ledger retrieval dates parse', '; '.join(errors[:5])))
+    snaps = er.get('api_snapshots') if isinstance(er, dict) else None
+    if not isinstance(snaps, dict):
+        out.append((False, 'er-api-snapshot: er_candidates.api_snapshots present',
+                     'must be a mapping with one entry per API source (%s)' % ', '.join(ER_API_SNAPSHOT_SOURCES)))
+        return out
+    out.append((True, 'er-api-snapshot: er_candidates.api_snapshots present', ''))
+    extra = sorted(k for k in snaps if k != 'derivation' and k not in ER_API_SNAPSHOT_SOURCES)
+    out.append((not extra, 'er-api-snapshot: api_snapshots names only API sources', 'unexpected keys: ' + ', '.join(extra)))
+    out.append((is_str(snaps.get('derivation')), 'er-api-snapshot: api_snapshots.derivation documented',
+                'state how the identifiers are derived'))
+    for src in ER_API_SNAPSHOT_SOURCES:
+        where = 'er-api-snapshot: api_snapshots.%s' % src
+        ent = snaps.get(src)
+        if not isinstance(ent, dict):
+            out.append((False, where + ' present', 'missing mapping'))
+            continue
+        missing = [k for k in ER_API_SNAPSHOT_FIELDS if k not in ent or is_empty_value(ent[k])]
+        out.append((not missing, where + ' fields present', 'missing or empty: ' + ', '.join(missing)))
+        out.append((ent.get('source') == src, where + '.source is %s' % src, 'got %r' % (ent.get('source'),)))
+        out.append((ent.get('derived_from') == ER_LEDGER_REL, where + '.derived_from is %s' % ER_LEDGER_REL,
+                    'got %r' % (ent.get('derived_from'),)))
+        dates = obs.get(src, {})
+        if len(dates) != 1:
+            out.append((False, where + ': ledger rows share one retrieval date',
+                        '%s has %d %s rows over %d distinct retrieval dates (%s); one snapshot_id cannot describe them'
+                        % (ER_LEDGER_REL, sum(dates.values()), src, len(dates),
+                           ', '.join('%s x%d' % kv for kv in sorted(dates.items())) or 'none')))
+            continue
+        (date, count), = dates.items()
+        expect = '%s-api-%s' % (src, date)
+        out.append((True, where + ': ledger rows share one retrieval date (%s, %d rows)' % (date, count), ''))
+        out.append((ent.get('snapshot_id') == expect, where + '.snapshot_id equals %s (derived from the ledger)' % expect,
+                    'manifest records %r' % (ent.get('snapshot_id'),)))
+        out.append((ent.get('retrieval_date') == date, where + '.retrieval_date equals %s' % date,
+                    'manifest records %r' % (ent.get('retrieval_date'),)))
+        rc = ent.get('ledger_rows')
+        out.append((isinstance(rc, int) and not isinstance(rc, bool) and rc == count,
+                    where + '.ledger_rows equals %d' % count, 'manifest records %r' % (rc,)))
+    return out
+
+
+def er_validate_api_snapshots(root, rep, er):
+    path = os.path.join(root, ER_LEDGER_REL)
+    try:
+        rows = er_read_tsv(path)
+    except OSError as e:
+        rep.fail('er-api-snapshot: read %s' % ER_LEDGER_REL, str(e))
+        return
+    obs, _ = er_api_snapshot_observed(rows)
+    for src in ER_API_SNAPSHOT_SOURCES:
+        for date, count in sorted(obs.get(src, {}).items()):
+            print('INFO er-api-snapshot: %s rows in %s retrieved on %s: %d' % (src, ER_LEDGER_REL, date, count))
+    for cond, what, why in er_api_snapshot_checks(er, rows):
+        rep.check(cond, what, why)
+
+
+def _er_fixture_api_snapshots(rep):
+    """DE-P5-04: the derivation check on synthetic ledger rows (no file, no network)."""
+    def row(src, kind, ts):
+        return ['f', 'u', 'dev', 'ordinary', src, kind, 'r', 'https://x.invalid/', ts, '200', '1', '0' * 64, 'l', '-']
+    header = (1, list(ER_LEDGER_COLS))
+    base = [header, (2, row('openalex', 'work-by-doi', '2026-11-05T20:04:49Z')),
+            (3, row('openalex', 'authors-of-work', '2026-11-05T23:59:59Z')),
+            (4, row('crossref', 'work-by-doi', '2026-11-05T20:10:00Z')),
+            (5, row('dblp', 'rec', '2026-11-13T05:55:45Z'))]
+
+    def ent(src, sid, date, n):
+        return {'source': src, 'snapshot_id': sid, 'retrieval_date': date, 'ledger_rows': n, 'derived_from': ER_LEDGER_REL}
+
+    def good():
+        return {'api_snapshots': {'derivation': 'd', 'openalex': ent('openalex', 'openalex-api-2026-11-05', '2026-11-05', 2),
+                                  'crossref': ent('crossref', 'crossref-api-2026-11-05', '2026-11-05', 1)}}
+
+    def passes(er, rows):
+        return all(c for c, _, _ in er_api_snapshot_checks(er, rows))
+
+    rep.check(passes(good(), base), 'fixture: api snapshot ids derived from the ledger pass (dblp rows ignored)',
+              '; '.join('%s: %s' % (w, y) for c, w, y in er_api_snapshot_checks(good(), base) if not c))
+    bad = good()
+    bad['api_snapshots']['openalex']['snapshot_id'] = 'openalex-api-2026-11-06'
+    rep.check(not passes(bad, base), 'fixture: api snapshot id with a different date fails', 'accepted')
+    bad = good()
+    bad['api_snapshots']['openalex']['snapshot_id'] = 'openalex-2026-10-14'
+    rep.check(not passes(bad, base), 'fixture: bulk snapshot id in place of the api id fails (option B)', 'accepted')
+    bad = good()
+    bad['api_snapshots']['crossref']['retrieval_date'] = '2026-11-04'
+    rep.check(not passes(bad, base), 'fixture: api snapshot retrieval_date that disagrees with the ledger fails', 'accepted')
+    bad = good()
+    bad['api_snapshots']['crossref']['ledger_rows'] = 2
+    rep.check(not passes(bad, base), 'fixture: api snapshot ledger_rows that disagrees with the ledger fails', 'accepted')
+    bad = good()
+    del bad['api_snapshots']['crossref']
+    rep.check(not passes(bad, base), 'fixture: missing api snapshot entry fails', 'accepted')
+    rep.check(not passes({}, base), 'fixture: missing api_snapshots section fails', 'accepted')
+    two = base + [(6, row('openalex', 'work-by-doi', '2026-11-06T00:00:00Z'))]
+    rep.check(not passes(good(), two), 'fixture: ledger rows of one source on two retrieval dates fail', 'accepted')
+    malformed = base + [(6, row('crossref', 'work-by-doi', '2026-11-05 20:10:00'))]
+    rep.check(not passes(good(), malformed), 'fixture: malformed retrieved_at_utc fails', 'accepted')
+    none = [header, (2, row('openalex', 'work-by-doi', '2026-11-05T20:04:49Z'))]
+    rep.check(not passes(good(), none), 'fixture: a source without ledger rows fails', 'accepted')
 
 
 def er_load_selection(root):
@@ -3429,6 +3573,7 @@ def _cmd_er_fixture_run(root):
                 _er_fixture_budget_and_names(rep, raw, tmp)
                 _er_fixture_orchestration(rep, root, raw, tmp)
                 _er_fixture_crossref_split(rep, root, raw, tmp)
+                _er_fixture_api_snapshots(rep)
                 # The one sanctioned subprocess: bash with a curl STUB first on PATH and a .invalid URL.
                 _er_fixture_full_download(rep, tmp, saved[1])
                 _er_fixture_full_wrapper(rep, tmp, saved[1])
@@ -3490,6 +3635,8 @@ def main(argv):
                 return 2
             only = rest[1]
         rep = validate(argv[1], only)
+        for line in getattr(rep, 'failed', []):
+            print('SUMMARY %s' % line)
         print('manifest validation: %d checks, %d failures' % (rep.checks, rep.failures))
         return 1 if rep.failures else 0
     if len(argv) == 3 and argv[0] == 'get':

@@ -21,7 +21,10 @@ object ExactId {
       Identifiers
         .normalizeExact(scheme, raw)
         .left
-        .map(why => ValidationError.MalformedId("value", scheme.tag, String.valueOf(raw), why))
+        .map(why =>
+          ValidationError
+            .MalformedId("value", scheme.tag, Identifiers.errorDisplay(scheme, raw), why)
+        )
         .map(ExactId(scheme, _))
 
   def check(field: String, e: ExactId): Vector[ValidationError] =
@@ -30,7 +33,10 @@ object ExactId {
       Identifiers.validateExact(e.scheme, e.value) match {
         case Right(_) => Vector.empty
         case Left(why) =>
-          Vector(ValidationError.MalformedId(field, e.scheme.tag, String.valueOf(e.value), why))
+          Vector(
+            ValidationError
+              .MalformedId(field, e.scheme.tag, Identifiers.errorDisplay(e.scheme, e.value), why)
+          )
       }
 
   /** Scheme tag, then value, both by UTF-8 bytes. */

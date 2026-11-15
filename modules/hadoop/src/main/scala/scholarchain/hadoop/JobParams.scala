@@ -101,8 +101,19 @@ object JobParams {
     "candidates" -> Vector(CandidatesFeatureVersion, BlockingMaxBlockSize, ReducersCandidates)
   )
 
+  /**
+   * Input-set labels (optional). No job reads them; they are recorded in the run manifest, so they
+   * change the run ID. `InputSplit` names the selection split of the inputs (for example `dev` or
+   * `heldout` of the ER candidate samples) and `InputDigest` binds the exact input files (64 hex).
+   * The local split entry point (test tree, `scholarchain.hadoop.local`) requires and verifies
+   * both.
+   */
+  val InputSplit = "scholarchain.input.split"
+  val InputDigest = "scholarchain.input.digest"
+  val Optional: Vector[String] = Vector(InputSplit, InputDigest)
+
   /** Every parameter a run manifest may carry. Unknown keys are rejected by the driver. */
-  val ManifestKeys: Set[String] = (Common ++ ByStage.values.flatten).toSet
+  val ManifestKeys: Set[String] = (Common ++ ByStage.values.flatten ++ Optional).toSet
 
   /**
    * Encodings whose first 128 code points are ASCII bytes (the parser prepends an ASCII header).

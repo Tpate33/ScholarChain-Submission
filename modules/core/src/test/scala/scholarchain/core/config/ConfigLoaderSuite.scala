@@ -8,10 +8,10 @@ import scholarchain.core.TimeWindow
 /** All values below are synthetic test values (`.invalid` hosts, all-zero account ID). */
 class ConfigLoaderSuite extends munit.FunSuite {
 
-  /** A representative `scholarchain.config.v1` HOCON file. */
+  /** A representative `scholarchain.config.v2` HOCON file. */
   val base: String =
-    """# Synthetic ScholarChain configuration (schema scholarchain.config.v1).
-      |configSchemaVersion = "scholarchain.config.v1"
+    """# Synthetic ScholarChain configuration (schema scholarchain.config.v2).
+      |configSchemaVersion = "scholarchain.config.v2"
       |environment = test
       |aws {
       |  region = "us-east-1"
@@ -43,6 +43,9 @@ class ConfigLoaderSuite extends munit.FunSuite {
       |  policyVersion = "er-policy-1.0.0"
       |  acceptThreshold = 0.9
       |  rejectThreshold = 0.2
+      |  llmBandLower = 0.4
+      |  llmBandUpper = 0.7
+      |  promptVersion = "er-adjudication-prompt.v1"
       |}
       |runtime {
       |  maxPathHops = 4
@@ -54,7 +57,7 @@ class ConfigLoaderSuite extends munit.FunSuite {
   /** The same values written as strict JSON, which is also valid HOCON. */
   val jsonBase: String =
     """{
-      |  "configSchemaVersion": "scholarchain.config.v1",
+      |  "configSchemaVersion": "scholarchain.config.v2",
       |  "environment": "test",
       |  "aws": {"region": "us-east-1", "accountId": "000000000000"},
       |  "storage": {
@@ -75,14 +78,14 @@ class ConfigLoaderSuite extends munit.FunSuite {
       |  },
       |  "bridge": {"algorithm": "betweenness-sampled", "sampleSize": 64, "randomSeed": 7, "maxIterations": 10},
       |  "community": {"algorithm": "label-propagation", "maxIterations": 20},
-      |  "entityResolution": {"policyVersion": "er-policy-1.0.0", "acceptThreshold": 0.9, "rejectThreshold": 0.2},
+      |  "entityResolution": {"policyVersion": "er-policy-1.0.0", "acceptThreshold": 0.9, "rejectThreshold": 0.2, "llmBandLower": 0.4, "llmBandUpper": 0.7, "promptVersion": "er-adjudication-prompt.v1"},
       |  "runtime": {"maxPathHops": 4, "retrievalTopK": 10, "defaultWindow": {"startYear": 2015, "endYear": 2024}}
       |}""".stripMargin
 
   /** The same values again, using dotted path keys, `//` comments, `:` and unquoted values. */
   val dottedBase: String =
     """// flat form with dotted path keys
-      |configSchemaVersion : scholarchain.config.v1
+      |configSchemaVersion : scholarchain.config.v2
       |environment : test
       |aws.region = us-east-1
       |aws.accountId = "000000000000"   # quoted: an unquoted value would be a number
@@ -115,6 +118,9 @@ class ConfigLoaderSuite extends munit.FunSuite {
       |entityResolution.policyVersion = er-policy-1.0.0
       |entityResolution.acceptThreshold = 0.9
       |entityResolution.rejectThreshold = 0.2
+      |entityResolution.llmBandLower = 0.4
+      |entityResolution.llmBandUpper = 0.7
+      |entityResolution.promptVersion = er-adjudication-prompt.v1
       |runtime.maxPathHops = 4
       |runtime.retrievalTopK = 10
       |runtime.defaultWindow.startYear = 2015
@@ -122,7 +128,7 @@ class ConfigLoaderSuite extends munit.FunSuite {
       |""".stripMargin
 
   val overlay: String =
-    """configSchemaVersion = "scholarchain.config.v1"
+    """configSchemaVersion = "scholarchain.config.v2"
       |environment = dev
       |runtime.retrievalTopK = 25
       |""".stripMargin
@@ -146,7 +152,7 @@ class ConfigLoaderSuite extends munit.FunSuite {
 
   test("a complete base file loads with every value from configuration") {
     val c = loadOk(filesEnv, files("base.conf" -> base))
-    assertEquals(c.configSchemaVersion, "scholarchain.config.v1")
+    assertEquals(c.configSchemaVersion, "scholarchain.config.v2")
     assertEquals(c.environment, "test")
     assertEquals(c.aws.accountId, "000000000000")
     assertEquals(c.storage.rawBucket, "example-raw-bucket")
@@ -156,6 +162,10 @@ class ConfigLoaderSuite extends munit.FunSuite {
     assertEquals(c.bridge, BridgeConfig("betweenness-sampled", 64, 7L, 10))
     assertEquals(c.entityResolution.acceptThreshold, 0.9)
     assertEquals(c.entityResolution.rejectThreshold, 0.2)
+    assertEquals(
+      c.entityResolution,
+      EntityResolutionConfig("er-policy-1.0.0", 0.9, 0.2, 0.4, 0.7, "er-adjudication-prompt.v1")
+    )
     assertEquals(c.runtime.defaultWindow, TimeWindow(2015, 2024))
   }
 
@@ -419,27 +429,31 @@ class ConfigLoaderSuite extends munit.FunSuite {
   }
 
   test("unsupported and missing config schema versions are rejected") {
-    val v2 = base.replace("scholarchain.config.v1", "scholarchain.config.v2")
-    assertEquals(
-      loadBase(v2),
-      Left(
-        Vector(
-          ConfigError.UnsupportedSchemaVersion(
-            "base.conf",
-            "scholarchain.config.v2",
-            ConfigLoader.SupportedSchemaVersions
+    assertEquals(ConfigLoader.SupportedSchemaVersions, Vector("scholarchain.config.v2"))
+    for (v <- ConfigLoader.RetiredSchemaVersions :+ "scholarchain.config.v3") {
+      assertEquals(
+        loadBase(base.replace("scholarchain.config.v2", v)),
+        Left(
+          Vector(
+            ConfigError.UnsupportedSchemaVersion(
+              "base.conf",
+              v,
+              ConfigLoader.SupportedSchemaVersions
+            )
           )
-        )
+        ),
+        v
       )
-    )
-    val noVersion = base.replace("configSchemaVersion = \"scholarchain.config.v1\"", "")
+    }
+    assertEquals(ConfigLoader.RetiredSchemaVersions, Vector("scholarchain.config.v1"))
+    val noVersion = base.replace("configSchemaVersion = \"scholarchain.config.v2\"", "")
     assertEquals(loadBase(noVersion), Left(Vector(ConfigError.MissingSchemaVersion("base.conf"))))
-    val numericVersion = base.replace("\"scholarchain.config.v1\"", "1")
+    val numericVersion = base.replace("\"scholarchain.config.v2\"", "1")
     assertEquals(
       loadBase(numericVersion),
       Left(Vector(ConfigError.MissingSchemaVersion("base.conf")))
     )
-    val badOverlay = overlay.replace("v1", "v0")
+    val badOverlay = overlay.replace("v2", "v0")
     val r = ConfigLoader.load(
       Map(ConfigLoader.FilesEnvVar -> "base.conf,dev.conf"),
       files("base.conf" -> base, "dev.conf" -> badOverlay)
@@ -549,6 +563,153 @@ class ConfigLoaderSuite extends munit.FunSuite {
           case _ => false
         })
     )
+  }
+
+  private def invalidKeys(r: Either[Vector[ConfigError], ScholarChainConfig]): Set[String] =
+    r.left.getOrElse(Vector.empty).collect { case ConfigError.InvalidValue(k, _, _) => k }.toSet
+
+  test("the LLM band must lie strictly inside (reject, accept): reject < lower < upper < accept") {
+    def band(lower: String, upper: String) =
+      loadBase(
+        base
+          .replace("llmBandLower = 0.4", s"llmBandLower = $lower")
+          .replace("llmBandUpper = 0.7", s"llmBandUpper = $upper")
+      )
+    assert(band("0.21", "0.89").isRight, "a band just inside the thresholds is valid")
+    assertEquals(
+      invalidKeys(band("0.2", "0.7")),
+      Set("entityResolution.llmBandLower"),
+      "lower = reject"
+    )
+    assertEquals(
+      invalidKeys(band("0.1", "0.7")),
+      Set("entityResolution.llmBandLower"),
+      "lower < reject"
+    )
+    assertEquals(
+      invalidKeys(band("0.5", "0.5")),
+      Set("entityResolution.llmBandUpper"),
+      "lower = upper"
+    )
+    assertEquals(
+      invalidKeys(band("0.6", "0.5")),
+      Set("entityResolution.llmBandUpper"),
+      "lower > upper"
+    )
+    assertEquals(
+      invalidKeys(band("0.4", "0.9")),
+      Set("entityResolution.llmBandUpper"),
+      "upper = accept"
+    )
+    assertEquals(
+      invalidKeys(band("0.4", "0.95")),
+      Set("entityResolution.llmBandUpper"),
+      "upper > accept"
+    )
+    val equal = base.replace("rejectThreshold = 0.2", "rejectThreshold = 0.9")
+    assert(
+      invalidKeys(loadBase(equal)).contains("entityResolution.rejectThreshold"),
+      "reject = accept is rejected (the unresolved interval must be non-empty)"
+    )
+    // The same rules, reported through the environment as well.
+    val env = Map(
+      "SCHOLARCHAIN_CFG_ENTITY_RESOLUTION__LLM_BAND_LOWER" -> "0.8",
+      "SCHOLARCHAIN_CFG_ENTITY_RESOLUTION__LLM_BAND_UPPER" -> "0.85"
+    )
+    assert(ConfigLoader.load(filesEnv ++ env, files("base.conf" -> base)).isRight)
+    val badEnv = env.updated("SCHOLARCHAIN_CFG_ENTITY_RESOLUTION__LLM_BAND_LOWER", "0.86")
+    assertEquals(
+      invalidKeys(ConfigLoader.load(filesEnv ++ badEnv, files("base.conf" -> base))),
+      Set("entityResolution.llmBandUpper")
+    )
+  }
+
+  test("band bounds are probabilities in [0,1]; the prompt version is a non-blank token") {
+    assertEquals(
+      invalidKeys(loadBase(base.replace("llmBandUpper = 0.7", "llmBandUpper = 1.5"))),
+      Set("entityResolution.llmBandUpper")
+    )
+    assertEquals(
+      invalidKeys(loadBase(base.replace("llmBandLower = 0.4", "llmBandLower = -0.1"))),
+      Set("entityResolution.llmBandLower")
+    )
+    for (bad <- Vector("\"\"", "\" \"", "\"has space\"", "\"tab\\tprompt\""))
+      assertEquals(
+        invalidKeys(
+          loadBase(
+            base.replace(
+              "promptVersion = \"er-adjudication-prompt.v1\"",
+              s"promptVersion = $bad"
+            )
+          )
+        ),
+        Set("entityResolution.promptVersion"),
+        bad
+      )
+    assertEquals(
+      invalidKeys(
+        ConfigLoader.load(
+          filesEnv + ("SCHOLARCHAIN_CFG_ENTITY_RESOLUTION__PROMPT_VERSION" -> ""),
+          files("base.conf" -> base)
+        )
+      ),
+      Set("entityResolution.promptVersion"),
+      "an empty environment value is rejected"
+    )
+    val viaEnv = loadOk(
+      filesEnv + ("SCHOLARCHAIN_CFG_ENTITY_RESOLUTION__PROMPT_VERSION" -> "er-adjudication-prompt.v2"),
+      files("base.conf" -> base)
+    )
+    assertEquals(viaEnv.entityResolution.promptVersion, "er-adjudication-prompt.v2")
+  }
+
+  test("the new entity-resolution keys are required, have no defaults, and map to env names") {
+    for (
+      (line, key, env) <- Vector(
+        (
+          "llmBandLower = 0.4",
+          "entityResolution.llmBandLower",
+          "SCHOLARCHAIN_CFG_ENTITY_RESOLUTION__LLM_BAND_LOWER"
+        ),
+        (
+          "llmBandUpper = 0.7",
+          "entityResolution.llmBandUpper",
+          "SCHOLARCHAIN_CFG_ENTITY_RESOLUTION__LLM_BAND_UPPER"
+        ),
+        (
+          "promptVersion = \"er-adjudication-prompt.v1\"",
+          "entityResolution.promptVersion",
+          "SCHOLARCHAIN_CFG_ENTITY_RESOLUTION__PROMPT_VERSION"
+        )
+      )
+    ) {
+      assertEquals(ConfigKeys.envNameOf(key), env)
+      assertEquals(
+        loadBase(base.replace(line, "")),
+        Left(Vector(ConfigError.MissingKey(key, env))),
+        key
+      )
+    }
+  }
+
+  test("EntityResolutionConfig.problems applies the loader's rules to in-memory values") {
+    val ok =
+      EntityResolutionConfig("er-policy-1.0.0", 0.9, 0.2, 0.4, 0.7, "er-adjudication-prompt.v1")
+    assertEquals(EntityResolutionConfig.problems(ok), Vector.empty)
+    assertEquals(
+      EntityResolutionConfig.problems(ok.copy(llmBandLower = 0.1)).map(_._1),
+      Vector("entityResolution.llmBandLower")
+    )
+    assertEquals(
+      EntityResolutionConfig.problems(ok.copy(llmBandUpper = Double.NaN)).map(_._1),
+      Vector("entityResolution.llmBandUpper"),
+      "a non-finite value is reported once, without ordering noise"
+    )
+    assertEquals(
+      EntityResolutionConfig.problems(ok.copy(promptVersion = " ", policyVersion = "")).map(_._1),
+      Vector("entityResolution.policyVersion", "entityResolution.promptVersion")
+    )
+    assertEquals(EntityResolutionConfig.problems(null).map(_._1), Vector("entityResolution"))
   }
 
   test("unreadable files are reported, and empty list entries are rejected") {

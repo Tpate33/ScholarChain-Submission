@@ -96,6 +96,8 @@ WorkRecord (and of every other core record) uses the strict core decoder `Json.d
 | `scholarchain.reducers.{normalize,exactIds,teams,blocking,candidates}` | reducer counts (`candidates` applies to all three candidate jobs) | `3, 2, 2, 2, 2` |
 | `scholarchain.codec.intermediate` | map-output codec class | `org.apache.hadoop.io.compress.DefaultCodec` |
 | `scholarchain.codec.output` | final-output codec class | `org.apache.hadoop.io.compress.GzipCodec` |
+| `scholarchain.input.split` (optional) | label of the input split (`dev`, `heldout`); read by no job, recorded in the run ID; required and verified by the local split entry point (see "Local per-split pipeline") | absent |
+| `scholarchain.input.digest` (optional) | 64-hex digest of the exact input files; read by no job, recorded in the run ID; required and verified by the local split entry point | absent |
 
 There is no pair-suppression parameter: the former `scholarchain.team.oversizePolicy` (and its
 `skip-pairs` value) and `scholarchain.blocking.entity` were removed; a manifest that still names
@@ -146,7 +148,20 @@ either is refused as an unknown parameter.
 | Reject conditions | rejected: malformed XML/JSON, undeclared entity, DBLP record interrupted by the next record start (`malformed-xml`), DBLP markup not closed within `maxRecordBytes` (`malformed-xml`), unterminated or oversize record, missing or malformed key, missing title, empty author name, malformed year, core contract failure. Flagged (record kept): malformed optional identifiers (dropped), several DOIs or arXiv IDs in one record (first is dedicated, others in `additionalIds`), `ee`/`url` with whitespace or control characters (dropped; duplicates removed silently), invalid optional text (venue name, volume, issue, pages, type), ORCID `source-work-id` without a valid `common:source`, conflicting copies. |
 | Reducers | `scholarchain.reducers.normalize` |
 | S3 prefixes | in: `raw/dblp/...`, `raw/openalex/...`, `raw/crossref/...`, `raw/orcid/.../extracted/`; out: `<run>/normalize/` |
-| Test fixtures | `DblpScannerSuite`, `DblpSynchronizationSuite`, `DblpMappingSuite`, `SourceNormalizersSuite`, `LocalPipelineSuite` |
+| Test fixtures | `DblpScannerSuite`, `DblpSynchronizationSuite`, `DblpMappingSuite`, `SourceNormalizersSuite`, `CrossrefEnvelopeSuite`, `LocalPipelineSuite` |
+
+Crossref line shapes (HD-P5-02). `CrossrefWorksMapper` accepts, per line, either one bare work
+object (public data file shape) or one REST API envelope holding exactly one work, as stored in the
+ER candidate samples (`datasets/schemas/er-candidates.md`): `{"status":"ok","message-type":
+"work-list","message":{...,"items":[<work>]}}` or `{"status":"ok","message-type":"work",
+"message":<work>}`. A line with any of the keys `status`, `message-type`, `message` is an envelope
+(`CrossrefNormalizer.unwrap`) and fails closed, rejected into `normalize/rejects` with its excerpt:
+missing `status`, `message`, `message-type` or `message.items` -> `missing-field`; `status` other
+than `"ok"`, an unknown `message-type`, `message.items` that is not an array or holds more than one
+work -> `malformed-field`; an empty `message.items` -> `missing-key` (no work, no DOI); a non-object
+item or message -> `malformed-json`. The unwrapped work is then normalized exactly like a bare
+line (so a work without `DOI` is still `missing-key`). A Crossref work without an author list (for
+example a retraction notice) is kept with no mentions.
 
 DBLP reader (`dblp.DblpScanner`, `dblp.DblpInputFormat`; Phase 4 repair of D1/D2/D3). The
 records and rejects it yields are the same for every split size (README 1166, 2243), except in the
@@ -380,4 +395,87 @@ samples, profiles, assertion source and source-work-id scoping), `PairExpansionS
 `ShuffleAndParamsSuite`, and `LocalPipelineSuite` (the local bounded pipeline over every sample
 with real entity-resolution keys and features, LocalJobRunner, 512-byte DBLP splits, determinism,
 idempotency, oversize teams, duplicate and conflicting DBLP keys, the commit order, candidate
-consolidation, blocking policies, and driver guards).
+consolidation, blocking policies, and driver guards). `CrossrefEnvelopeSuite` (every committed DEV
+Crossref envelope accepted, content read from `message.items[0]`, bare lines unchanged, every
+malformed envelope variant rejected with its reason, and the same through a MapReduce normalize
+with counters and versioned rejects) and `ErSplitPipelineSuite` (usage, the dataset-manifest
+reader, the D13 option D snapshot tokens and the bulk/wrong/missing-token refusals, the
+duplicate-source refusals (openalex bulk+API in both orders, dblp with two snapshots, an exact
+duplicate pair, which core decoding already rejects), manifest
+checks against the ledgers, split and input guards, retry rule, a hand-checkable block
+simulation, and one DEV run end to end whose OpenAlex and Crossref record provenance carries only
+the API tokens; held-out samples are never read by a test).
+
+## Local per-split pipeline (ER candidate samples, HD-P5-02)
+
+Entry point `scholarchain.hadoop.local.ErSplitPipelineMain` (test tree, so the Provided Hadoop jars
+and forked-JVM options apply), one argument `dev` or `heldout`; anything else exits 2. Everything
+else is fixed:
+
+| Item | Value |
+|---|---|
+| Inputs | `datasets/samples/er-candidates/<split>/{dblp,openalex-works,openalex-authors,crossref-works}/*` (no ORCID, no institutions, never the other split) |
+| Manifest | `modules/hadoop/local-runs/er-candidates.<split>.run-manifest.json` (committed) |
+| Output | `modules/hadoop/target/local-pipeline/er-candidates/<split>/attempt-<n>/` with `curated/hadoop/snapshot=dblp-2026-10-03/run=<hex>/`, `hadoop-tmp/`, markers, `summary.txt` |
+| Repository root | nearest ancestor of the working directory holding `build.sbt` and the samples |
+
+Guards, all before any job runs (exit 2): `inputSnapshots` lists every source at most once,
+whatever the snapshot values (HD-P5-05, finding HD-1; core validation only requires distinct
+(source, snapshot) pairs, so a repeated source would let different lookups see different snapshots),
+checked first so every later lookup is source-unique; the manifest's `scholarchain.input.split`
+equals the argument; `scholarchain.input.digest` equals `Canonical.hashFields("scholarchain.hadoop.er-split-
+inputs.v1", file1, sha256-1, ...)` over the split's `PROVENANCE.tsv` rows sorted by file; the
+`configDigest` equals `Canonical.hashFields("scholarchain.hadoop.local-config.v1", k1, v1, ...)`
+over the sorted parameters (the Hadoop pipeline reads no other configuration); the dblp snapshot
+equals the split's `release_id` in `DBLP-RELEASE-RANGES.tsv` and `datasets.dblp.snapshot.id` in
+`datasets/dataset-manifest.yaml`; no ORCID snapshot. Snapshot tokens of the API-fetched sources
+(HD-P5-04, human decision D13 option D): the OpenAlex and Crossref snapshots must equal
+`er_candidates.api_snapshots.{openalex,crossref}.snapshot_id` of `datasets/dataset-manifest.yaml`
+verbatim (today `openalex-api-2026-11-05`, `crossref-api-2026-11-05`; recorded by
+dataset-engineer), and a manifest carrying the bulk snapshot ID `datasets.<source>.snapshot.id`
+(`openalex-2026-10-14`, `crossref-public-data-file-2026-03`), another token, or no token is refused
+with exit 2. The token must also agree with the split's `PROVENANCE.tsv` retrieval date
+(`<source>-api-<UTC date>`). The committed run manifest stays the immutable root of provenance (its
+snapshots are part of the run ID); the dataset manifest is read only to verify it, by
+`scholarchain.hadoop.local.DatasetManifest`, a fail-closed reader of the manifest's YAML subset
+(dotted paths; list items unreachable; duplicate paths, unterminated strings and unreadable lines
+are errors). The summary then prints `snapshots <source>=<token> ...`, one `provenance
+source=<s> records=<n> snapshots=<tokens> expected=<token>` line per source over every Provenance
+object in the normalized works, mentions and profiles, and `provenance
+check=every-record-snapshot==manifest-snapshot:<ok|FAILED>`; FAILED makes the run `inconsistent`.
+Inputs: the split
+root holds only the four input directories; every entry is a regular file (no symbolic link) whose
+real path is inside the split root; the file set equals the ledger rows of that split, and every
+file's SHA-256 equals its ledger value.
+
+Retry and partial-run rule: each run creates a NEW `attempt-<max+1>` directory (never reused) and
+writes `_IN_PROGRESS` first. Success writes `summary.txt` and `_SUCCESS` and removes
+`_IN_PROGRESS`; a failed stage or consistency check writes `_FAILED` (with the summary so far). An
+attempt with neither `_SUCCESS` nor `_FAILED` (killed or timed out) is partial. On the next start,
+partial and failed attempts are printed and left untouched; an attempt with `_SUCCESS` refuses
+every further run of the split (exit 2, the message names the directory to move away).
+
+Stages run one after another (normalize, exact-ids, teams, blocking, candidates) through
+`Pipeline.run`, each timed. Exit 0 = complete and consistent; 1 = a stage failed or a consistency
+check failed. Summary lines (stdout and `summary.txt`) all start with `[er-split] split=<split>`
+and are `key=value` tokens: `elapsed stage=<s> ms=<n> status=<ran|skipped|failed>`, `normalize
+input=<in> read=<n> accepted=<n>`, one `normalize conflict source=<s> id=<id> disposition=<d>
+file=<f> rejectId=<id> detail=<text>` per `conflict` record of normalize, one `normalize duplicate
+source=<openalex-work|openalex-author|crossref-work> id=<id> copies=<n> files=<f|f>` per source ID
+found in more than one JSON input file (a driver diagnostic: identical copies count `DUPLICATE`
+without a record), `normalize conflictRecords=<n> duplicateCounter=<n>
+duplicateCopiesNamedFromJsonInputs=<n> allDuplicatesNamed=<bool>`, `distinct.researcher=<n> distinct.work=<n> ...
+check=...:<ok|FAILED>`, per entity `oversize entity=<e> cap=<c> policy=<p> groups=<n>
+groupsWithDrops=<n> membersDropped=<n> membersRefined=<n> uncappedPairsOfOversizeGroups=<n>
+uncappedPairsOfDroppingGroups=<n> pairsInvolvingDroppedMembers=<n> largestOversizeGroup=<n>
+droppedByKind=<kind:n,...|none> simulationMatchesRun=<bool>`, `histogram entity=<e> level=0
+members=<n> groups=<n> sizes=<size:count,...>`, `capsim entity=<e> cap=<2|3|4|5|6|8|none>
+blocks=<n> pairs=<n> oversizeGroups=<n> membersDropped=<n> largestBlock=<n> droppedByKind=...`,
+`teams ...`, `elapsed total ms=<n>`, and last `runId=<id> attempt=<dir> status=<complete|
+inconsistent|failed> output=<dir>`. Distinct candidate pairs per entity are `EMITTED.<entity>-
+candidates`; the check requires their sum to equal `CANDIDATE_PAIRS - CANDIDATE_MERGED` and each to
+equal the distinct `candidateId`s read back from `candidates/final/<entity>`. The block-size report
+(`histogram`, `capsim`) is a driver-side diagnostic over the run's curated works and profiles with
+the same key source; it replays the BlockReducer rules and must reproduce the run's own dropped
+members, oversize groups and per-block pairs at the manifest cap (`simulationMatchesRun`), else the
+run is `inconsistent`. It is not part of the MapReduce job graph.

@@ -18,7 +18,7 @@ class SchemaVersionSuite extends munit.FunSuite {
     assertEquals(SchemaVersions.SourceAuthorProfile, "scholarchain.source-author-profile.v1")
     assertEquals(SchemaVersions.CoauthorEdge, "scholarchain.coauthor-edge.v1")
     assertEquals(SchemaVersions.ResearcherMetrics, "scholarchain.researcher-metrics.v1")
-    assertEquals(SchemaVersions.MatchDecision, "scholarchain.match-decision.v1")
+    assertEquals(SchemaVersions.MatchDecision, "scholarchain.match-decision.v2")
     assertEquals(SchemaVersions.EvidenceBundle, "scholarchain.evidence-bundle.v1")
     assertEquals(SchemaVersions.RunManifest, "scholarchain.run-manifest.v1")
   }
@@ -61,7 +61,37 @@ class SchemaVersionSuite extends munit.FunSuite {
         assert(unsupported(c.checkVersion(old)), s"${c.recordType} $old")
       }
     }
-    assertEquals(SchemaVersions.retired.keySet, Set("WorkRecord", "CoauthorPairCandidate"))
+    assertEquals(
+      SchemaVersions.retired.keySet,
+      Set("WorkRecord", "CoauthorPairCandidate", "MatchDecision")
+    )
+  }
+
+  test("match-decision.v1 JSON is rejected before decoding, and v1-shaped JSON labelled v2 fails") {
+    // The literal v1 wire example frozen before Phase 5 (conflictingTargetIds, no candidateId).
+    val run = "run:8dc188c7670e600b1e1f8bf679a11809bd4ebadbd4a9ed27d27e318a59a88614"
+    val v1 =
+      s"""{"schemaVersion":"scholarchain.match-decision.v1","decisionId":"match:9d9d899ab153f9836f40ae28d20a71913ca8bc1f2a0313b6a15d124467f65670","entityKind":"researcher","sourceId":"mention:4d99b473c7f1d066094cb66ae71ded0bb0305eea0b75006f46ff2fd12c4c0bc4","targetId":"researcher:orcid:0000-0000-0000-0001","features":{"coauthorOverlap":0.75,"orcidExact":1},"rulesFired":["orcid-exact"],"decision":"ACCEPTED","confidence":0.97,"reasonCodes":["ORCID_EXACT"],"conflictingTargetIds":[],"decidedAt":"2026-10-29T12:00:00Z","provenance":{"sourceDataset":"scholarchain-derived","sourceRecordId":"work:dblp:journals/example/Synthetic21","snapshot":"dblp-2026-10-03","runId":"$run","sourceSchemaVersion":"scholarchain.work-record.v1","policyVersion":"er-policy-1.0.0","modelVersion":null,"promptVersion":null}}"""
+    assertEquals(
+      Json.decode[MatchDecision](v1),
+      Left(
+        Vector(
+          ValidationError.UnsupportedSchemaVersion(
+            "MatchDecision",
+            "scholarchain.match-decision.v1",
+            Vector("scholarchain.match-decision.v2")
+          )
+        )
+      )
+    )
+    val relabelled = v1.replace("match-decision.v1", "match-decision.v2")
+    assert(
+      Json
+        .decode[MatchDecision](relabelled)
+        .left
+        .exists(_.exists(_.isInstanceOf[ValidationError.Undecodable])),
+      "v1 keys (conflictingTargetIds) are unknown and v2 keys are missing"
+    )
   }
 
   test("work-record.v1 JSON is rejected, and v1-shaped JSON labelled v3 lacks required keys") {

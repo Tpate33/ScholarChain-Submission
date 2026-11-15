@@ -230,9 +230,24 @@ class StableIdSuite extends munit.FunSuite {
       evidenceWork.evidenceId,
       "ev:a23c2deeb69843d6d7c61d20b74106c611b2ca9811701c05eb9edd7ac9dcf425"
     )
+    // The decision ID formula is unchanged by match-decision.v2: the pre-Phase-5 inputs still
+    // give the pre-Phase-5 golden (frozen in the AuthorshipRecord example).
+    assertEquals(
+      MatchDecisionId
+        .of(MatchEntityKind.Researcher, mention0.mentionId, researcherA, erPolicy, runId),
+      Right(frozenAuthorshipDecisionId)
+    )
+    assertEquals(
+      frozenAuthorshipDecisionId,
+      "match:9d9d899ab153f9836f40ae28d20a71913ca8bc1f2a0313b6a15d124467f65670"
+    )
     assertEquals(
       matchDecision.decisionId,
-      "match:9d9d899ab153f9836f40ae28d20a71913ca8bc1f2a0313b6a15d124467f65670"
+      "match:520ebb18b97f746f3a6d87e7982d510b1aecc0ff94bd57df3ac362918f3b3582"
+    )
+    assertEquals(
+      conflictDecision.decisionId,
+      "match:63d9125dd805b7f7eddaaf7a90e4e5b1bbffb23bc1937dafaa4c0bde836d7d32"
     )
     assertEquals(
       bundle.bundleId,

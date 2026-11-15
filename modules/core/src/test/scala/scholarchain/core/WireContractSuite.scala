@@ -85,9 +85,41 @@ class WireContractSuite extends munit.FunSuite {
         "graph-policy-1.0.0"
       )}}"""
 
+  private def decisionProvJson(candidateId: String, model: String, prompt: String) =
+    s"""{"sourceDataset":"scholarchain-derived","sourceRecordId":"$candidateId","snapshot":"dblp-2026-10-03","runId":"$Run","sourceSchemaVersion":"scholarchain.match-candidate.v1","policyVersion":"er-policy-1.0.0","modelVersion":$model,"promptVersion":$prompt}"""
+
+  private val ResearcherCand =
+    "mcand:400ad93720eceb8fc152cf580854ebf0788262cd4b4d446ec53a51dbed53d300"
+  private val WorkCand = "mcand:80251271dbfba13e3ad2bce7c7e91d5afce6b7c5158b86a354060b9cdf410999"
+
+  /** match-decision.v2: exact-identifier ACCEPTED, no score. */
   val MatchDecisionGolden: String =
-    s"""{"schemaVersion":"scholarchain.match-decision.v1","decisionId":"match:9d9d899ab153f9836f40ae28d20a71913ca8bc1f2a0313b6a15d124467f65670","entityKind":"researcher","sourceId":"mention:4d99b473c7f1d066094cb66ae71ded0bb0305eea0b75006f46ff2fd12c4c0bc4","targetId":"researcher:orcid:0000-0000-0000-0001","features":{"coauthorOverlap":0.75,"orcidExact":1},"rulesFired":["orcid-exact"],"decision":"ACCEPTED","confidence":0.97,"reasonCodes":["ORCID_EXACT"],"conflictingTargetIds":[],"decidedAt":"2026-10-29T12:00:00Z","provenance":${derived(
-        "er-policy-1.0.0"
+    s"""{"schemaVersion":"scholarchain.match-decision.v2","decisionId":"match:520ebb18b97f746f3a6d87e7982d510b1aecc0ff94bd57df3ac362918f3b3582","candidateId":"$ResearcherCand","entityKind":"researcher","sourceId":"$M0","targetId":"source-author:openalex:A1","matchPath":"exact-id","decision":"ACCEPTED","confidence":0.97,"score":null,"blockingVersion":"er-keys-1.0.0","featureVersion":"er-features-1.0.0","features":{"nameSimilarity":0.92,"orcidEqual":1},"rulesFired":["exact-id.agree.orcid"],"reasonCodes":["exact-id-agreement.orcid"],"conflicts":[],"adjudication":null,"decidedAt":"2026-10-29T12:00:00Z","provenance":${decisionProvJson(
+        ResearcherCand,
+        "null",
+        "null"
+      )}}"""
+
+  /** match-decision.v2: CONFLICT from a pairwise DOI disagreement, with a score. */
+  val ConflictDecisionGolden: String =
+    s"""{"schemaVersion":"scholarchain.match-decision.v2","decisionId":"match:63d9125dd805b7f7eddaaf7a90e4e5b1bbffb23bc1937dafaa4c0bde836d7d32","candidateId":"$WorkCand","entityKind":"work","sourceId":"work:dblp:journals/example/Synthetic21","targetId":"work:openalex:W1","matchPath":"exact-id","decision":"CONFLICT","confidence":0.99,"score":0.93,"blockingVersion":"er-keys-1.0.0","featureVersion":"er-features-1.0.0","features":{"id.doi.conflict":1,"title.exact":1},"rulesFired":["exact-id.conflict.doi"],"reasonCodes":["authoritative-id-disagreement.doi"],"conflicts":[{"kind":"identifier-disagreement","scheme":"doi","valuesA":["10.1234/example.2021.001"],"valuesB":["10.1234/example.2021.002"],"contradictingRule":null}],"adjudication":null,"decidedAt":"2026-10-29T12:00:00Z","provenance":${decisionProvJson(
+        WorkCand,
+        "null",
+        "null"
+      )}}"""
+
+  /** match-decision.v2: REJECTED by a validated LLM adjudication (reference, no model text). */
+  val LlmDecisionGolden: String =
+    s"""{"schemaVersion":"scholarchain.match-decision.v2","decisionId":"match:520ebb18b97f746f3a6d87e7982d510b1aecc0ff94bd57df3ac362918f3b3582","candidateId":"$ResearcherCand","entityKind":"researcher","sourceId":"$M0","targetId":"source-author:openalex:A1","matchPath":"llm-adjudicated","decision":"REJECTED","confidence":0.45,"score":0.55,"blockingVersion":"er-keys-1.0.0","featureVersion":"er-features-1.0.0","features":{"nameSimilarity":0.92,"orcidEqual":1},"rulesFired":["probabilistic.unresolved","probabilistic.llm-band","llm-adjudicated.reject"],"reasonCodes":["score-between-thresholds","score-inside-llm-band","llm-reject"],"conflicts":[],"adjudication":{"inputHash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","promptVersion":"er-adjudication-prompt.v1","modelVersion":"example-llm-model","policyVersion":"er-policy-1.0.0","decision":"reject","evidenceIds":["feature:nameSimilarity","$M0"],"reasonCodes":["coauthors-disjoint","names-consistent"]},"decidedAt":"2026-10-29T12:00:00Z","provenance":${decisionProvJson(
+        ResearcherCand,
+        "\"example-llm-model\"",
+        "\"er-adjudication-prompt.v1\""
+      )}}"""
+
+  /** match-candidate.v1 (unchanged schema): a work candidate, used by the CONFLICT example. */
+  val WorkCandidateGolden: String =
+    s"""{"schemaVersion":"scholarchain.match-candidate.v1","candidateId":"$WorkCand","entityKind":"work","sourceIdA":"work:dblp:journals/example/Synthetic21","sourceIdB":"work:openalex:W1","sourceDatasetA":"dblp","sourceDatasetB":"openalex","blockKeys":[{"level":0,"key":"synthetic|2021"}],"blockingVersion":"er-keys-1.0.0","featureVersion":"er-features-1.0.0","features":{"id.doi.conflict":1,"title.exact":1},"exactIdAgreements":[],"provenance":${candProv(
+        "work:dblp:journals/example/Synthetic21"
       )}}"""
 
   private val EvidenceWorkJson =
@@ -196,6 +228,13 @@ class WireContractSuite extends munit.FunSuite {
   frozen("WorkRecord (OpenAlex, topics and MAG)", openAlexWork, OpenAlexWorkGolden)
   frozen("CandidateBlock", block, CandidateBlockGolden)
   frozen("MatchCandidate", matchCandidate, MatchCandidateGolden)
+  frozen("MatchCandidate (work)", workCandidate, WorkCandidateGolden)
+  frozen(
+    "MatchDecision v2 (CONFLICT, identifier disagreement)",
+    conflictDecision,
+    ConflictDecisionGolden
+  )
+  frozen("MatchDecision v2 (LLM-adjudicated REJECTED)", llmDecision, LlmDecisionGolden)
   frozen("IdentityLink", mentionLink, IdentityLinkGolden)
   frozen("IdentityLink (ORCID claim)", claimLink, ClaimLinkGolden)
   frozen("SourceAuthorProfile (OpenAlex)", openAlexProfile, OpenAlexProfileGolden)
@@ -249,6 +288,8 @@ class WireContractSuite extends munit.FunSuite {
   roundTrip("Institution", institution)
   roundTrip("Topic", topic)
   roundTrip("MatchDecision", matchDecision)
+  roundTrip("MatchDecision (CONFLICT)", conflictDecision)
+  roundTrip("MatchDecision (LLM)", llmDecision)
   roundTrip("GraphNode", graphNode)
   roundTrip("GraphEdge", graphEdge)
   roundTrip("EvidenceItem", evidenceEdge)

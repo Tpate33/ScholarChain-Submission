@@ -258,24 +258,13 @@ object Fixtures {
     provenance = derivedProv(erPolicy)
   )
 
-  val matchDecision: MatchDecision = MatchDecision(
-    schemaVersion = SchemaVersions.MatchDecision,
-    decisionId = ok(
-      MatchDecisionId
-        .of(MatchEntityKind.Researcher, mention0.mentionId, researcherA, erPolicy, runId)
-    ),
-    entityKind = MatchEntityKind.Researcher,
-    sourceId = mention0.mentionId,
-    targetId = researcherA,
-    features = SortedMap("orcidExact" -> 1.0, "coauthorOverlap" -> 0.75),
-    rulesFired = Vector("orcid-exact"),
-    decision = MatchOutcome.Accepted,
-    confidence = 0.97,
-    reasonCodes = Vector("ORCID_EXACT"),
-    conflictingTargetIds = Vector.empty,
-    decidedAt = "2026-10-29T12:00:00Z",
-    provenance = derivedProv(erPolicy)
-  )
+  /**
+   * The decision ID frozen in the AuthorshipRecord wire example (computed by the unchanged
+   * [[MatchDecisionId]] formula for the retired v1 fixture). Pinned as a literal so that the
+   * match-decision.v2 fixtures below do not change the authorship-record.v1 example.
+   */
+  val frozenAuthorshipDecisionId: String =
+    "match:9d9d899ab153f9836f40ae28d20a71913ca8bc1f2a0313b6a15d124467f65670"
 
   val authorship: AuthorshipRecord = AuthorshipRecord(
     schemaVersion = SchemaVersions.AuthorshipRecord,
@@ -284,7 +273,7 @@ object Fixtures {
     researcherId = researcherA,
     position = 0,
     year = Some(2021),
-    matchDecisionId = matchDecision.decisionId,
+    matchDecisionId = frozenAuthorshipDecisionId,
     matchConfidence = 0.97,
     provenance = derivedProv(erPolicy)
   )
@@ -358,6 +347,140 @@ object Fixtures {
       SortedMap("orcidEqual" -> 1.0, "nameSimilarity" -> 0.92),
       Vector(ExactId(ExactIdScheme.Orcid, orcidA)),
       candidateProv(mention0.mentionId)
+    )
+  )
+
+  /** A work candidate: the DBLP fixture work against the OpenAlex fixture work. */
+  val workCandidate: MatchCandidate = ok(
+    MatchCandidate.build(
+      MatchEntityKind.Work,
+      openAlexWork.workId,
+      SourceType.OpenAlex,
+      workId,
+      SourceType.Dblp,
+      Vector(BlockKey(0, "synthetic|2021")),
+      blockingVersion,
+      featureVersion,
+      SortedMap("id.doi.conflict" -> 1.0, "title.exact" -> 1.0),
+      Vector.empty,
+      candidateProv(workId)
+    )
+  )
+
+  // ---------------------------------------------------------------- Phase 5 decisions
+
+  /**
+   * Provenance of a match decision: derived from the decided candidate (literal candidate schema,
+   * so a later MatchCandidate bump does not change the frozen decision examples).
+   */
+  def decisionProv(
+      candidateId: String,
+      model: Option[String] = None,
+      prompt: Option[String] = None
+  ): Provenance = Provenance(
+    sourceDataset = SourceType.Derived,
+    sourceRecordId = candidateId,
+    snapshot = "dblp-2026-10-03",
+    runId = runId,
+    sourceSchemaVersion = "scholarchain.match-candidate.v1",
+    policyVersion = Some(erPolicy),
+    modelVersion = model,
+    promptVersion = prompt
+  )
+
+  val decidedAt = "2026-10-29T12:00:00Z"
+
+  /** Exact-identifier ACCEPTED: the candidate's ORCID agreement. No score on this path. */
+  val matchDecision: MatchDecision = ok(
+    MatchDecision.build(
+      candidateId = matchCandidate.candidateId,
+      entityKind = MatchEntityKind.Researcher,
+      sourceId = matchCandidate.sourceIdA,
+      targetId = matchCandidate.sourceIdB,
+      matchPath = MatchDecisionPath.ExactId,
+      decision = MatchOutcome.Accepted,
+      confidence = 0.97,
+      score = None,
+      blockingVersion = blockingVersion,
+      featureVersion = featureVersion,
+      features = matchCandidate.features,
+      rulesFired = Vector("exact-id.agree.orcid"),
+      reasonCodes = Vector("exact-id-agreement.orcid"),
+      conflicts = Vector.empty,
+      adjudication = None,
+      decidedAt = decidedAt,
+      provenance = decisionProv(matchCandidate.candidateId)
+    )
+  )
+
+  /** Side B's DOI in the conflict fixture (synthetic, 10.1234 example prefix). */
+  val otherDoi = "10.1234/example.2021.002"
+
+  /** CONFLICT on the exact-identifier path: the two works assert disjoint DOIs. */
+  val conflictDecision: MatchDecision = ok(
+    MatchDecision.build(
+      candidateId = workCandidate.candidateId,
+      entityKind = MatchEntityKind.Work,
+      sourceId = workCandidate.sourceIdA,
+      targetId = workCandidate.sourceIdB,
+      matchPath = MatchDecisionPath.ExactId,
+      decision = MatchOutcome.Conflict,
+      confidence = 0.99,
+      score = Some(0.93),
+      blockingVersion = blockingVersion,
+      featureVersion = featureVersion,
+      features = workCandidate.features,
+      rulesFired = Vector("exact-id.conflict.doi"),
+      reasonCodes = Vector("authoritative-id-disagreement.doi"),
+      conflicts = Vector(
+        IdentifierConflict(
+          IdentifierConflictKind.Disagreement,
+          ExactIdScheme.Doi,
+          Vector("10.1234/example.2021.001"),
+          Vector(otherDoi),
+          None
+        )
+      ),
+      adjudication = None,
+      decidedAt = decidedAt,
+      provenance = decisionProv(workCandidate.candidateId)
+    )
+  )
+
+  val promptVersion = "er-adjudication-prompt.v1"
+  val modelVersion = "example-llm-model"
+
+  val adjudicationRef: AdjudicationReference = AdjudicationReference(
+    inputHash = "b" * 64,
+    promptVersion = promptVersion,
+    modelVersion = modelVersion,
+    policyVersion = erPolicy,
+    decision = AdjudicationVerdict.Reject,
+    evidenceIds = Vector("feature:nameSimilarity", mention0.mentionId),
+    reasonCodes = Vector("coauthors-disjoint", "names-consistent")
+  )
+
+  /** REJECTED by a validated LLM adjudication of a pair in the unresolved band. */
+  val llmDecision: MatchDecision = ok(
+    MatchDecision.build(
+      candidateId = matchCandidate.candidateId,
+      entityKind = MatchEntityKind.Researcher,
+      sourceId = matchCandidate.sourceIdA,
+      targetId = matchCandidate.sourceIdB,
+      matchPath = MatchDecisionPath.LlmAdjudicated,
+      decision = MatchOutcome.Rejected,
+      confidence = 0.45,
+      score = Some(0.55),
+      blockingVersion = blockingVersion,
+      featureVersion = featureVersion,
+      features = matchCandidate.features,
+      rulesFired =
+        Vector("probabilistic.unresolved", "probabilistic.llm-band", "llm-adjudicated.reject"),
+      reasonCodes = Vector("score-between-thresholds", "score-inside-llm-band", "llm-reject"),
+      conflicts = Vector.empty,
+      adjudication = Some(adjudicationRef),
+      decidedAt = decidedAt,
+      provenance = decisionProv(matchCandidate.candidateId, Some(modelVersion), Some(promptVersion))
     )
   )
 

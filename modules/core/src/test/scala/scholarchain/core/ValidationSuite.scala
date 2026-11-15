@@ -315,16 +315,23 @@ class ValidationSuite extends munit.FunSuite {
     )
   }
 
-  test("CONFLICT decisions need conflicting targets; others must not have them") {
-    val conflictNoTargets = matchDecision.copy(decision = MatchOutcome.Conflict)
-    assert(has[ValidationError.InvalidValue](MatchDecision.contract.validate(conflictNoTargets)))
-    val acceptedWithTargets = matchDecision.copy(conflictingTargetIds = Vector(researcherB))
-    assert(has[ValidationError.InvalidValue](MatchDecision.contract.validate(acceptedWithTargets)))
-    val conflict = matchDecision.copy(
-      decision = MatchOutcome.Conflict,
-      conflictingTargetIds = Vector(researcherB)
+  test("CONFLICT decisions need pairwise identifier conflicts; ACCEPTED must not have them") {
+    val conflictWithout = conflictDecision.copy(conflicts = Vector.empty)
+    assertEquals(
+      MatchDecision.contract.validate(conflictWithout),
+      Vector(ValidationError.InvalidValue("conflicts", "required for CONFLICT"))
     )
-    assertEquals(MatchDecision.contract.validate(conflict), Vector.empty)
+    val acceptedWith = conflictDecision.copy(decision = MatchOutcome.Accepted)
+    assertEquals(
+      MatchDecision.contract.validate(acceptedWith),
+      Vector(
+        ValidationError.InvalidValue(
+          "conflicts",
+          "an ACCEPTED decision must not carry identifier conflicts"
+        )
+      )
+    )
+    assertEquals(MatchDecision.contract.validate(conflictDecision), Vector.empty)
   }
 
   test("match decisions reject non-finite features, missing reason codes, and non-UTC times") {

@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "er-policy-file.v1",
+  "policyVersion": "er-policy.v1",
+  "blockingVersion": "er-blocking.v2",
+  "featureVersion": "er-features.v2",
+  "calibrated": false,
+  "thresholds": { "accept": 0.85, "reject": 0.2 },
+  "llmBand": { "lower": 0.4, "upper": 0.7 },
+  "exactIdConfidence": 0.99,
+  "deterministicConfidence": 0.95,
+  "adjudication": {
+    "promptVersion": "er-adjudication-prompt.v1",
+    "responseSchemaVersion": "er-adjudication-response.v1",
+    "modelIdConfigKey": "models.llmModelId",
+    "maxEvidenceItems": 16,
+    "maxReasonCodes": 6
+  },
+  "sourceReliability": {
+    "center": 0.8,
+    "bySource": { "dblp": 0.95, "orcid": 0.9, "crossref": 0.85, "openalex": 0.75 }
+  },
+  "researcher": {
+    "authoritativeConflictSchemes": ["orcid", "dblp-pid"],
+    "exactAcceptSchemes": ["orcid", "dblp-pid"],
+    "bias": -3.0,
+    "weights": {
+      "name.family_key_agree": 0.75,
+      "name.family_exact": 0.25,
+      "name.first_given_agree": 1.0,
+      "name.initials_compatible": 0.5,
+      "name.first_initial_agree": 0.25,
+      "name.best_variant_sim": 0.25,
+      "name.homonym_suffix_agree": 0.5,
+      "coauthor.jaccard": 3.0,
+      "coauthor.shared": 0.75,
+      "affiliation.id_jaccard": 1.5,
+      "affiliation.text_jaccard": 0.5,
+      "venue.id_agree": 0.25,
+      "venue.name_jaccard": 0.25,
+      "work.title_jaccard": 1.5,
+      "work.doi_agree": 1.5,
+      "work.position_agree": 0.25,
+      "work.team_size_agree": 0.25,
+      "id.openalex-author.agree": 2.0,
+      "id.openalex-author.conflict": -2.5,
+      "context.claimed_work": 3.0,
+      "year.abs_diff": -0.05,
+      "policy.source_reliability": 1.0
+    },
+    "caps": { "coauthor.shared": 4.0, "year.abs_diff": 30.0 }
+  },
+  "work": {
+    "authoritativeConflictSchemes": ["doi", "arxiv"],
+    "exactAcceptSchemes": ["doi", "arxiv", "dblp-key", "openalex-work", "mag", "scopus-eid"],
+    "bias": -4.0,
+    "weights": {
+      "title.exact": 2.0,
+      "title.sim": 2.0,
+      "title.token_jaccard": 2.0,
+      "year.abs_diff": -0.5,
+      "venue.id_agree": 0.5,
+      "venue.name_jaccard": 0.5,
+      "authors.family_jaccard": 2.0,
+      "authors.first_family_agree": 0.75,
+      "authors.sequence_lcs_ratio": 1.0,
+      "authors.count_diff": -0.2,
+      "authors.orcid_shared": 0.5,
+      "id.other.conflict": -1.5,
+      "policy.source_reliability": 1.0
+    },
+    "caps": {
+      "year.abs_diff": 10.0,
+      "authors.count_diff": 10.0,
+      "authors.orcid_shared": 3.0,
+      "id.other.conflict": 2.0
+    }
+  }
+}

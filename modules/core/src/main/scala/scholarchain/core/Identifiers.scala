@@ -142,6 +142,185 @@ object Identifiers {
   /** Scopus EID as observed inside ORCID external IDs: `2-s2.0-<digits>` (observed form). */
   def isValidScopusEid(s: String): Boolean = s != null && ScopusEidPattern.matches(s)
 
+  // ---------------------------------------------------------------- Semantic Scholar
+  //
+  // Not observed: no selected dataset carries Semantic Scholar identifiers
+  // (datasets/schemas/identifiers.md). The forms below follow Semantic Scholar's public
+  // conventions: a paper has a numeric corpus ID (written `CorpusId:<n>` in its external-ID
+  // lists) and a 40-character hexadecimal paper ID; an author has a numeric author ID. Web URLs
+  // are `https://www.semanticscholar.org/paper/[<title slug>/]<paper ID>` and
+  // `https://www.semanticscholar.org/author/[<name slug>/]<author ID>`. The 18-digit bound keeps
+  // numeric IDs inside a signed 64-bit integer; it is a representation limit, not an observed
+  // maximum.
+
+  private val S2Numeric = "^[1-9][0-9]{0,17}$".r
+  private val S2PaperHex = "^[0-9a-f]{40}$".r
+  private val S2CorpusPrefix = "corpusid:"
+  private val S2WebUrl =
+    "^(?i:https?://(?:www\\.)?semanticscholar\\.org)/(paper|author)/(?:[^/?#]+/)?([^/?#]+)/?(?:[?#].*)?$".r
+
+  /** Semantic Scholar corpus ID (a paper): decimal digits, no leading zero, at most 18 digits. */
+  def isValidS2CorpusId(s: String): Boolean = s != null && S2Numeric.matches(s)
+
+  /** Semantic Scholar paper ID (a paper): exactly 40 lowercase hexadecimal characters. */
+  def isValidS2PaperId(s: String): Boolean = s != null && S2PaperHex.matches(s)
+
+  /** Semantic Scholar author ID (an author): decimal digits, no leading zero, at most 18 digits. */
+  def isValidS2AuthorId(s: String): Boolean = s != null && S2Numeric.matches(s)
+
+  private def s2Web(kind: String, raw: String): Option[String] = raw match {
+    case S2WebUrl(k, id) if k.equalsIgnoreCase(kind) => Some(id)
+    case _ => None
+  }
+
+  /** Accepts the bare digits or `CorpusId:<digits>` (prefix in any case); returns the digits. */
+  def normalizeS2CorpusId(raw: String): Either[String, String] = {
+    val bare =
+      if (raw != null && raw.regionMatches(true, 0, S2CorpusPrefix, 0, S2CorpusPrefix.length))
+        raw.substring(S2CorpusPrefix.length)
+      else raw
+    if (isValidS2CorpusId(bare)) Right(bare)
+    else Left("not a Semantic Scholar corpus ID (decimal digits, no leading zero)")
+  }
+
+  /** Accepts the bare paper ID (any case) or a semanticscholar.org paper URL; lowercases. */
+  def normalizeS2PaperId(raw: String): Either[String, String] = {
+    val id = Option(raw).map(r => s2Web("paper", r).getOrElse(r).toLowerCase(Locale.ROOT))
+    id.filter(isValidS2PaperId).toRight("not a Semantic Scholar paper ID (40 hexadecimal digits)")
+  }
+
+  /** Accepts the bare author ID or a semanticscholar.org author URL; returns the digits. */
+  def normalizeS2AuthorId(raw: String): Either[String, String] = {
+    val id = Option(raw).map(r => s2Web("author", r).getOrElse(r))
+    id.filter(isValidS2AuthorId)
+      .toRight("not a Semantic Scholar author ID (decimal digits, no leading zero)")
+  }
+
+  // ---------------------------------------------------------------- repository URL
+  //
+  // Not observed: no selected dataset records repository URLs (datasets/schemas/identifiers.md).
+
+  /**
+   * URL schemes accepted on input, with their default port. Every accepted form is rewritten to
+   * `https`, so a non-default port (which would not survive that rewrite) is refused.
+   */
+  private val RepositorySchemes: Map[String, String] = Map(
+    "https" -> "443",
+    "http" -> "80",
+    "ssh" -> "22",
+    "git+https" -> "443",
+    "git+http" -> "80",
+    "git+ssh" -> "22"
+  )
+
+  /**
+   * Hosts whose owner and repository names are routed case-insensitively, so both are lowercased
+   * and the URL must name exactly `<owner>/<repository>`. Only GitHub is listed: case-folding the
+   * path of any other host could merge distinct repositories.
+   */
+  val CaseInsensitiveRepositoryHosts: Set[String] = Set("github.com")
+
+  /**
+   * Hosts on which the query string never names the repository, so a query is dropped. On these
+   * hosts the repository is exactly the `<owner>/<repository>` path (see
+   * [[CaseInsensitiveRepositoryHosts]]). On every other host a query might be the only thing that
+   * names the repository (for example gitweb `index.cgi?p=<repository>`), so a URL with a non-empty
+   * query is refused rather than risking a merge.
+   */
+  val QueryIgnoringRepositoryHosts: Set[String] = Set("github.com")
+
+  private val UrlForm =
+    "^([A-Za-z][A-Za-z0-9+.-]*)://([^/?#]*)([^?#]*)(?:\\?([^#]*))?(?:#.*)?$".r
+  private val ScpForm = "^[A-Za-z0-9._-]+@([A-Za-z0-9.-]+):([^/?#][^?#]*)$".r
+  private val HostName =
+    "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$".r
+  private val RepositorySegment = "^[A-Za-z0-9._~-]+$".r
+
+  /**
+   * Canonical repository URL: `https://<host>/<segment>/<segment>[/<segment>...]`.
+   *
+   * Accepted inputs: `https`, `http`, `ssh`, `git+https`, `git+http`, `git+ssh` URLs and the
+   * scp-like form `<user>@<host>:<path>`. Rewriting: the scheme becomes `https`; the host is
+   * lowercased and one leading `www.` removed; user information (credentials) is dropped and never
+   * echoed in an error ([[errorDisplay]]); a default port is dropped; the fragment is dropped (it
+   * is never sent to the server, so it cannot name a repository); an empty query (`?` alone) is
+   * dropped; a non-empty query is dropped only on [[QueryIgnoringRepositoryHosts]] and refused on
+   * every other host; trailing slashes are removed; a `.git` suffix of the last segment is removed.
+   * Path case is preserved, except on [[CaseInsensitiveRepositoryHosts]], where exactly two
+   * segments (owner and repository) are required and both are lowercased. Refused: other schemes,
+   * non-default ports, a non-empty query on a host that is not query-ignoring (the query may be the
+   * repository name, as in gitweb `index.cgi?p=<repository>`), empty, `.` or `..` segments,
+   * characters outside `[A-Za-z0-9._~-]` in a segment (percent-encoding included), fewer than two
+   * segments, and hosts that are not dotted DNS names. Deep links such as
+   * `/<owner>/<repo>/tree/<branch>` are not shortened: a deep link that is not a repository root
+   * fails to match rather than risking a merge. The rule never guesses: it is a format rule, not a
+   * check that the repository exists.
+   */
+  def normalizeRepositoryUrl(raw: String): Either[String, String] =
+    if (!isPrintableAscii(raw)) Left("must be non-empty printable ASCII without whitespace")
+    else {
+      val parts: Either[String, (String, String, String, String)] = raw match {
+        case UrlForm(scheme, authority, path, query) =>
+          Right((scheme.toLowerCase(Locale.ROOT), authority, path, Option(query).getOrElse("")))
+        case ScpForm(host, path) => Right(("ssh", host, "/" + path, ""))
+        case _ => Left("not a repository URL")
+      }
+      parts.flatMap { case (scheme, authority, path, query) =>
+        RepositorySchemes.get(scheme) match {
+          case None => Left("repository URL scheme must be https, http, ssh, or git+<one of these>")
+          case Some(defaultPort) =>
+            val hostPort = authority.substring(authority.lastIndexOf('@') + 1)
+            val colon = hostPort.indexOf(':')
+            val (rawHost, port) =
+              if (colon < 0) (hostPort, "") else (hostPort.take(colon), hostPort.drop(colon + 1))
+            val host = rawHost.toLowerCase(Locale.ROOT).stripPrefix("www.")
+            val trimmed = path.reverse.dropWhile(_ == '/').reverse
+            val segments = trimmed.split("/", -1).toVector.drop(1)
+            val last = segments.lastOption.map(_.stripSuffix(".git"))
+            val segs = segments.dropRight(1) ++ last.toVector
+            if (!HostName.matches(host)) Left("repository URL host is not a DNS name")
+            else if (port.nonEmpty && port != defaultPort) Left("non-default ports are not allowed")
+            else if (query.nonEmpty && !QueryIgnoringRepositoryHosts.contains(host))
+              Left(
+                "a query string may name the repository on this host; refused rather than risking a merge"
+              )
+            else if (!trimmed.startsWith("/") || segs.size < 2)
+              Left("repository URL must name at least <owner>/<repository>")
+            else if (segs.exists(s => !RepositorySegment.matches(s) || s.forall(_ == '.')))
+              Left("repository path segments must match [A-Za-z0-9._~-]+ and not be . or ..")
+            else if (CaseInsensitiveRepositoryHosts.contains(host))
+              if (segs.size != 2)
+                Left(s"a $host repository URL must be exactly <owner>/<repository>")
+              else Right(s"https://$host/" + segs.map(_.toLowerCase(Locale.ROOT)).mkString("/"))
+            else Right(s"https://$host/" + segs.mkString("/"))
+        }
+      }
+    }
+
+  /**
+   * What a validation error shows in place of a repository-URL value: a fixed placeholder that
+   * contains no part of the value.
+   */
+  val WithheldRepositoryUrl: String = "<repository-url withheld>"
+
+  /**
+   * The value as shown in a validation error. A repository-URL value is never echoed, in whole or
+   * in part: it is replaced by [[WithheldRepositoryUrl]]. Pattern-based redaction was rejected
+   * (RV-P5-04 m10, TE-P5-01 D2) because credentials can sit in many places that a pattern can miss:
+   * after leading whitespace, in a password containing `/`, in scp-like `user:pass@host:path`, in
+   * scheme-less user information, or in query parameters such as `access_token=`. Even showing the
+   * scheme and host is unsafe, because a password containing `/` makes the user name and a numeric
+   * password look like a host and port. Other schemes are echoed unchanged; `null` is shown as
+   * `null`.
+   */
+  def errorDisplay(scheme: ExactIdScheme, raw: String): String =
+    if (raw == null) "null"
+    else if (scheme == ExactIdScheme.RepositoryUrl) WithheldRepositoryUrl
+    else raw
+
+  /** True for a canonical repository URL ([[normalizeRepositoryUrl]] leaves it unchanged). */
+  def isCanonicalRepositoryUrl(s: String): Boolean = normalizeRepositoryUrl(s) == Right(s)
+
   /** Validates an exact identifier value against its scheme's canonical form (no rewriting). */
   def validateExact(scheme: ExactIdScheme, value: String): Either[String, String] = {
     val ok = scheme match {
@@ -154,14 +333,19 @@ object Identifiers {
       case ExactIdScheme.Orcid => isValidOrcid(value)
       case ExactIdScheme.OpenAlexAuthor => isValidOpenAlex('A', value)
       case ExactIdScheme.DblpPid => isValidDblpPid(value)
+      case ExactIdScheme.SemanticScholarCorpus => isValidS2CorpusId(value)
+      case ExactIdScheme.SemanticScholarPaper => isValidS2PaperId(value)
+      case ExactIdScheme.SemanticScholarAuthor => isValidS2AuthorId(value)
+      case ExactIdScheme.RepositoryUrl => isCanonicalRepositoryUrl(value)
     }
     if (ok) Right(value) else Left(s"not a canonical ${scheme.tag} identifier")
   }
 
   /**
    * Normalizes a raw exact identifier to its canonical form: DOI resolver prefixes and case, the
-   * ORCID URI prefix, and the OpenAlex URI prefix are removed. Other schemes must already be
-   * canonical.
+   * ORCID URI prefix, the OpenAlex URI prefix, the Semantic Scholar `CorpusId:` prefix and web
+   * URLs, and the repository URL rewriting of [[normalizeRepositoryUrl]]. Other schemes must
+   * already be canonical.
    */
   def normalizeExact(scheme: ExactIdScheme, raw: String): Either[String, String] =
     scheme match {
@@ -169,6 +353,10 @@ object Identifiers {
       case ExactIdScheme.Orcid => normalizeOrcid(raw)
       case ExactIdScheme.OpenAlexWork => normalizeOpenAlex('W', raw)
       case ExactIdScheme.OpenAlexAuthor => normalizeOpenAlex('A', raw)
+      case ExactIdScheme.SemanticScholarCorpus => normalizeS2CorpusId(raw)
+      case ExactIdScheme.SemanticScholarPaper => normalizeS2PaperId(raw)
+      case ExactIdScheme.SemanticScholarAuthor => normalizeS2AuthorId(raw)
+      case ExactIdScheme.RepositoryUrl => normalizeRepositoryUrl(raw)
       case other => validateExact(other, raw)
     }
 

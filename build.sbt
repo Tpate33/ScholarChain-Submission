@@ -2,8 +2,22 @@
 // Every version comes from project/versions.properties via Ledger (project/Ledger.scala),
 // resolved from the build base directory.
 // The internal dependency graph mirrors CLAUDE.md "Module dependency boundaries" exactly.
-// Environment variables: the build uses only the NAMES of inherited AWS_* variables, to
-// blank them in forked test JVMs (see commonSettings). No other variable is read.
+// Environment variables (role law 7; the complete list):
+//   - AWS_*: only the NAMES of inherited variables are used: blanked in forked test and
+//     runMain JVMs (awsIsolationEnv) and removed from the local-run JVMs
+//     (project/LocalRuns.scala). Values are never read.
+//   - SCHOLARCHAIN_CFG_*: only the NAMES are checked, by goldSetEvalDev / goldSetEvalHeldout,
+//     which refuse to run while any is set. Local-run JVMs never inherit any SCHOLARCHAIN_*.
+//   - SCHOLARCHAIN_CONFIG_FILES: never read by the build; the two evaluation tasks set it in
+//     their forked JVM to the committed gold/entity-resolution/<split>-v1/er-config.conf.
+//   - SCHOLARCHAIN_ROUTE_PROBE_MARKER: never read by the build; set by heldoutRouteProbe in
+//     its synthetic child JVM only (random marker, see verifyHeldoutOutputRoute).
+//   - PATH: used only to locate `git` (markTestRun and the local runs).
+//   - GIT_*: only the NAMES are used: project/LocalRuns.scala removes every inherited GIT_*
+//     variable from its git processes (so none can redirect the held-out checks). Its
+//     verifyHeldoutGuards fixture sets GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM and
+//     GIT_CEILING_DIRECTORIES in its own git processes on a temporary repository only.
+// No other variable is read.
 
 // Build-policy guard (review F1). A strict val: it runs while sbt initializes this file
 // to discover projects, before any subproject *.sbt file is evaluated, and aborts the
@@ -22,6 +36,43 @@ lazy val verifyVersionLedger =
   taskKey[Unit]("Checks the version ledger, its tool-mandated mirrors, and literal versions")
 lazy val verifyBuildSources =
   taskKey[Unit]("Fails if any *.sbt file exists outside /build.sbt and /project/")
+// Fixed-shape local runs (BE-P5-02, BE-P5-04): no arguments; see project/LocalRuns.scala.
+lazy val localPipeline =
+  taskKey[Unit]("Refuses: run localPipelineDev or localPipelineHeldout")
+lazy val localPipelineDev =
+  taskKey[Unit]("Bounded local Hadoop pipeline, dev split (ErSplitPipelineMain dev)")
+lazy val localPipelineHeldout =
+  taskKey[Unit](
+    "Bounded local Hadoop pipeline, held-out split (ErSplitPipelineMain heldout); plain batch " +
+      "`sbt localPipelineHeldout` in an interactive Terminal only: refuses under sbt --client/sbtn, " +
+      "an sbt server or shell, BSP/IDE, or redirected stdout/stderr, and on a D3(b)-unclean tree"
+  )
+lazy val goldSetEval =
+  taskKey[Unit]("Refuses: run goldSetEvalDev or goldSetEvalHeldout")
+lazy val goldSetEvalDev =
+  taskKey[Unit](
+    "Gold-set evaluation, dev split (gold/entity-resolution/dev-v1/): DEV diagnostics only"
+  )
+lazy val goldSetEvalHeldout =
+  taskKey[Unit](
+    "Gold-set evaluation, held-out split (gold/entity-resolution/heldout-v1/); human Terminal " +
+      "only, as plain batch sbt: refuses under sbt --client/sbtn, an sbt server or shell, " +
+      "BSP/IDE, or redirected stdout/stderr, and on a D3(b)-unclean tree"
+  )
+// Synthetic held-out output-route check (decisions-17/19), part of `check`. No key name may
+// contain the held-out evaluation task's name (guard rule heldout-eval-human-only).
+lazy val heldoutRouteProbe =
+  taskKey[LocalRuns.RouteProbe](
+    "Forks a synthetic child on the held-out output route and on the sbt-log route"
+  )
+lazy val verifyHeldoutOutputRoute =
+  taskKey[Unit](
+    "Fails unless held-out-route output is absent from every sbt-persisted file (with counter-test)"
+  )
+lazy val verifyHeldoutGuards =
+  taskKey[Unit](
+    "Tests the held-out launch and clean-tree refusals on synthetic signals and a temporary git repo"
+  )
 
 ThisBuild / versionLedger := Ledger.load((ThisBuild / baseDirectory).value)
 ThisBuild / organization := "scholarchain"
@@ -71,41 +122,44 @@ val java17Opens = Seq(
   "sun.util.calendar"
 ).map(p => s"--add-opens=java.base/$p=ALL-UNNAMED") :+ "-Djdk.reflect.useDirectMethodHandle=false"
 
+// Best-effort AWS isolation for forked JVMs (tests, runMain, local runs). The network is NOT
+// blocked. sbt can add or override variables of a forked JVM but cannot unset inherited ones,
+// so every AWS_* variable present in sbt's environment (by name; values are not used) and the
+// named credential, profile, role, container-credential, and endpoint variables are set to "".
+// Per-service AWS_ENDPOINT_URL_<SERVICE> variables cannot all be enumerated; only those
+// inherited by sbt are blanked. Config and credentials files point at nonexistent paths; IMDS
+// is disabled. (The local runs additionally remove every inherited AWS_* first.)
+def awsIsolationEnv(noAws: File): Map[String, String] = {
+  val named = Seq(
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_SESSION_TOKEN",
+    "AWS_PROFILE",
+    "AWS_DEFAULT_PROFILE",
+    "AWS_ROLE_ARN",
+    "AWS_ROLE_SESSION_NAME",
+    "AWS_WEB_IDENTITY_TOKEN_FILE",
+    "AWS_CONTAINER_CREDENTIALS_FULL_URI",
+    "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI",
+    "AWS_CONTAINER_AUTHORIZATION_TOKEN",
+    "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE",
+    "AWS_ENDPOINT_URL"
+  )
+  val inherited = sys.env.keySet.filter(_.startsWith("AWS_"))
+  (named ++ inherited).map(_ -> "").toMap ++ Map(
+    "AWS_EC2_METADATA_DISABLED" -> "true",
+    "AWS_CONFIG_FILE" -> (noAws / "config").getAbsolutePath,
+    "AWS_SHARED_CREDENTIALS_FILE" -> (noAws / "credentials").getAbsolutePath
+  )
+}
+
 lazy val commonSettings = Seq(
   scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-release:17", "-Werror"),
   javacOptions ++= Seq("--release", "17"),
   libraryDependencies += munit.value % Test,
-  // Best-effort AWS isolation for forked test JVMs. The network is NOT blocked.
-  // sbt can add or override variables of the forked JVM but cannot unset inherited
-  // ones, so every AWS_* variable present in sbt's environment (by name; values are
-  // not used) and the named credential, profile, role, container-credential, and
-  // endpoint variables are set to "". Per-service AWS_ENDPOINT_URL_<SERVICE>
-  // variables cannot all be enumerated; only those inherited by sbt are blanked.
-  // Config and credentials files point at nonexistent paths; IMDS is disabled.
+  // AWS isolation for forked test JVMs: see awsIsolationEnv (behaviour unchanged).
   Test / fork := true,
-  Test / envVars ++= {
-    val named = Seq(
-      "AWS_ACCESS_KEY_ID",
-      "AWS_SECRET_ACCESS_KEY",
-      "AWS_SESSION_TOKEN",
-      "AWS_PROFILE",
-      "AWS_DEFAULT_PROFILE",
-      "AWS_ROLE_ARN",
-      "AWS_ROLE_SESSION_NAME",
-      "AWS_WEB_IDENTITY_TOKEN_FILE",
-      "AWS_CONTAINER_CREDENTIALS_FULL_URI",
-      "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI",
-      "AWS_CONTAINER_AUTHORIZATION_TOKEN",
-      "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE",
-      "AWS_ENDPOINT_URL"
-    )
-    val inherited = sys.env.keySet.filter(_.startsWith("AWS_"))
-    (named ++ inherited).map(_ -> "").toMap ++ Map(
-      "AWS_EC2_METADATA_DISABLED" -> "true",
-      "AWS_CONFIG_FILE" -> (target.value / "no-aws" / "config").getAbsolutePath,
-      "AWS_SHARED_CREDENTIALS_FILE" -> (target.value / "no-aws" / "credentials").getAbsolutePath
-    )
-  },
+  Test / envVars ++= awsIsolationEnv(target.value / "no-aws"),
   testOutcome := TestMarker.Outcome(
     thisProject.value.id,
     (Test / executeTests).value,
@@ -128,6 +182,37 @@ def jobAssembly(jarBase: String) = Seq(
   }
 )
 
+// Fixed-shape local runs (BE-P5-02, BE-P5-04). Each forks one JVM from the repository root;
+// inputs, bounds, refusals, output routing, and exit-code messages are in project/LocalRuns.scala.
+def pipelineRun(split: LocalRuns.Split) = Def.task {
+  LocalRuns.localPipeline(
+    split,
+    (ThisBuild / baseDirectory).value,
+    javaHome.value,
+    // ErSplitPipelineMain is in the hadoop test tree; this classpath also carries the Provided
+    // Hadoop jars, as `hadoop/Test/runMain` does. Same JVM options as Test / javaOptions.
+    (hadoop / Test / fullClasspath).value.map(_.data),
+    java17Opens,
+    awsIsolationEnv(target.value / "no-aws"),
+    LocalRuns.observeLaunch(state.value),
+    target.all(ScopeFilter(inAnyProject)).value,
+    streams.value.log
+  )
+}
+def goldSetEvalRun(split: LocalRuns.Split) = Def.task {
+  LocalRuns.goldSetEval(
+    split,
+    (ThisBuild / baseDirectory).value,
+    javaHome.value,
+    (entityResolution / Compile / fullClasspath).value.map(_.data),
+    awsIsolationEnv(target.value / "no-aws"),
+    sys.env,
+    LocalRuns.observeLaunch(state.value),
+    target.all(ScopeFilter(inAnyProject)).value,
+    streams.value.log
+  )
+}
+
 // --- Projects ----------------------------------------------------------------------
 
 lazy val core = project
@@ -142,7 +227,15 @@ lazy val entityResolution = project
   .in(file("modules/entity-resolution"))
   .dependsOn(core)
   .settings(commonSettings)
-  .settings(name := "scholarchain-entity-resolution")
+  .settings(
+    name := "scholarchain-entity-resolution",
+    // decisions-15 item 4: runMain (the human's Terminal generators and evaluation) forks a JVM
+    // in the repository root, so sys.exit ends only that JVM and relative paths resolve from the
+    // root. AWS isolation as in the tests; inherited SCHOLARCHAIN_* variables still reach it.
+    Compile / run / fork := true,
+    Compile / run / baseDirectory := (ThisBuild / baseDirectory).value,
+    Compile / run / envVars ++= awsIsolationEnv(target.value / "no-aws")
+  )
 
 lazy val hadoop = project
   .in(file("modules/hadoop"))
@@ -155,7 +248,11 @@ lazy val hadoop = project
       hadoopClientApi.value % Provided,
       hadoopClientRuntime.value % Provided
     ),
-    Test / javaOptions ++= java17Opens
+    Test / javaOptions ++= java17Opens,
+    // decisions-15 item 4: Test/runMain already forks (Test / run / fork delegates to
+    // Test / fork) with Test / javaOptions and Test / envVars; it now starts in the repository
+    // root instead of modules/hadoop. Test working directories are unchanged.
+    Test / run / baseDirectory := (ThisBuild / baseDirectory).value
   )
 
 lazy val sparkAnalytics = project
@@ -269,6 +366,36 @@ lazy val root = project
       (ThisBuild / baseDirectory).value,
       testOutcome.all(ScopeFilter(inAnyProject)).value,
       streams.value.log
+    ),
+    // Fixed-shape local runs (BE-P5-02, BE-P5-04). None is part of `check`; none writes the
+    // test marker. Held-out child output goes straight to the terminal (LocalRuns.outputRoute).
+    localPipeline := LocalRuns.chooseSplit("localPipeline"),
+    localPipelineDev := pipelineRun(LocalRuns.Dev).value,
+    localPipelineHeldout := pipelineRun(LocalRuns.Heldout).value,
+    goldSetEval := LocalRuns.chooseSplit("goldSetEval"),
+    goldSetEvalDev := goldSetEvalRun(LocalRuns.Dev).value,
+    goldSetEvalHeldout := goldSetEvalRun(LocalRuns.Heldout).value,
+    // Synthetic held-out output-route check (decisions-17/19), run by `check`. The probe's task
+    // streams are closed when it completes, before the scan reads every sbt target directory.
+    heldoutRouteProbe := LocalRuns.routeProbe(
+      (ThisBuild / baseDirectory).value,
+      javaHome.value,
+      streams.value.log
+    ),
+    verifyHeldoutOutputRoute := LocalRuns.routeScan(
+      (ThisBuild / baseDirectory).value,
+      target.all(ScopeFilter(inAnyProject)).value,
+      heldoutRouteProbe.value,
+      streams.value.log
+    ),
+    // BE-P5-05 (CR-P5-05 BE-1, BE-2), run by `check`: the held-out launch and clean-tree
+    // refusals on synthetic inputs and a temporary git repository; reports, never enforces, the
+    // real launch signals and the real D3(b) scope.
+    verifyHeldoutGuards := LocalRuns.guardSelfTest(
+      (ThisBuild / baseDirectory).value,
+      LocalRuns.observeLaunch(state.value),
+      target.all(ScopeFilter(inAnyProject)).value,
+      streams.value.log
     )
   )
 
@@ -277,7 +404,9 @@ lazy val root = project
 addCommandAlias("fmt", "; scalafmtSbt ; scalafmtAll")
 addCommandAlias(
   "check",
-  "; verifyBuildSources ; verifyVersionLedger ; scalafmtSbtCheck ; scalafmtCheckAll ; Test/compile ; markTestRun"
+  "; verifyBuildSources ; verifyVersionLedger ; scalafmtSbtCheck ; scalafmtCheckAll ; Test/compile ; verifyHeldoutOutputRoute ; verifyHeldoutGuards ; markTestRun"
 )
 addCommandAlias("packageJobs", "; hadoop/assembly ; sparkAnalytics/assembly")
 addCommandAlias("dockerLocal", "; services/Docker/publishLocal")
+// localPipelineDev/Heldout and goldSetEvalDev/Heldout are root tasks, not aliases: see the
+// root project settings and project/LocalRuns.scala.

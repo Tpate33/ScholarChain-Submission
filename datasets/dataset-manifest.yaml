@@ -7,7 +7,7 @@
 # Validate with: datasets/scripts/validate-manifest.sh --verify
 manifest_version: "1.0.0"
 owning_agent: dataset-engineer
-last_reviewed: "2026-11-12"
+last_reviewed: "2026-11-14"
 raw_prefix_template: "s3://{raw_bucket}/raw/{dataset}/snapshot_date={snapshot_date}/"
 raw_bucket_note: "{raw_bucket} is external configuration. No bucket name, account ID, ARN, or endpoint of ScholarChain infrastructure is recorded here. It is resolved through the configuration contract (domain-engineer) and provisioned through Terraform (infra-engineer). Raw prefixes are immutable: a new snapshot always gets a new snapshot_date prefix."
 identity_policy: "A matching author name is never evidence of identity. ORCID iDs asserted by DBLP, OpenAlex, Crossref or ORCID itself are evidence with provenance (who asserted it, when), not ground truth. Match features, policy and thresholds belong to entity-resolution-engineer."
@@ -569,6 +569,20 @@ er_candidates:
   failures_file: "datasets/samples/er-candidates/FETCH-FAILURES.tsv"
   ranges_file: "datasets/samples/er-candidates/DBLP-RELEASE-RANGES.tsv"
   selected_on: "2026-11-05"
+  api_snapshots:
+    derivation: "Work order DE-P5-04, human decision D13 option D (docs/agent-runs/phase-05/amendment-fe-p5-06.md). The OpenAlex and Crossref records of this set are bodies of live API responses (api.openalex.org, api.crossref.org), not records of a bulk snapshot. Their snapshot identifier is therefore '<source>-api-<retrieval date>', where the retrieval date is the UTC date part of retrieved_at_utc shared by every row of that source in derived_from (OpenAlex: kinds work-by-doi and authors-of-work; Crossref: work-by-doi). They are NOT the bulk snapshot IDs datasets.openalex.snapshot.id (openalex-2026-10-14) or datasets.crossref.snapshot.id (crossref-public-data-file-2026-03), which would misstate provenance (option B, rejected). dblp excerpts of this set are cut from the pinned release and keep datasets.dblp.snapshot.id (dblp-2026-10-03). datasets/scripts/validate-manifest.sh --verify recomputes the token, date and row count from the ledger and fails when they disagree, or when one source's rows span more than one retrieval date (a later --sample run that stores a record on another date must then be resolved by a human decision, not by editing these values). Downstream jobs copy snapshot_id verbatim."
+    openalex:
+      source: openalex
+      snapshot_id: "openalex-api-2026-11-05"
+      retrieval_date: "2026-11-05"
+      ledger_rows: 152
+      derived_from: "datasets/samples/er-candidates/PROVENANCE.tsv"
+    crossref:
+      source: crossref
+      snapshot_id: "crossref-api-2026-11-05"
+      retrieval_date: "2026-11-05"
+      ledger_rows: 19
+      derived_from: "datasets/samples/er-candidates/PROVENANCE.tsv"
   retrieval:
     script: "datasets/scripts/fetch-er-candidates.sh"
     entry_point_note: "Until the human commits fetch-er-candidates.sh with its executable bit, it is run through the committed datasets/scripts/fetch-samples.sh with the extra argument datasets/er-candidates."

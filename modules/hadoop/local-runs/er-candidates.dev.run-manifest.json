@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "scholarchain.run-manifest.v1",
+  "stage": "hadoop.pipeline",
+  "codeVersion": "36ffcf95e585c7def6aa06835a784820936e1b60",
+  "configDigest": "179e02020754eb95b9abc855d55d8209c3e8baa2b46d4696a0b9a857a204ca40",
+  "inputSnapshots": [
+    {"source": "dblp", "snapshot": "dblp-2026-10-03"},
+    {"source": "openalex", "snapshot": "openalex-api-2026-11-05"},
+    {"source": "crossref", "snapshot": "crossref-api-2026-11-05"}
+  ],
+  "parameters": {
+    "scholarchain.blocking.keySource": "scholarchain.hadoop.jobs.EntityResolutionKeySource",
+    "scholarchain.blocking.keySourceVersion": "er-blocking.v2",
+    "scholarchain.blocking.maxBlockSize": "8",
+    "scholarchain.blocking.oversizePolicy": "drop",
+    "scholarchain.candidates.featureVersion": "er-features.v2",
+    "scholarchain.codec.intermediate": "org.apache.hadoop.io.compress.DefaultCodec",
+    "scholarchain.codec.output": "org.apache.hadoop.io.compress.GzipCodec",
+    "scholarchain.dblp.encoding": "ISO-8859-1",
+    "scholarchain.dblp.maxRecordBytes": "1048576",
+    "scholarchain.dblp.recordTypes": "article,inproceedings,proceedings,book,incollection,phdthesis,mastersthesis",
+    "scholarchain.dblp.venues": "*",
+    "scholarchain.dblp.yearRange": "*",
+    "scholarchain.input.digest": "97897d97c73fcdbb2e749e1d665247a97f58632d840766c00ff52e450f04ad7d",
+    "scholarchain.input.split": "dev",
+    "scholarchain.orcid.maxRecordBytes": "1048576",
+    "scholarchain.reducers.blocking": "1",
+    "scholarchain.reducers.candidates": "1",
+    "scholarchain.reducers.exactIds": "1",
+    "scholarchain.reducers.normalize": "1",
+    "scholarchain.reducers.teams": "1",
+    "scholarchain.reject.maxExcerptChars": "256",
+    "scholarchain.team.maxSize": "100",
+    "scholarchain.team.sources": "dblp"
+  },
+  "attempt": 1
+}

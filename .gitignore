@@ -3,7 +3,8 @@
 # Rule: every pattern is anchored to the exact location where a tool writes
 # generated output. No unanchored directory globs. Adding an sbt project means
 # adding its exact <base>/target/ line here. The only negation is the single
-# root file !/.env.example (human decision 2026-10-28).
+# root file !/.env.example (human decision 2026-10-28). The one pattern that is
+# not generated output is the single held-out labels file (decision D5 = L1).
 
 # --- sbt build output (one line per sbt project base directory) ------------
 /target/
@@ -33,6 +34,11 @@
 
 # --- Dataset download directory (human-confirmed 2026-10-28) ---------------
 /datasets/downloads/
+
+# --- Held-out human gold labels (decision D5 = L1, amendment FE-P5-06) -----
+# Human-owned (gold/**). Kept ignored and untracked until the human accepts the
+# held-out evaluation; sbt goldSetEvalHeldout requires this file to be ignored.
+/gold/entity-resolution/heldout-v1/er-gold-labels.jsonl
 
 # --- Terraform working files (inside the Terraform territory only) ---------
 /infra/terraform/**/.terraform/

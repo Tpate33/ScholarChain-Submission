@@ -27,6 +27,28 @@ datasets/samples/er-candidates/<split>/crossref-works/<doi-safe>-<sha8>.json
 `<split>` is `dev` or `heldout`. Run any downstream pipeline once per split directory, never over both
 at once. A combined run would create candidate pairs that cross the split.
 
+## Snapshot identifiers of the API records (work order DE-P5-04, decision D13 option D)
+
+The OpenAlex and Crossref files of this set are live API responses, not bulk-snapshot records, so
+they carry an API snapshot identifier recorded in the manifest under `er_candidates.api_snapshots`:
+
+| Key | Type | Meaning |
+|---|---|---|
+| `er_candidates.api_snapshots.derivation` | string | how the identifiers are derived and why they are not bulk snapshot IDs |
+| `er_candidates.api_snapshots.<source>.source` | plain scalar | `openalex` or `crossref` (the `source` column of `PROVENANCE.tsv`) |
+| `er_candidates.api_snapshots.<source>.snapshot_id` | string | `<source>-api-<YYYY-MM-DD>`; downstream jobs copy it verbatim as the snapshot of every record of that source in this set |
+| `er_candidates.api_snapshots.<source>.retrieval_date` | string `YYYY-MM-DD` | the UTC date part of `retrieved_at_utc`, identical for every `PROVENANCE.tsv` row of that source |
+| `er_candidates.api_snapshots.<source>.ledger_rows` | integer | number of `PROVENANCE.tsv` rows of that source (OpenAlex counts `work-by-doi` and `authors-of-work`) |
+| `er_candidates.api_snapshots.<source>.derived_from` | string | `datasets/samples/er-candidates/PROVENANCE.tsv` |
+
+Recorded values: `openalex-api-2026-11-05` (152 rows) and `crossref-api-2026-11-05` (19 rows).
+They are not `datasets.openalex.snapshot.id` or `datasets.crossref.snapshot.id`, which name bulk
+releases that these records were not taken from. dblp excerpts keep the release pin
+`datasets.dblp.snapshot.id`. `datasets/scripts/validate-manifest.sh --verify` recomputes the token,
+date and row count from the ledger and fails on any disagreement, and also when one source's rows span
+more than one retrieval date, because one token cannot describe them. The fixture
+(`fetch-samples.sh --verify datasets/er-candidates/fixture`) covers the failing cases on synthetic rows.
+
 ## Labeler visibility: columns that must be withheld (RV-P5-02 finding 5)
 
 Several bookkeeping columns encode **dblp's own identity claims**. Anyone who sees them can copy dblp's

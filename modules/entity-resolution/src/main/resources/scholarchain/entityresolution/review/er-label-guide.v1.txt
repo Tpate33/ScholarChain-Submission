@@ -1,0 +1,35 @@
+er-label-guide.v1
+ScholarChain entity-resolution labeling guide
+
+Labeling target: Option A (human decision 2026-11-06). Work pairs: labelingTarget publication-stage. Researcher pairs: labelingTarget person.
+This guide is fixed before labeling. A change is a new guide version, never an edit of this one.
+
+How to answer
+- Answer every pair with exactly one of: match, non-match, unsure.
+- Judge only the source evidence the blind view shows for the two endpoints.
+- If the evidence shown is insufficient, choose unsure. Unsure is a valid answer; it is never replaced by another pair.
+- Masked DBLP person identifiers and homonym numbers are hidden on purpose. Do not try to recover them.
+
+Researcher pairs (labelingTarget: person)
+QUESTION researcher: Do endpoint A and endpoint B refer to the same person? Answer match, non-match, or unsure.
+
+Work pairs (labelingTarget: publication-stage)
+QUESTION work: Do endpoint A and endpoint B describe the same publication entity at the same publication stage (revisions within that entity count as the same)? Answer match, non-match, or unsure.
+
+Definition of a work match
+- A work pair is a match when both records describe the same publication entity at the same publication stage.
+- Publication stages: preprint; conference or workshop paper; journal article; book or book chapter; thesis or dissertation; technical report.
+- Revisions within that entity at that stage are still a match: a corrected or updated version, arXiv versions v1, v2 and later of one preprint, and two records of one publication taken from different sources or catalogues.
+- Records of one publication may differ in wording, metadata, formatting, author-name spelling, or identifiers. That alone does not make a non-match.
+- A preprint and the published article or published conference paper of the same research are a non-match, even when the title and the authors agree.
+
+Edge cases (M = match, N = non-match)
+1. Preprint vs published version (version of record): N.
+2. Extended journal version of a conference paper: N.
+3. Corrected version (the same DOI updated, or arXiv vN of one preprint): M.
+4. Erratum or corrigendum notice vs the article it corrects: N.
+5. Retraction notice vs the retracted paper: N.
+6. Retracted paper (flagged as retracted) vs another record of the same paper: M.
+7. Same-title editorial, preface or introduction in a different year: N.
+8. Thesis vs paper: N.
+9. One publication registered under two DOIs (for example a proceedings paper also deposited as a newsletter reprint): M.

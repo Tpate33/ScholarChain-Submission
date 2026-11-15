@@ -49,6 +49,62 @@ object MatchOutcome {
   given ReadWriter[MatchOutcome] = EnumCodec.tagged("MatchOutcome", values.toSeq, _.tag)
 }
 
+/**
+ * The level of the entity-resolution evidence hierarchy that produced a [[MatchDecision]] (README
+ * Phase 5: metrics are reported by match path). Closed: adding a path requires a MatchDecision
+ * schema version bump. Named `MatchDecisionPath` (not `MatchPath`) so that it never shadows or
+ * collides with a module-local type of that name.
+ */
+enum MatchDecisionPath(val tag: String) {
+
+  /** An exact identifier agreement or disagreement decided the pair. */
+  case ExactId extends MatchDecisionPath("exact-id")
+
+  /** Exact normalized bibliographic rules decided the pair (no score needed). */
+  case DeterministicBibliographic extends MatchDecisionPath("deterministic-bibliographic")
+
+  /** The blocked probabilistic score decided the pair against the configured thresholds. */
+  case Probabilistic extends MatchDecisionPath("probabilistic")
+
+  /** A validated LLM adjudication of a pair in the bounded unresolved score band. */
+  case LlmAdjudicated extends MatchDecisionPath("llm-adjudicated")
+}
+object MatchDecisionPath {
+  def fromTag(tag: String): Option[MatchDecisionPath] = values.find(_.tag == tag)
+  given ReadWriter[MatchDecisionPath] =
+    EnumCodec.tagged("MatchDecisionPath", values.toSeq, _.tag)
+}
+
+/**
+ * The decision of a validated LLM adjudication response, and the [[MatchOutcome]] it implies. The
+ * LLM may abstain; an abstention leaves the pair UNRESOLVED.
+ */
+enum AdjudicationVerdict(val tag: String, val outcome: MatchOutcome) {
+  case Accept extends AdjudicationVerdict("accept", MatchOutcome.Accepted)
+  case Reject extends AdjudicationVerdict("reject", MatchOutcome.Rejected)
+  case Abstain extends AdjudicationVerdict("abstain", MatchOutcome.Unresolved)
+}
+object AdjudicationVerdict {
+  def fromTag(tag: String): Option[AdjudicationVerdict] = values.find(_.tag == tag)
+  given ReadWriter[AdjudicationVerdict] =
+    EnumCodec.tagged("AdjudicationVerdict", values.toSeq, _.tag)
+}
+
+/** Kind of an [[IdentifierConflict]] between the two sides of a match decision. */
+enum IdentifierConflictKind(val tag: String) {
+
+  /** Both sides assert the scheme and their canonical value sets are disjoint. */
+  case Disagreement extends IdentifierConflictKind("identifier-disagreement")
+
+  /** Both sides share a value of the scheme, but a named policy rule contradicts that agreement. */
+  case ContradictedAgreement extends IdentifierConflictKind("agreement-contradicted")
+}
+object IdentifierConflictKind {
+  def fromTag(tag: String): Option[IdentifierConflictKind] = values.find(_.tag == tag)
+  given ReadWriter[IdentifierConflictKind] =
+    EnumCodec.tagged("IdentifierConflictKind", values.toSeq, _.tag)
+}
+
 /** Kind of entity a MatchDecision links. */
 enum MatchEntityKind(val tag: String) {
   case Work extends MatchEntityKind("work")
@@ -209,6 +265,27 @@ object ExternalIdScheme {
  * exactly one entity kind (`entityKind`). Value formats are checked by
  * [[Identifiers.validateExact]]. Separate from [[ExternalIdScheme]] so that the records already
  * frozen with that enum keep their exact wire contract.
+ *
+ * A scheme's format rule is never proof that the identifier exists or that it was assigned to the
+ * entity that carries it: a source's assertion is evidence with provenance. What each scheme
+ * identifies:
+ *   - `doi`, `arxiv`, `dblp-key`, `openalex-work` (OpenAlex `W` ID), `mag`, `scopus-eid`: one work.
+ *   - `orcid`, `openalex-author` (OpenAlex `A` ID, an OpenAlex author cluster, not a person
+ *     asserted by the person), `dblp-pid`: one researcher.
+ *   - `s2-corpus` and `s2-paper` (Phase 5): one Semantic Scholar paper record, in its two encodings
+ *     (numeric corpus ID, 40-hex paper ID). They identify the same kind of thing but are distinct
+ *     schemes: values of one are never compared with values of the other.
+ *   - `s2-author` (Phase 5): one Semantic Scholar author record (a numeric ID, kept distinct from
+ *     `s2-corpus` although both are digit strings).
+ *   - `repository-url` (Phase 5): one source-code repository. Its entity kind is `work` because a
+ *     repository is cited by works, but one repository can accompany several distinct works (a
+ *     paper and its extended version, or many papers that use one tool), so an agreement is
+ *     evidence of a shared artifact, not proof that two works are the same work.
+ *
+ * No selected dataset (DBLP, OpenAlex, ORCID, Crossref) is recorded as carrying the three Semantic
+ * Scholar schemes or repository URLs (`datasets/schemas/identifiers.md`); their formats follow the
+ * public identifier conventions documented in [[Identifiers]], not observed samples. Adding a case
+ * does not change any frozen wire example of the records that carry exact identifiers.
  */
 enum ExactIdScheme(val tag: String, val entityKind: MatchEntityKind) {
   case Doi extends ExactIdScheme("doi", MatchEntityKind.Work)
@@ -220,6 +297,10 @@ enum ExactIdScheme(val tag: String, val entityKind: MatchEntityKind) {
   case Orcid extends ExactIdScheme("orcid", MatchEntityKind.Researcher)
   case OpenAlexAuthor extends ExactIdScheme("openalex-author", MatchEntityKind.Researcher)
   case DblpPid extends ExactIdScheme("dblp-pid", MatchEntityKind.Researcher)
+  case SemanticScholarCorpus extends ExactIdScheme("s2-corpus", MatchEntityKind.Work)
+  case SemanticScholarPaper extends ExactIdScheme("s2-paper", MatchEntityKind.Work)
+  case SemanticScholarAuthor extends ExactIdScheme("s2-author", MatchEntityKind.Researcher)
+  case RepositoryUrl extends ExactIdScheme("repository-url", MatchEntityKind.Work)
 }
 object ExactIdScheme {
   def fromTag(tag: String): Option[ExactIdScheme] = values.find(_.tag == tag)

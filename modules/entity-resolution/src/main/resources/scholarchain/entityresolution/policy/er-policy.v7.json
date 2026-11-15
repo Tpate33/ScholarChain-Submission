@@ -1,0 +1,236 @@
+{
+  "schemaVersion": "er-policy-file.v7",
+  "policyVersion": "er-policy.v7",
+  "blockingVersion": "er-blocking.v2",
+  "featureVersion": "er-features.v2",
+  "calibrated": false,
+  "confidenceDefinition": "every confidence value of this policy is a policy confidence constant (uncalibrated): agreementConfidence, conflictConfidence, implausibleDisagreementConfidence and deterministicConfidence are hand-set constants, and the probabilistic value p is the logistic output of hand-set weights; none of them is a measured probability that the outcome is correct",
+  "evaluationOrder": [
+    "0 refuse an invalid candidate, a blocking or feature version other than the policy's, or endpoint identifiers that do not reproduce the candidate",
+    "1 classify every scheme as agree, disagree or absent; evidence-only schemes add reason codes and never decide; for a work pair compute the publication stage (publicationStage) from the endpoint identifiers and the venue features",
+    "2 T1 disagreement (conflict-if-plausible: orcid, dblp-pid, doi, arxiv): CONFLICT when the pair is plausible or any identifier agrees (a non-deciding arxiv or preprint-doi agreement included), otherwise REJECTED; nothing overrides it",
+    "3 no accepting T1 agreement or T1 disagreement, a blocking disagreement (block-inferred-acceptance or block-inferred-acceptance-if-plausible) and another identifier agreement of the same tier: CONFLICT (contradicting identifiers); a record-key agreement that step 6b does not let decide still counts here",
+    "4 no accepting T1 agreement and an algorithmic author disagreement (block-inferred-acceptance-if-plausible) on a pair that is not plausible: REJECTED",
+    "5 researcher pair with an accepting identifier agreement and two positions on one work or different DBLP homonym numbers: CONFLICT",
+    "6a T1 agreement: ACCEPTED on the exact-id path; it overrides every blocking disagreement, recorded as reason code <disposition>.<scheme>.overridden-by.<scheme> and rule exact-id.override.<scheme>.by.<scheme>; an arxiv agreement accepts only when both sides are at the preprint stage (same-stage-preprint), otherwise it does not decide (reason code arxiv-agreement-cross-stage); a doi agreement whose shared dois all start with one of workCorroboration.preprintDoiPrefixes accepts only for same-stage-preprint, otherwise it does not decide (reason code preprint-doi-agreement-cross-stage, rule exact-id.unresolved.preprint-doi-agreement-cross-stage, recorded only on the outcomes of steps 3, 4 and 6c that this block decided, never on ACCEPTED); a doi agreement with at least one shared doi without a preprint prefix decides",
+    "6b another accepting agreement without a blocking disagreement: ACCEPTED on the exact-id path; a cluster identifier (accept-if-corroborated) accepts only with corroborating publication-stage evidence (workCorroboration), otherwise the pair is UNRESOLVED with reason code cluster-id-agreement-uncorroborated.<scheme> and is never sent to the LLM; a record-key agreement (dblp-key, scopus-eid) does not decide while a preprint-doi agreement does not decide (step 6a): the pair stays UNRESOLVED (step 6c) with reason code record-key-agreement-blocked-by-preprint-doi-stage and rule exact-id.unresolved.record-key-agreement-blocked-by-preprint-doi-stage.<scheme>; a record-key agreement also does not decide while a shared arxiv identifier does not decide (step 6a) and no other T1 agreement decides: the pair stays UNRESOLVED (step 6c) with reason code record-key-agreement-blocked-by-arxiv-stage and rule exact-id.unresolved.record-key-agreement-blocked-by-arxiv-stage.<scheme>; when both apply both are recorded",
+    "6c only a non-deciding arxiv agreement, a non-deciding preprint-doi agreement and the record-key agreements they block, or uncorroborated cluster agreements remain: UNRESOLVED on the exact-id path, never decided by the deterministic bibliographic rules or the score and never sent to the LLM",
+    "7 deterministic bibliographic rules: a reject rule gives REJECTED; an accept rule gives ACCEPTED, or UNRESOLVED when a blocking disagreement exists or, for a work pair, when the same publication stage is not established (reason code publication-stage-cross-stage or publication-stage-uncertain)",
+    "8 the probabilistic score p (uncalibrated): p >= accept gives ACCEPTED, or UNRESOLVED when a blocking disagreement exists or the same publication stage of a work pair is not established; p <= reject gives REJECTED; otherwise UNRESOLVED, eligible for the LLM band only when p is inside the band, no identifier disagreement is recorded in conflicts, and for a work pair the same publication stage is established",
+    "9 blocking disagreements are written to conflicts on UNRESOLVED, REJECTED and CONFLICT outcomes and never on ACCEPTED"
+  ],
+  "thresholds": { "accept": 0.85, "reject": 0.2 },
+  "llmBand": { "lower": 0.4, "upper": 0.7 },
+  "conflictConfidence": 0.99,
+  "implausibleDisagreementConfidence": 0.95,
+  "deterministicConfidence": 0.95,
+  "adjudication": {
+    "promptVersion": "er-adjudication-prompt.v2",
+    "responseSchemaVersion": "er-adjudication-response.v1",
+    "modelIdConfigKey": "models.llmModelId",
+    "maxEvidenceItems": 16,
+    "maxReasonCodes": 6
+  },
+  "sourceReliability": {
+    "center": 0.8,
+    "bySource": { "dblp": 0.95, "orcid": 0.9, "crossref": 0.85, "openalex": 0.75 }
+  },
+  "researcherPlausibility": {
+    "definition": "plausible iff (name.family_key_agree = 1 or familySimMin <= name.family_sim < 1) and (name.initials_compatible = 1 or (missingGivenNamesCompatible and name.given_both = 0)) and context.same_work = 0 and not (name.homonym_suffix_both = 1 and name.homonym_suffix_agree = 0); identifier features are never read",
+    "rationale": "an identifier disagreement means a conflicted identity only when the non-identifier evidence could describe one person: the names agree as the blocking keys group them, and nothing shows two people (two author positions on one work, or different DBLP homonym numbers); otherwise the disagreement is an independent second sign of two people and the pair is rejected",
+    "familySimMin": 0.85,
+    "missingGivenNamesCompatible": true
+  },
+  "workPlausibility": {
+    "definition": "plausible iff title.exact = 1 or titleSimMin <= title.sim < 1 (clause T), or authors.both = 1 and authors.sequence_lcs_ratio >= authorSequenceLcsMin and title.token_jaccard >= titleJaccardWithAuthorsMin (clause TA); identifier features are never read",
+    "rationale": "two copies or two versions of one work keep a near-identical title, or keep the author team and most title words; an author team alone is not enough because one team writes many works; years are not used because a preprint and its version of record can be years apart",
+    "titleSimMin": 0.85,
+    "titleJaccardWithAuthorsMin": 0.5,
+    "authorSequenceLcsMin": 0.75
+  },
+  "workCorroboration": {
+    "definition": "corroborating publication-stage evidence holds iff all four clauses hold: venue (venue.id_agree = 1, or venue.name_both = 1 and venue.name_jaccard >= venueNameJaccardMin); year (year.both = 1 and year.abs_diff <= maxYearDiff); title (title.exact = 1, or titleSimMin <= title.sim < 1); stage (the identifier stages are compatible: both sides are pure preprints, or neither side carries a preprint marker; a preprint marker is an arxiv identifier or a doi that starts with one of preprintDoiPrefixes, read from the endpoint identifiers that the er-features.v2 functions rebuild; a side with both a preprint marker and a published doi is of uncertain stage and fails the clause); every input is an er-features.v2 feature or endpoint identifier, and no other evidence is read; every preprintDoiPrefixes entry is a canonical doi registrant prefix 10.<digits>/ in lower case ending in a slash, and any other form is refused",
+    "rationale": "a cluster identifier (an OpenAlex W ID, a MAG ID, a Semantic Scholar corpus or paper ID) names a record that the source built by merging copies automatically, and those sources are known to merge a preprint with its published version; the policy's work entity is one publication at one publication stage, so a shared cluster ID alone is not evidence of the same stage; the same venue, the same year and a near-identical title are what two records of one publication at one stage share, and a preprint marker on exactly one side shows a preprint against a published version, which is never accepted; a missing input fails its clause, so an incomplete record is left UNRESOLVED rather than accepted",
+    "venueNameJaccardMin": 0.8,
+    "maxYearDiff": 0,
+    "titleSimMin": 0.9,
+    "preprintDoiPrefixes": ["10.48550/"]
+  },
+  "publicationStage": {
+    "definition": "each work side has an identifier stage: preprint (a preprint marker, that is an arxiv identifier or a doi starting with one of workCorroboration.preprintDoiPrefixes, and no published doi), published (a doi without a preprint prefix and no preprint marker), mixed (both) or unknown (neither); the same stage is established as same-stage-preprint (both sides preprint), same-stage-published (both sides published) or same-stage-venue (no preprint marker on either side and the venue clause of workCorroboration holds); it is not established as cross-stage (exactly one side carries a preprint marker) or uncertain (every other case: a mixed side, or no marker and no venue agreement); a work pair whose same stage is not established is never ACCEPTED by the deterministic bibliographic rule or the score (UNRESOLVED with reason code publication-stage-cross-stage or publication-stage-uncertain) and is never eligible for the LLM band; an arxiv agreement accepts only for same-stage-preprint, otherwise the pair is UNRESOLVED with reason code arxiv-agreement-cross-stage; a doi agreement whose shared dois all carry a preprint prefix (the arxiv identifier in doi form) accepts only for same-stage-preprint, otherwise the pair is UNRESOLVED with reason code preprint-doi-agreement-cross-stage and the publication-stage-<verdict> reason code, and no other path (record-key agreement, deterministic bibliographic rule, score, LLM) may accept it; a shared dblp-key or scopus-eid on such a pair does not decide either (reason code record-key-agreement-blocked-by-preprint-doi-stage); a shared dblp-key or scopus-eid also does not decide when a shared arxiv identifier does not decide and no other T1 agreement decides (reason code record-key-agreement-blocked-by-arxiv-stage); inputs are the endpoint identifiers that the er-features.v2 functions rebuild and the er-features.v2 venue features only",
+    "rationale": "the policy's work entity is one publication entity at one publication stage, revisions within that entity allowed, and a preprint against the published version of the same research is a different entity (human decision 2026-11-06); a title, year and author sequence agreement, a high score, or a shared arxiv identifier does not by itself show the same stage, because a published record can list the arxiv identifier of its preprint and the preprint and the published version share title and authors; the same holds for a shared preprint doi, which is the arxiv identifier in doi form and which a published record can list next to its own doi (human decision 2026-11-11); when the preprint doi rule leaves a pair unresolved because the stages differ or are uncertain, a shared dblp-key or scopus-eid does not override that result (human decision 2026-11-11, decisions-08), and the same holds when a shared arxiv identifier leaves a pair unresolved because the stages differ or are uncertain (human decision 2026-11-11, decisions-09), while authoritative identifier conflicts are handled as before; two pure preprints, two published dois, or two records of one venue are at the same stage; when the stage is uncertain and the evidence cannot establish a match at the same stage the pair is left UNRESOLVED for a manual decision rather than merged"
+  },
+  "researcher": {
+    "identifierRules": [
+      {
+        "scheme": "orcid",
+        "scope": "one person: an ORCID iD is registered by, and asserted for, one individual researcher",
+        "reliability": "person-asserted and check-digit verified; duplicate iDs for one person are rare and discouraged by ORCID; a source can attach a wrong iD to a mention",
+        "onAgreement": "accept",
+        "agreementConfidence": 0.99,
+        "agreementRationale": "T1 person identifier: an agreement is the person's own assertion; no corroboration is required",
+        "onDisagreement": "conflict-if-plausible"
+      },
+      {
+        "scheme": "dblp-pid",
+        "scope": "one DBLP person page",
+        "reliability": "curated by the DBLP team, which splits homonyms into numbered person pages by hand; a page can still hold a misassigned paper",
+        "onAgreement": "accept",
+        "agreementConfidence": 0.99,
+        "agreementRationale": "T1 person identifier curated by hand; no corroboration is required",
+        "onDisagreement": "conflict-if-plausible"
+      },
+      {
+        "scheme": "openalex-author",
+        "scope": "one OpenAlex author cluster (an A ID): the output of OpenAlex automated author name disambiguation, not an identity asserted by the person",
+        "reliability": "algorithmic; its dominant known error is splitting one person into several A IDs, and it can also merge different people; A IDs are reassigned when clusters are merged",
+        "onAgreement": "accept",
+        "agreementConfidence": 0.9,
+        "agreementRationale": "an author cluster, unchanged from the previous policy at the lower constant 0.90; the publication-stage concern of cluster work IDs does not apply to a person, and its merge failure mode is not addressed by stage evidence",
+        "onDisagreement": "block-inferred-acceptance-if-plausible"
+      },
+      {
+        "scheme": "s2-author",
+        "scope": "one Semantic Scholar author record: the output of automated author disambiguation",
+        "reliability": "algorithmic, with the same split and merge failure modes as OpenAlex author clusters; no selected dataset carries it (inert on current data)",
+        "onAgreement": "accept",
+        "agreementConfidence": 0.9,
+        "agreementRationale": "as openalex-author",
+        "onDisagreement": "block-inferred-acceptance-if-plausible"
+      }
+    ],
+    "bias": -3.0,
+    "weights": {
+      "name.family_key_agree": 0.75,
+      "name.family_exact": 0.25,
+      "name.first_given_agree": 1.0,
+      "name.initials_compatible": 0.5,
+      "name.first_initial_agree": 0.25,
+      "name.best_variant_sim": 0.25,
+      "name.homonym_suffix_agree": 0.5,
+      "coauthor.jaccard": 3.0,
+      "coauthor.shared": 0.75,
+      "affiliation.id_jaccard": 1.5,
+      "affiliation.text_jaccard": 0.5,
+      "venue.id_agree": 0.25,
+      "venue.name_jaccard": 0.25,
+      "work.title_jaccard": 1.5,
+      "work.doi_agree": 1.5,
+      "work.position_agree": 0.25,
+      "work.team_size_agree": 0.25,
+      "id.openalex-author.agree": 2.0,
+      "id.openalex-author.conflict": -2.5,
+      "context.claimed_work": 3.0,
+      "year.abs_diff": -0.05,
+      "policy.source_reliability": 1.0
+    },
+    "caps": { "coauthor.shared": 4.0, "year.abs_diff": 30.0 }
+  },
+  "work": {
+    "identifierRules": [
+      {
+        "scheme": "doi",
+        "scope": "one registered object: a DOI is assigned by a registration agency (Crossref, DataCite, arXiv) to one deposited item; a preprint and its version of record are distinct objects with distinct DOIs",
+        "reliability": "registered and resolvable; a source can copy a wrong DOI onto a record, and a published record can list the preprint DOI (workCorroboration.preprintDoiPrefixes, for example the arXiv DOI) of its preprint next to its own DOI",
+        "onAgreement": "accept",
+        "agreementConfidence": 0.99,
+        "agreementRationale": "T1 per-version identifier: one DOI registers one deposited object at one publication stage, and an updated deposit keeps its DOI; a shared DOI without a preprint prefix (a publication DOI) is publication-stage evidence and accepts without corroboration; a shared preprint DOI is not, because a published record can list its preprint's DOI next to its own: when every shared DOI carries a preprint prefix the agreement accepts only when both sides are pure preprints (publicationStage same-stage-preprint), otherwise it does not decide and the pair is UNRESOLVED with reason code preprint-doi-agreement-cross-stage, and a shared dblp-key or scopus-eid does not override that result",
+        "onDisagreement": "conflict-if-plausible"
+      },
+      {
+        "scheme": "arxiv",
+        "scope": "one arXiv submission, all of its versions (versions vN are compared as one value)",
+        "reliability": "assigned by arXiv; a source can copy a wrong arXiv ID onto a record, and a published record can list the arXiv ID of its preprint",
+        "onAgreement": "accept",
+        "agreementConfidence": 0.99,
+        "agreementRationale": "T1 per-version-line identifier: one arXiv ID is one preprint across its revisions vN, which are revisions within one entity at one stage; an agreement accepts only when both sides are pure preprints (publicationStage same-stage-preprint), because a published record that lists the arXiv ID of its preprint shares it with the preprint; otherwise the agreement does not decide and the pair is UNRESOLVED with reason code arxiv-agreement-cross-stage, and when no other T1 agreement decides a shared dblp-key or scopus-eid does not override that result (human decision 2026-11-11, decisions-09)",
+        "onDisagreement": "conflict-if-plausible"
+      },
+      {
+        "scheme": "dblp-key",
+        "scope": "one DBLP publication record",
+        "reliability": "curated record key; DBLP keeps a preprint and its venue version as two records, so two keys are two records, often a preprint and its venue version, sometimes a duplicate; a differing key alone does not prove two identities",
+        "onAgreement": "accept",
+        "agreementConfidence": 0.99,
+        "agreementRationale": "per-record key: one DBLP record describes one publication at one stage (DBLP keeps a preprint and its venue version apart), so an agreement means the same record; no corroboration is required; exceptions: when the doi agreement of the pair is a preprint-doi agreement that does not decide (publicationStage not same-stage-preprint), the dblp-key agreement does not decide either and the pair is UNRESOLVED with reason code record-key-agreement-blocked-by-preprint-doi-stage (human decision 2026-11-11, decisions-08); when a shared arxiv identifier does not decide (publicationStage not same-stage-preprint) and no other T1 agreement decides, the dblp-key agreement does not decide either and the pair is UNRESOLVED with reason code record-key-agreement-blocked-by-arxiv-stage (human decision 2026-11-11, decisions-09)",
+        "onDisagreement": "block-inferred-acceptance"
+      },
+      {
+        "scheme": "openalex-work",
+        "scope": "one OpenAlex work record (a W ID), which OpenAlex builds by merging source copies of one work",
+        "reliability": "algorithmic merging of source copies; known to leave some duplicate W IDs for one work and to merge a preprint with its published version into one W ID",
+        "onAgreement": "accept-if-corroborated",
+        "agreementConfidence": 0.95,
+        "agreementRationale": "cluster identifier: OpenAlex merges versions (in 7 of 8 sampled preprint-versus-published units both DOIs returned one OpenAlex work), so an agreement alone is not publication-stage evidence; it accepts only with workCorroboration, otherwise UNRESOLVED",
+        "onDisagreement": "evidence-only"
+      },
+      {
+        "scheme": "mag",
+        "scope": "one Microsoft Academic Graph paper record, as carried by OpenAlex ids.mag",
+        "reliability": "legacy record key of a retired graph that merged source copies automatically, including versions of one paper",
+        "onAgreement": "accept-if-corroborated",
+        "agreementConfidence": 0.95,
+        "agreementRationale": "cluster identifier of an automatically merged graph that also grouped versions; same reasoning as openalex-work: accepts only with workCorroboration, otherwise UNRESOLVED",
+        "onDisagreement": "evidence-only"
+      },
+      {
+        "scheme": "scopus-eid",
+        "scope": "one Scopus record, as carried in ORCID external IDs",
+        "reliability": "publisher-curated record key of the published version; duplicates exist, so two EIDs are two records and a differing EID alone does not prove two identities",
+        "onAgreement": "accept",
+        "agreementConfidence": 0.99,
+        "agreementRationale": "per-record key of an indexed published item; an agreement means the same record at one stage; no corroboration is required; exceptions: when the doi agreement of the pair is a preprint-doi agreement that does not decide (publicationStage not same-stage-preprint), the scopus-eid agreement does not decide either and the pair is UNRESOLVED with reason code record-key-agreement-blocked-by-preprint-doi-stage (human decision 2026-11-11, decisions-08); when a shared arxiv identifier does not decide (publicationStage not same-stage-preprint) and no other T1 agreement decides, the scopus-eid agreement does not decide either and the pair is UNRESOLVED with reason code record-key-agreement-blocked-by-arxiv-stage (human decision 2026-11-11, decisions-09)",
+        "onDisagreement": "block-inferred-acceptance"
+      },
+      {
+        "scheme": "s2-corpus",
+        "scope": "one Semantic Scholar paper record (numeric corpus ID)",
+        "reliability": "record key of an automatically merged corpus that groups a preprint with its published version; never compared with s2-paper values; no selected dataset carries it (inert on current data)",
+        "onAgreement": "accept-if-corroborated",
+        "agreementConfidence": 0.95,
+        "agreementRationale": "cluster identifier: Semantic Scholar merges versions of one paper into one record; same reasoning as openalex-work: accepts only with workCorroboration, otherwise UNRESOLVED",
+        "onDisagreement": "evidence-only"
+      },
+      {
+        "scheme": "s2-paper",
+        "scope": "one Semantic Scholar paper record (40-hex paper ID)",
+        "reliability": "record key of an automatically merged corpus that groups a preprint with its published version; never compared with s2-corpus values; no selected dataset carries it (inert on current data)",
+        "onAgreement": "accept-if-corroborated",
+        "agreementConfidence": 0.95,
+        "agreementRationale": "as s2-corpus",
+        "onDisagreement": "evidence-only"
+      },
+      {
+        "scheme": "repository-url",
+        "scope": "one source-code repository, cited by works; one repository can accompany several distinct works, and one work can cite a mirror or a fork",
+        "reliability": "author-supplied link; an agreement is evidence of a shared artifact, not of the same work, and a disagreement is not evidence of different works; no selected dataset carries it (inert on current data)",
+        "onAgreement": "evidence-only",
+        "agreementConfidence": 0.0,
+        "agreementRationale": "a shared artifact, not a shared work: never decides",
+        "onDisagreement": "evidence-only"
+      }
+    ],
+    "bias": -4.0,
+    "weights": {
+      "title.exact": 2.0,
+      "title.sim": 2.0,
+      "title.token_jaccard": 2.0,
+      "year.abs_diff": -0.5,
+      "venue.id_agree": 0.5,
+      "venue.name_jaccard": 0.5,
+      "authors.family_jaccard": 2.0,
+      "authors.first_family_agree": 0.75,
+      "authors.sequence_lcs_ratio": 1.0,
+      "authors.count_diff": -0.2,
+      "authors.orcid_shared": 0.5,
+      "id.other.conflict": 0.0,
+      "policy.source_reliability": 1.0
+    },
+    "caps": {
+      "year.abs_diff": 10.0,
+      "authors.count_diff": 10.0,
+      "authors.orcid_shared": 3.0,
+      "id.other.conflict": 2.0
+    }
+  }
+}

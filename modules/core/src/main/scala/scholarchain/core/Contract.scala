@@ -19,6 +19,13 @@ import upickle.default.ReadWriter
  *     curated output, and its frozen examples changed bytes.
  *   - `coauthor-pair-candidate.v2` (Phase 4): adds positionA and positionB. v1 is rejected for the
  *     same reason.
+ *   - `match-decision.v2` (Phase 5): a decision about one MatchCandidate pair, with pairwise
+ *     semantics. Adds candidateId, matchPath, score (separate from confidence), blockingVersion,
+ *     featureVersion, conflicts (pairwise identifier conflicts) and adjudication (LLM adjudication
+ *     reference); removes conflictingTargetIds ("other targets in conflict" is not a property of
+ *     one pair); requires canonical pair order and researcher or work endpoints. v1 is rejected: no
+ *     v1 decision was ever accepted into a curated output. The decision ID formula
+ *     ([[MatchDecisionId]], hash tag `scholarchain.match-decision.v1`) is unchanged.
  */
 object SchemaVersions {
   val WorkRecord = "scholarchain.work-record.v3"
@@ -32,7 +39,7 @@ object SchemaVersions {
   val Venue = "scholarchain.venue.v1"
   val Institution = "scholarchain.institution.v1"
   val Topic = "scholarchain.topic.v1"
-  val MatchDecision = "scholarchain.match-decision.v1"
+  val MatchDecision = "scholarchain.match-decision.v2"
   val GraphNode = "scholarchain.graph-node.v1"
   val GraphEdge = "scholarchain.graph-edge.v1"
   val EvidenceItem = "scholarchain.evidence-item.v1"
@@ -49,7 +56,8 @@ object SchemaVersions {
   /** Superseded versions that no decoder accepts (kept to make the rejection explicit). */
   val retired: Map[String, Vector[String]] = Map(
     "WorkRecord" -> Vector("scholarchain.work-record.v1", "scholarchain.work-record.v2"),
-    "CoauthorPairCandidate" -> Vector("scholarchain.coauthor-pair-candidate.v1")
+    "CoauthorPairCandidate" -> Vector("scholarchain.coauthor-pair-candidate.v1"),
+    "MatchDecision" -> Vector("scholarchain.match-decision.v1")
   )
 
   /** Every current version, keyed by record type name. */

@@ -168,12 +168,16 @@ class EnumCodecSuite extends munit.FunSuite {
         "scopus-eid",
         "orcid",
         "openalex-author",
-        "dblp-pid"
+        "dblp-pid",
+        "s2-corpus",
+        "s2-paper",
+        "s2-author",
+        "repository-url"
       )
     )
     assertEquals(
       ExactIdScheme.values.filter(_.entityKind == MatchEntityKind.Researcher).map(_.tag).toSeq,
-      Seq("orcid", "openalex-author", "dblp-pid")
+      Seq("orcid", "openalex-author", "dblp-pid", "s2-author")
     )
     assert(
       ExactIdScheme.values.forall(s =>
@@ -181,5 +185,24 @@ class EnumCodecSuite extends munit.FunSuite {
       )
     )
     roundTrip(AssertionSourceKind.values.toSeq, _.tag, Seq("client", "orcid"))
+  }
+
+  test("match decision v2 enums: paths, adjudication verdicts, identifier conflict kinds") {
+    roundTrip(
+      MatchDecisionPath.values.toSeq,
+      _.tag,
+      Seq("exact-id", "deterministic-bibliographic", "probabilistic", "llm-adjudicated")
+    )
+    roundTrip(AdjudicationVerdict.values.toSeq, _.tag, Seq("accept", "reject", "abstain"))
+    assertEquals(
+      AdjudicationVerdict.values.map(_.outcome).toSeq,
+      Seq(MatchOutcome.Accepted, MatchOutcome.Rejected, MatchOutcome.Unresolved),
+      "abstain leaves the pair UNRESOLVED; no verdict yields CONFLICT"
+    )
+    roundTrip(
+      IdentifierConflictKind.values.toSeq,
+      _.tag,
+      Seq("identifier-disagreement", "agreement-contradicted")
+    )
   }
 }
