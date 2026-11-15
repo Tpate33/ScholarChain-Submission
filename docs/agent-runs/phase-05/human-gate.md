@@ -63,3 +63,13 @@ commit.txt records the Unicode prerequisite commit only.
 
 This closes only the Unicode prerequisite. Main Phase 5 remains unimplemented
 and unaccepted. The follow-up commit records evidence only.
+
+## FE-P5-07 ratification and validation — 2026-11-14
+
+I ratified FE-P5-07 and applied its patch from regular Terminal with Claude Code closed.
+- Patch SHA-256: `978146a43ecb7a3cbc2342caa28160ded373d675c77e534c81297f510b504937`
+- Applied allowlist SHA-256: `eb708cd4ea78c8f8da0a68579c1bb0b009840c762f5c0a58c052847f18f7eb73`
+- All four hook syntax checks passed. Settings JSON parsed. The allowlist parsed with 94 identity rows and 3 groups, and the 119-row documentation mirror matched.
+- Agent-file validator: PASS, 0 failures.
+- Behavior probes: PASS, 0 failures, with 661 table probes and 38 fixture probes. Both held-out cleanup guard checks passed.
+- The applied probe table matched the reference after normalizing three Unicode escapes. Temporary fixture cleanup required interactive confirmation.

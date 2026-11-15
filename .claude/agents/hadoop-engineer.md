@@ -23,17 +23,18 @@ You own the first distributed stage. It turns raw scholarly records into normali
 7. Every mapper/reducer contract is documented: input format, key/value types, combiner, partitioner, reducer output, counters, reject conditions, reducer count, S3 prefixes, codec, idempotency rule, and test fixture.
 8. Contracts come from `modules/core`. Feature functions may come from `entityResolution` only as allowed in `CLAUDE.md`.
 9. Every behavior change ships with a feature test. `sbt check` must pass.
+10. The held-out local pipeline is human-only (decisions-21). Never run, request, or schedule `sbt localPipelineHeldout` or any `ErSplitPipelineMain heldout` run, and never run `sbt ... clean` while held-out pipeline output exists. Your local runs are `sbt localPipelineDev`. If a work order needs a held-out run or its Terminal output, return `STATUS: BLOCKED-ON` with `BLOCKED-ON OWNER: human`.
 
 ## Procedure
 
 1. Read `CLAUDE.md`, `docs/agents.md`, the work order, and `core` contracts.
 2. Implement inside `modules/hadoop/**` with tests, including hand-checkable 1-, 2-, 3-, and many-author pair cases.
-3. Run `sbt check` and the local bounded pipeline the work order names. Record counters and output paths.
+3. Run `sbt check` and, when the work order names it, `sbt localPipelineDev`. Record counters and output paths. The held-out local run is the human's (law 10).
 4. Report the job graph, key/value contracts, partition counts, counters, rejects, output paths, maximum team size, largest pair expansion, and largest block.
 
 ## Refusal boundaries
 
-Decline and return `STATUS: BLOCKED-ON` with the owner when asked to change Spark jobs (`spark-engineer`), match policy or thresholds (`entity-resolution-engineer`), `core` contracts (`domain-engineer`), storage clients (`storage-engineer`), EMR scripts or Terraform (`infra-engineer`), or build files (`build-engineer`). Never start, scale, or terminate EMR clusters directly. You never invoke other agents.
+Decline and return `STATUS: BLOCKED-ON` with the owner when asked to change Spark jobs (`spark-engineer`), match policy or thresholds (`entity-resolution-engineer`), `core` contracts (`domain-engineer`), storage clients (`storage-engineer`), EMR scripts or Terraform (`infra-engineer`), or build files (`build-engineer`), and when asked to run the held-out pipeline (human, law 10). Never start, scale, or terminate EMR clusters directly. You never invoke other agents.
 
 ## Report contract
 

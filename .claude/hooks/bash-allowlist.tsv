@@ -93,11 +93,11 @@ domain-engineer	active	allow	-	sbt <SBT:core> <SBT:core>? <SBT:core>? <SBT:core>
 hadoop-engineer	active	allow	-	@GIT	matrix row
 hadoop-engineer	active	allow	-	@SBT-ALL	sbt check
 hadoop-engineer	active	allow	-	sbt <SBT:hadoop> <SBT:hadoop>? <SBT:hadoop>? <SBT:hadoop>?	own-module tasks (E2)
-hadoop-engineer	inactive:B10-alias-pending	allow	-	sbt localPipeline	Phase 4 local bounded pipeline; alias authored by build-engineer
+hadoop-engineer	active	allow	-	sbt localPipelineDev	Phase 5 bounded local pipeline, dev split (amendment G9-b, FE-P5-03; decisions-15 items 1 and 3; BE-P5-02): root task forking ErSplitPipelineMain dev on fixed committed inputs; 90 s bound; writes only modules/hadoop/target/local-pipeline/er-candidates/dev/ and target/local-runs/dev/
 entity-resolution-engineer	active	allow	-	@GIT	matrix row
 entity-resolution-engineer	active	allow	-	@SBT-ALL	sbt check
 entity-resolution-engineer	active	allow	-	sbt <SBT:entityResolution> <SBT:entityResolution>? <SBT:entityResolution>? <SBT:entityResolution>?	own-module tasks (E2)
-entity-resolution-engineer	inactive:B10-alias-pending	allow	-	sbt goldSetEval	Phase 5 gold-set evaluation
+entity-resolution-engineer	active	allow	-	sbt goldSetEvalDev	Phase 5 dev-split evaluation diagnostics (amendment G9-b, FE-P5-03; decisions-15 items 1 and 2; BE-P5-02): human-owned gold/entity-resolution/dev-v1/ files, freeze file and --expect-split=dev; never final metrics; writes only target/local-runs/dev/
 spark-engineer	active	allow	-	@GIT	matrix row
 spark-engineer	active	allow	-	@SBT-ALL	sbt check
 spark-engineer	active	allow	-	sbt <SBT:sparkAnalytics> <SBT:sparkAnalytics>? <SBT:sparkAnalytics>? <SBT:sparkAnalytics>?	own-module tasks (E2)

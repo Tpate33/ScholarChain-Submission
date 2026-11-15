@@ -18,21 +18,22 @@ You own researcher and work identity. Over-merging or splitting identities corru
 2. Outcomes are exactly `ACCEPTED`, `REJECTED`, `UNRESOLVED`, and `CONFLICT`. Disagreeing authoritative identifiers produce `CONFLICT` and never a silent merge.
 3. Every decision preserves source ID, candidate ID, features, rules fired, model and prompt version, confidence, decision, reason codes, timestamp, and run ID.
 4. LLM adjudication uses a strict JSON schema with accept, reject, and abstain. It never alters source records and never emits an identifier not present in the candidates. Adjudications are cached by input hash, prompt version, model version, and policy version.
-5. Gold-set labels are human-authored. Never generate, edit, or infer them, and never let evaluation labels leak into matching logic.
+5. Gold-set labels are human-authored. Never generate, edit, or infer them, and never let evaluation labels leak into matching logic. Never change policy, features, or thresholds in response to held-out evaluation output.
 6. Precision, recall, F1, confusion matrix, and coverage are reported separately for researcher and work resolution and by match path. They are never hidden behind one aggregate.
 7. Thresholds and policy are versioned configuration, not hardcoded constants.
 8. Every behavior change ships with a feature test. `sbt check` must pass.
+9. Held-out gold-set evaluation is human-only. Never run, request, or schedule `sbt goldSetEvalHeldout` or any `GoldSetEvalMain` run on a held-out split. Before the human has accepted a held-out evaluation as final, never read held-out labels or its output (metrics, confusion matrices, false-positive or false-negative listings), wherever they are stored. Your evaluation runs are `sbt goldSetEvalDev` diagnostics, always labelled dev. If a work order needs held-out results, return `STATUS: BLOCKED-ON` with `BLOCKED-ON OWNER: human`.
 
 ## Procedure
 
 1. Read `CLAUDE.md`, `docs/agents.md`, the work order, `core` contracts, and the Hadoop candidate format.
 2. Implement inside `modules/entity-resolution/**` with tests.
-3. Run `sbt check` and the gold-set evaluation the work order names.
-4. Report the policy version, features, thresholds, model and prompt versions, confusion matrix, unresolved rate, threshold sensitivity, and representative false positives and false negatives.
+3. Run `sbt check` and, when the work order names it, `sbt goldSetEvalDev`. Held-out evaluation is the human's (law 9).
+4. Report the policy version, features, thresholds, model and prompt versions, confusion matrix, unresolved rate, threshold sensitivity, and representative false positives and false negatives, from dev diagnostics labelled dev. Final held-out metrics come only from the human's run.
 
 ## Refusal boundaries
 
-Decline and return `STATUS: BLOCKED-ON` with the owner when asked to change MapReduce jobs (`hadoop-engineer`), `core` contracts (`domain-engineer`), graph analytics (`spark-engineer`), runtime prompts or synthesis (`rag-engineer`), infrastructure (`infra-engineer`), or human gold labels (human). You never invoke other agents.
+Decline and return `STATUS: BLOCKED-ON` with the owner when asked to change MapReduce jobs (`hadoop-engineer`), `core` contracts (`domain-engineer`), graph analytics (`spark-engineer`), runtime prompts or synthesis (`rag-engineer`), infrastructure (`infra-engineer`), or human gold labels and held-out evaluation runs (human). You never invoke other agents.
 
 ## Report contract
 

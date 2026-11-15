@@ -6,7 +6,8 @@
 #   .claude/hooks/validate-agent-files.sh --hook   PostToolUse mode: reads the hook
 #        payload on stdin and validates only when a constitutional file was written
 #   .claude/hooks/validate-agent-files.sh --probes  full validation, then the committed probe
-#        table (.claude/hooks/probes.tsv) and disposable-fixture probes (audit, format, provenance, stop)
+#        table (.claude/hooks/probes.tsv) and disposable-fixture probes (audit, format, provenance, stop,
+#        D10(ii) held-out run protection)
 #
 # Checks (spec: "validate-agent-files.sh validates frontmatter, required tool
 # fences, unique names, executable hooks, and JSON syntax"), plus the factory
@@ -304,7 +305,7 @@ if [ "${1:-}" = "--probes" ]; then
   printf 'FAKE\n' > "$F/fix/home/.ssh/id_rsa"; printf 'harmless\n' > "$F/fix/proj/docs/notes.md"
   ln -s ../home/.ssh/id_rsa "$F/fix/proj/innocent.txt"; ln -s ../home/.ssh "$F/fix/proj/configdir"
   probe() { # label expected(BLOCK|ALLOW|ASK|exit code) got want-substring output
-    local ok=1; [ "$2" = "$3" ] || ok=0
+    local ok=1; pn=$((pn + 1)); [ "$2" = "$3" ] || ok=0
     if [ -n "$4" ] && ! printf '%s' "$5" | grep -qF -- "$4"; then ok=0; fi
     if [ "$ok" = 1 ]; then pass "probe $1 -> $3"; else fail "probe $1: expected $2, got $3 ($(printf '%s' "$5" | head -n 2 | tr '\n' ' ' | cut -c1-160))"; fi
   }
@@ -314,7 +315,7 @@ if [ "${1:-}" = "--probes" ]; then
     elif [ $ec -eq 0 ] && printf '%s' "$o" | grep -q '"permissionDecision": "ask"'; then got=ASK
     elif [ $ec -eq 0 ]; then got=ALLOW; else got="EXIT$ec"; fi
   }
-  TAB="$(printf '\t')"; n=0
+  TAB="$(printf '\t')"; n=0; pn=0
   while IFS="$TAB" read -r exp hook label json want; do
     case "$exp" in ''|\#*) continue ;; esac
     case "$hook" in *[!a-z.-]*|'') fail "probes.tsv: bad hook column '$hook'"; continue ;; esac
@@ -324,7 +325,8 @@ if [ "${1:-}" = "--probes" ]; then
   done < .claude/hooks/probes.tsv
   echo "NOTE  $n table probes run"
 
-  section "Fixture probes (C4 hash audit, C5 formatter, provenance, test marker)"
+  section "Fixture probes (C4 hash audit, C5 formatter, provenance, test marker, D10(ii) held-out run protection)"
+  pn=0
   G="$F/repo"; mkdir -p "$G/.claude/hooks" "$G/modules/services" "$G/tests/x" "$G/scripts" "$G/datasets/scripts"
   cp .claude/hooks/*.sh .claude/hooks/*.tsv "$G/.claude/hooks/"
   printf '#!/bin/sh\nexit 0\n' > "$G/scripts/check.sh"; printf '#!/bin/sh\nexit 0\n' > "$G/datasets/scripts/sample.sh"
@@ -406,7 +408,19 @@ if [ "${1:-}" = "--probes" ]; then
   ( cd "$G" && rm -f modules/services/Prod.scala tests/x/T.scala && mkdir -p .claude && touch .claude/.last-test-run )
   o="$(CLAUDE_PROJECT_DIR="$G" "$GH/verify-tests-ran.sh" --check </dev/null 2>&1)"
   probe "verify-tests-ran --check fresh" 0 "$?" "OK" "$o"
-  case "$F" in "${TMPDIR:-/tmp}"/scholarchain-probes.*) rm -r "$F" ;; esac
+  # D10(ii) held-out run protection (FE-P5-06, decisions-18 (c); replaces table probe [entry] service-engineer sbt clean check).
+  # pv sets CLAUDE_PROJECT_DIR to the fixture root $G, which is the ROOT the guard resolves the directory against, so the
+  # real repository's target/ is never read or created. A regular .gitignore lets sbt pass gitignore-missing. Setup failure = FAIL.
+  HO="modules/hadoop/target/local-pipeline/er-candidates/heldout"
+  case "$G" in "${TMPDIR:-/tmp}"/scholarchain-probes.*/repo) fxok=1 ;; *) fxok=0 ;; esac
+  if [ "$fxok" = 1 ] && rm -f "$G/.gitignore" && printf '/target/\n' > "$G/.gitignore" && [ -f "$G/.gitignore" ] && [ ! -L "$G/.gitignore" ] && [ ! -e "$G/$HO" ]; then
+    pv "D10(ii) service-engineer sbt clean check, held-out output absent" service-engineer "sbt clean check" ALLOW
+  else pn=$((pn + 1)); fxok=0; fail "probe D10(ii) held-out output absent: fixture setup failed (fixture root '$G' not the mktemp fixture, .gitignore not created, or $HO already present)"; fi
+  if [ "$fxok" = 1 ] && mkdir -p "$G/$HO" && [ -d "$G/$HO" ] && [ ! -L "$G/$HO" ] && [ "$(cd "$G/$HO" && pwd -P)" = "$(cd "$G" && pwd -P)/$HO" ]; then
+    pv "D10(ii) service-engineer sbt clean check, held-out output present" service-engineer "sbt clean check" BLOCK "heldout-run-protected"
+  else pn=$((pn + 1)); fail "probe D10(ii) held-out output present: fixture setup failed (cannot create a real directory $G/$HO)"; fi
+  echo "NOTE  $pn fixture probes run"
+  case "$F" in "${TMPDIR:-/tmp}"/scholarchain-probes.*) rm -r "$F"; [ ! -e "$F" ] || fail "probe fixture $F was not removed (the human removes it)" ;; esac
 fi
 
 echo

@@ -75,6 +75,7 @@ This table is mirrored by `.claude/hooks/lib-ownership.sh`. `validate-agent-file
 | `docker-compose.yaml` | `build-engineer` | matrix: local compose files |
 | `docker-compose.yml` | `build-engineer` | matrix: local compose files |
 | `**/*.sbt` | `UNASSIGNED` | amendment F1 (Phase 2 review): sbt loads every subproject `*.sbt` as build policy, so only `build.sbt` and `project/**` above are writable (by `build-engineer`); first match wins, so the constitutional `.claude/**` rows above still take precedence |
+| `gold/**` | `HUMAN` | amendment G9-a (FE-P5-03): spec Phase 5 gate "Gold labels are human-reviewed" (README.md at d23d307); human decisions 2026-11-04 (blind labeling; labels kept out of policy development and tuning), 2026-11-05 (freeze membership before labeling), 2026-11-06 (recorded manifest SHA-256 for final held-out metrics), 2026-11-13 (decisions-15: human-owned config, one human-recorded hash file, separate dev and held-out runs). Holds, per split `gold/entity-resolution/<split>-v1/`, the membership manifest, the freeze record `er-gold-membership.jsonl.sha256` (exactly the `shasum -a 256` line plus LF), the evaluation config `er-config.conf` (config.v2, dummy non-secret values), the blind view, the review queue and the labels; written only by the human in a terminal; placed after `**/*.sbt` so `gold/**/*.sbt` stays `UNASSIGNED` (F1) |
 | `modules/core/**` | `domain-engineer` | matrix |
 | `modules/hadoop/**` | `hadoop-engineer` | matrix |
 | `modules/entity-resolution/**` | `entity-resolution-engineer` | matrix |
@@ -124,11 +125,11 @@ This table is mirrored by `.claude/hooks/lib-ownership.sh`. `validate-agent-file
 | `incident-responder` | Read, Grep, Glob, Write, Edit, Bash, mcp__aws-api | `docs/incidents/**` | may run `scripts/rollback.sh`; no destructive repair |
 | `dependency-updater` | Read, Grep, Glob, Edit, Bash, WebFetch | none until the ledger path is ratified (gap G5) | global floor; no shell writes at all |
 
-The **global floor** applies to every identity, including the orchestrator. It covers secret reads, terraform apply/destroy/state mutation, force push, recursive forced deletion, destructive AWS/database operations, unreviewed EMR/ECS scale changes, constitution writes by non-factory identities, test-marker forgery, `scripts/cleanup.sh` (human only), and **any Bash command that is not an active row of the Bash allowlist** (files are written with Write/Edit under the same ownership map; shell syntax, inline interpreter code, and unlisted programs are refused by default).
+The **global floor** applies to every identity, including the orchestrator. It covers secret reads, held-out gold-label reads (G9-c: no Read of `gold/**/heldout*/er-gold-labels*`, no Grep under `gold/` or repository-wide with a gold/heldout/label glob, no `git diff`/`git show` that names a `gold/` path other than the non-label files or would print a held-out label file), held-out runs (D15(c) and decisions-21: `sbt goldSetEvalHeldout` and `sbt localPipelineHeldout` are human-only, and the held-out evaluation output kept under `target/` is not readable), terraform apply/destroy/state mutation, force push, recursive forced deletion, destructive AWS/database operations, unreviewed EMR/ECS scale changes, constitution writes by non-factory identities, test-marker forgery, `scripts/cleanup.sh` (human only), and **any Bash command that is not an active row of the Bash allowlist** (files are written with Write/Edit under the same ownership map; shell syntax, inline interpreter code, and unlisted programs are refused by default).
 
 ### Bash allowlist (machine-checked)
 
-Default deny. A Bash call runs only if it passes the character gate in `guard-dangerous.sh` and matches an ACTIVE row for the acting identity. This table mirrors `.claude/hooks/bash-allowlist.tsv` row for row (119 rows; source sha256 `eacc92bb776577d131d16850575f5b83e3565f333b6af9cd47558d31a425796d`). Group rows (`@GIT`, `@SBT-ALL`, `@AWS-RO`) are included by identities whose row names the group. `code-reviewer` has no rows. INACTIVE rows never match; each names the decision that activates it. The environment lists (`@env`, `@env-nonprod`) are empty until Phase 12 ratifies them.
+Default deny. A Bash call runs only if it passes the character gate in `guard-dangerous.sh` and matches an ACTIVE row for the acting identity. This table mirrors `.claude/hooks/bash-allowlist.tsv` row for row (119 rows; source sha256 `eb708cd4ea78c8f8da0a68579c1bb0b009840c762f5c0a58c052847f18f7eb73`). Group rows (`@GIT`, `@SBT-ALL`, `@AWS-RO`) are included by identities whose row names the group. `code-reviewer` has no rows. INACTIVE rows never match; each names the decision that activates it. The environment lists (`@env`, `@env-nonprod`) are empty until Phase 12 ratifies them.
 
 Directives: `@projects` = core hadoop entityResolution sparkAnalytics storage rag services; `@env` = (empty); `@env-nonprod` = (empty).
 
@@ -192,11 +193,11 @@ Directives: `@projects` = core hadoop entityResolution sparkAnalytics storage ra
 | `hadoop-engineer` | active | allow | - | `@GIT` | matrix row |
 | `hadoop-engineer` | active | allow | - | `@SBT-ALL` | sbt check |
 | `hadoop-engineer` | active | allow | - | `sbt <SBT:hadoop> <SBT:hadoop>? <SBT:hadoop>? <SBT:hadoop>?` | own-module tasks (E2) |
-| `hadoop-engineer` | inactive:B10-alias-pending | allow | - | `sbt localPipeline` | Phase 4 local bounded pipeline; alias authored by build-engineer |
+| `hadoop-engineer` | active | allow | - | `sbt localPipelineDev` | Phase 5 bounded local pipeline, dev split (amendment G9-b, FE-P5-03; decisions-15 items 1 and 3; BE-P5-02): root task forking ErSplitPipelineMain dev on fixed committed inputs; 90 s bound; writes only modules/hadoop/target/local-pipeline/er-candidates/dev/ and target/local-runs/dev/ |
 | `entity-resolution-engineer` | active | allow | - | `@GIT` | matrix row |
 | `entity-resolution-engineer` | active | allow | - | `@SBT-ALL` | sbt check |
 | `entity-resolution-engineer` | active | allow | - | `sbt <SBT:entityResolution> <SBT:entityResolution>? <SBT:entityResolution>? <SBT:entityResolution>?` | own-module tasks (E2) |
-| `entity-resolution-engineer` | inactive:B10-alias-pending | allow | - | `sbt goldSetEval` | Phase 5 gold-set evaluation |
+| `entity-resolution-engineer` | active | allow | - | `sbt goldSetEvalDev` | Phase 5 dev-split evaluation diagnostics (amendment G9-b, FE-P5-03; decisions-15 items 1 and 2; BE-P5-02): human-owned gold/entity-resolution/dev-v1/ files, freeze file and --expect-split=dev; never final metrics; writes only target/local-runs/dev/ |
 | `spark-engineer` | active | allow | - | `@GIT` | matrix row |
 | `spark-engineer` | active | allow | - | `@SBT-ALL` | sbt check |
 | `spark-engineer` | active | allow | - | `sbt <SBT:sparkAnalytics> <SBT:sparkAnalytics>? <SBT:sparkAnalytics>? <SBT:sparkAnalytics>?` | own-module tasks (E2) |
@@ -268,8 +269,8 @@ Each lifecycle step has exactly one routed owner. The orchestrator uses this tab
 | Dependency version bumps within approved major versions | `dependency-updater` | sbt check, vulnerability review, code review |
 | Shared domain records, stable IDs, serialization and configuration contracts | `domain-engineer` | contract tests, sbt check, code review |
 | Dataset manifest, bounded download and sampling scripts, schemas, licenses | `dataset-engineer` | dataset validation, manifest review |
-| Hadoop MapReduce jobs: parse, normalize, block, team extraction, pair expansion, export | `hadoop-engineer` | local or EMR sample run, deterministic outputs, sbt check |
-| Entity resolution: features, policy, thresholds, LLM adjudication, gold-set evaluation tooling | `entity-resolution-engineer` | gold-set evaluation, match-policy review |
+| Hadoop MapReduce jobs: parse, normalize, block, team extraction, pair expansion, export | `hadoop-engineer` | dev local sample run (`sbt localPipelineDev`) or EMR sample run, deterministic outputs, sbt check (the held-out local run is the human's, decisions-21) |
+| Entity resolution: features, policy, thresholds, LLM adjudication, gold-set evaluation tooling | `entity-resolution-engineer` | dev gold-set diagnostics, the human's held-out gold-set evaluation (D15(c)), match-policy review |
 | Spark graph construction, collaboration analytics, evidence paths, semantic summaries | `spark-engineer` | Spark tests, sample run, output invariants |
 | Storage ports, adapters, loaders, embedding ingestion queue | `storage-engineer` | contract tests, bounded load test |
 | Runtime query workflow, prompts, retrieval fusion, evidence bundles, claim verification | `rag-engineer` | retrieval and groundedness evaluation, sbt check |
@@ -283,7 +284,7 @@ Each lifecycle step has exactly one routed owner. The orchestrator uses this tab
 | README, docs, final report, diagrams, demo script, evaluation write-up | `documentation-engineer` | link check, command replay, evidence review |
 | Incident diagnosis, incident reports, rollback of an already released revision | `incident-responder` | human escalation for data, security, destructive actions |
 | Phase evidence assembly under docs/agent-runs | `orchestrator` | evidence format below |
-| Ratification, human gate records, commits, gold-set labels, cleanup execution | `human` | human judgement |
+| Ratification, human gate records, commits, gold-set membership generation, freeze records, evaluation configs and labels (`gold/**`), held-out local pipeline runs (decisions-21), held-out gold-set evaluation runs (D15(c)), cleanup execution | `human` | human judgement |
 | Release manifest (unresolved between deploy-engineer and documentation-engineer, gap G3) | `human` | human decides the owner before Phase 14 |
 <!-- routing-table:end -->
 
@@ -323,18 +324,140 @@ In every case the agent stops, makes no partial change, and returns `STATUS: BLO
 - **Every phase:** review the agent report and reviewer verdict, accept or reject, disclose manual edits, commit, and record the hash.
 - **Commits and pushes are human-only.** No agent or orchestrator Bash row contains `git add`, `commit`, `push`, `tag`, `merge`, or `rebase`; the human runs them in a terminal.
 - **Phase 3:** confirm that no dataset license, identifier, or source is invented.
-- **Phase 5:** label and review gold-set examples.
+- **Phase 5:** in a terminal (preferably with no Claude Code session open), generate each split's frozen membership manifest and blind view into `gold/entity-resolution/<split>-v1/`; write `er-config.conf`; write the freeze record with `shasum -a 256 er-gold-membership.jsonl > er-gold-membership.jsonl.sha256` and record the value in `human-gate.md`; commit membership, blind view, freeze record and config before any label exists; label blindly from the blind view only; generate the review queue with the same config. **Run both held-out tasks yourself** (`sbt localPipelineHeldout` before any held-out labels file exists, `sbt goldSetEvalHeldout` after labelling), each as a plain batch sbt command in your regular Terminal after the pre-run checklist in [Held-out runs](#held-out-runs-phase-5-build-checks-accepted-limitations-and-terminal-checklist): never with `!` inside a Claude Code session, never via `sbt --client`, an sbt server, BSP/IDE, or the interactive sbt shell (D15(c), decisions-21). After the held-out pipeline run, archive its attempt directory outside the repository and record its runId and `summary.txt` sha256 in `human-gate.md` (D10(i)). Before you accept the held-out evaluation as final, record only its exit status, runId and sha256 values in `human-gate.md`, and keep its metrics and listings out of the repository and out of every work order. After any held-out result, a change to policy, features or thresholds needs disclosure in `human-gate.md` and a fresh held-out set before new final claims (D3(c)). Held-out labels stay gitignored until the held-out evaluation is accepted (D5 = L1). No agent or orchestrator writes `gold/**`, reads held-out labels, runs either held-out task, or reads the held-out evaluation.
 - **Phase 12:** review the Terraform plan and cost estimate. Sign the plan before any apply.
 - **Phase 14:** verify the plan checksum, account, Region, cost bounds, and the absence of unexplained destroy or replace. Approve the deployment command.
 - **Phase 15:** approve experiment manifests and cost bounds.
 - **Cleanup:** approve and run the cleanup and evidence-archival location.
+
+### Held-out runs (Phase 5): build checks, accepted limitations, and Terminal checklist
+
+Both held-out tasks, `sbt localPipelineHeldout` and `sbt goldSetEvalHeldout`, are human-only (D15(c), decisions-21; amendment FE-P5-07). No agent and not the orchestrator can start either: the guard refuses them by name (rules `heldout-pipeline-human-only` and `heldout-eval-human-only`), `settings.json` denies them, and no allowlist row names them. Both tasks also refuse inside any agent Bash call, because there is no terminal there. The human runs each as a plain batch sbt command from the repository root in a regular Terminal: never with `!` inside a Claude Code session, never through `sbt --client` or sbtn, an sbt server, BSP or an IDE, or the interactive sbt shell. No hook runs in that Terminal, so the checklist below is the human's own control. The held-out pipeline's output stays readable by agent Read (see R6 coverage below and the held-out residuals paragraph under Enforcement layers); the human inspects the run's Terminal output and records what `human-gate.md` needs.
+
+**R6 coverage (decisions-22).** R6 protects held-out **evaluation** output only. Its fences are the guard's Read and Grep refusals (rule `heldout-eval-output-read`) for `target/streams/**/goldsetevalheldout` and `target/local-runs/heldout` (any case), its Grep refusal for `target`, `target/streams` and everything under it, and `target/local-runs`, and the `settings.json` Read denies `Read(./target/streams/**/goldSetEvalHeldout/**)` and `Read(./target/local-runs/heldout/**)`. The held-out **pipeline**'s candidate data and `summary.txt` under `modules/hadoop/target/local-pipeline/er-candidates/heldout/`, and its sbt envelope log (the `localPipelineHeldout` task directory under `target/streams/`), remain agent-readable: no rule refuses an agent Read of them, and Grep is refused only where the `target/streams` Grep fence applies. No labels or metrics are in them; the labels file is read only by `sbt goldSetEvalHeldout`, and the pipeline's own JVM scratch under `target/local-runs/heldout/` lies inside the R6 fence. No new fence is added in this round (decisions-21, decisions-22).
+
+**What the build checks** (D3(b) as implemented in `project/LocalRuns.scala`, owner `build-engineer`; BE-P5-04, BE-P5-05; reviewed in CR-P5-06). Before it forks any JVM, each held-out task refuses unless all of the following hold, in this order:
+
+1. **Launch (BE-2), checked first.** The command came from the batch command line (command channel none; the interactive shell's `console0` and every `network-N` channel of a thin client, BSP or IDE refuse); the sbt launcher arguments contain none of `--server`, `--detach-stdio`, `--client`, `-client`, `--jvm-client`, `-bsp`, `--bsp`, `shell`; `shell` is not queued; a console is present (JDK 22 and later: `Console.isTerminal()` is true, and a JDK 22 or later without that method refuses; earlier JDKs: `System.console()` is non-null and `jdk.console` is unset); and `/dev/fd/1` and `/dev/fd/2` are character devices other than `/dev/null` (an unreadable file type refuses).
+2. **Index flags.** `git ls-files -v -z` over the scope `build.sbt project modules tests datasets gold` lists at least one tracked file and only `H` entries; `S` (skip-worktree), lower-case tags (assume-unchanged) and `M` (unmerged) refuse.
+3. **Changes and ignored paths.** One call, `git status --porcelain=v1 -z --ignored=matching --untracked-files=all` over the same scope. Any modified, staged, deleted, renamed or untracked path refuses. Every ignored path must equal, as an exact string, an entry of the allow set: the `target/` directory of each sbt project whose base is in the scope (`modules/*/target/`, `tests/target/`), `project/target/`, `project/project/target/`, `datasets/downloads/` (kept by the human, decisions-21), and, for `goldSetEvalHeldout` only, `gold/entity-resolution/heldout-v1/er-gold-labels.jsonl`. Every other ignored path refuses, wherever its ignore rule comes from (any `.gitignore`, `.git/info/exclude`, `core.excludesFile`), including every `.DS_Store` (refusal kept by the human, decisions-21), `project/metals.sbt`, `project/project/metals.sbt` and `project/.bloop/`. Consequently `localPipelineHeldout` refuses while the held-out labels file exists.
+4. **Root `.gitignore`.** A regular, symlink-free file, committed at HEAD and byte-identical to it (`git hash-object --no-filters`), for both held-out tasks.
+5. **Git hygiene and failure.** Every inherited `GIT_*` variable is removed from the build's git processes (stdin closed, stderr discarded); the clean-tree calls run with `--no-optional-locks -c core.fsmonitor=false -c core.untrackedCache=false`; each git call is bounded at 30 s and killed on timeout. Any git start failure, non-zero exit, timeout or incomplete output refuses (fail closed).
+
+Task-specific checks follow. The pipeline requires its committed, unmodified run manifest and sample ledgers and a bounded, symlink-free samples tree. The evaluation refuses any inherited `SCHOLARCHAIN_CFG_*` (checked right after the launch check), requires the four committed gold files byte-identical to HEAD, and requires the labels file to be a regular, symlink-free, git-ignored file. Both tasks send the forked child's output straight to the Terminal, never through an sbt log.
+
+**Remaining gaps** (the build does not check these; "checklist" marks items the checklist below covers at run time). No guard expansion is made in Phase 5 (decisions-21).
+
+1. BE-6: git configuration and attributes (`core.checkStat`, `core.trustctime`, clean and smudge filters, `core.attributesFile`, `.git/info/attributes`, the default global attributes file) can make `git status` report a clean tree while tracked bytes differ (accepted, see below; checklist).
+2. Files placed by hand inside the allowed `target/` directories, for example a `core-site.xml` in `modules/hadoop/target/scala-*/test-classes/`, which is on `hadoop/Test/fullClasspath`; whether sbt's resource copy removes it is unverified (checklist, optional item).
+3. Root launcher files `.jvmopts` and `.sbtopts` (and `.sbtrc` and the global `sbtopts` files), outside the scope (checklist).
+4. `SBT_OPTS`, `JAVA_OPTS`, `JAVA_TOOL_OPTIONS`, `_JAVA_OPTIONS` and `JDK_JAVA_OPTIONS` in sbt's environment (checklist).
+5. JDK selector files (`.java-version`, `.tool-versions`, `.sdkmanrc`, mise files) (checklist).
+6. `~/.sbt` global settings and plugins (checklist).
+7. Dependency caches outside the repository (Coursier, Ivy, `~/.sbt/boot`); a modified cached jar would be on the classpath. Not covered.
+8. Global git configuration (`~/.gitconfig`, `$XDG_CONFIG_HOME/git/config`), which the build's git calls read and the Bash audit does not see (checklist).
+9. Pseudo-terminal wrappers (`script`, tmux logging, IDE terminals) pass the launch check, and their logs can capture held-out output (checklist: do not use them).
+10. Submodule ignore settings: a committed gitlink with `submodule.<name>.ignore=all` would hide changes inside it, because no `--ignore-submodules=none` is passed (checklist).
+11. Compile-before-check race: task dependencies compile before the clean-tree check, so an edit made and reverted in between is not seen; likewise a change after the check, during the run (checklist: no other writer open).
+12. The allow path (console present, both descriptors character devices, channel none, nothing queued) has not been observed in a real Terminal; the first held-out run is its first observation, and the task refuses if a signal differs.
+
+**BE-6: accepted limitation for Phase 5 (decisions-21).** CR-P5-06 finding BE-6 (minor) is accepted for Phase 5 without a build change. Rationale: both failure inputs need a deliberate change to git configuration or attributes by someone with write access to `.git/config`, `~/.gitconfig` or an attributes file. No agent Write/Edit and no allowlisted path argument can write `.git/**`; sbt-run code could, but `audit-bash-writes.sh` reports changes to `.git/config` and `.git/info/attributes` after the fact, while `~/.gitconfig` and `~/.config/git/attributes` are outside the audit. Both held-out tasks are now run only by the human, who performs the checklist below immediately before each run; its items 2-6 detect both CR-P5-06 failure inputs, including a raw-byte comparison of every tracked file in scope with HEAD and an index-to-HEAD comparison. And the human decided no guard expansion this round. Residual: a change made between the checklist and the run. Owner of the permanent fix: `build-engineer`, in a later phase, by work order: compare raw bytes (`git hash-object --no-filters --stdin-paths`) of every `git ls-tree -r -z HEAD` entry in scope with its HEAD blob (refusing symlink and gitlink modes explicitly), require `git diff-index --cached --quiet HEAD` over the scope, and keep the untracked and ignored listing (CR-P5-06 suggested fix; pinning `core.checkStat` and `core.trustctime` alone does not close the filter route).
+
+**Deferred (decisions-21).** The HD-1 duplicate-source check stays in `modules/hadoop` (`ErSplitPipeline.checkManifest`, refused before any job; `hadoop-engineer`). The broader core unique-source validation (at most one snapshot per source in `inputSnapshots`; `domain-engineer`, with contract tests, after confirming that no stage needs two snapshots of one source) is deferred to a later work order. There is no Phase 5 change.
+
+**Pre-run Terminal checklist.** Run these from the repository root, in the Terminal you will use for the run, immediately before each held-out task, and stop at the first unexpected result. They are for the human's Terminal only and are not agent Bash shapes. Expected results marked "from tool documentation" were not observed on this machine.
+
+1. No other writer or sbt server. Close every Claude Code session on this repository and quit any IDE, Metals or BSP client that has it open.
+   ```sh
+   cd /Users/taufeeqpatel/Desktop/ScholarChain
+   ps -ax -o pid=,command= | grep -E '[x]sbt\.boot|[s]bt-launch|[s]btn|[m]etals|[b]loop|[s]bt\.ForkMain'
+   ls -la project/target/active.json
+   ```
+   Expected: `ps` prints nothing that belongs to this repository; `ls` prints `No such file or directory` (an sbt server writes this file while it runs, from tool documentation; if it exists and no sbt process runs, it is stale and you may delete it).
+2. Git configuration and gitlinks (BE-6).
+   ```sh
+   git config --show-origin --get-regexp 'core\.(checkstat|trustctime|attributesfile|fsmonitor|excludesfile|hookspath|untrackedcache)|filter\.|^submodule\.'
+   git ls-files -s -- build.sbt project modules tests datasets gold | grep -vE '^100(644|755) '
+   ```
+   Expected: no output from either (the first exits with status 1), or only `git config` entries you recognise and accept. Any `core.checkstat`, `core.trustctime`, `core.attributesfile` or `filter.` entry: stop and remove it. Any line from the second command is a symlink or gitlink in scope: stop.
+3. Attribute and exclude files.
+   ```sh
+   ls -la .git/info/attributes ~/.config/git/attributes
+   git ls-files -- .gitattributes '*/.gitattributes'
+   cat .git/info/exclude
+   ```
+   Expected: `No such file or directory` for both attributes files (if `XDG_CONFIG_HOME` is set, check `$XDG_CONFIG_HOME/git/attributes` instead of `~/.config/git/attributes`); no output from `git ls-files`; `.git/info/exclude` holds only git's default comment lines (each starting with `#`) or entries you added and recognise.
+4. Attributes in effect over the whole scope, and on representative files.
+   ```sh
+   git ls-files -- build.sbt project modules tests datasets gold | git check-attr --stdin -a
+   git check-attr -a -- build.sbt project/LocalRuns.scala modules/hadoop/src/main/scala/scholarchain/hadoop/JobParams.scala
+   ```
+   Expected: no output from either.
+5. Index flags (what D3(b) item 2 checks).
+   ```sh
+   git ls-files -v -- build.sbt project modules tests datasets gold | grep -v '^H '
+   ```
+   Expected: no output.
+6. Raw bytes equal HEAD (detects both BE-6 failure inputs at the moment you run it).
+   ```sh
+   git diff-index --cached --quiet HEAD -- build.sbt project modules tests datasets gold && echo "index equals HEAD"
+   cmp <(git ls-tree -r HEAD -- build.sbt project modules tests datasets gold | awk '{print $3}') <(git ls-tree -r HEAD -- build.sbt project modules tests datasets gold | cut -f2 | git hash-object --no-filters --stdin-paths) && echo "work tree bytes equal HEAD"
+   test "$(git hash-object --no-filters -- .gitignore)" = "$(git rev-parse HEAD:.gitignore)" && echo ".gitignore equals HEAD"
+   ```
+   Expected, exactly: `index equals HEAD`, `work tree bytes equal HEAD`, `.gitignore equals HEAD`. A `cmp` difference, a `hash-object` error or a missing line: stop.
+7. Remove `.DS_Store` files in scope (the build refuses them and Finder recreates them, so do this just before the run).
+   ```sh
+   find build.sbt project modules tests datasets gold -name .DS_Store -print
+   find build.sbt project modules tests datasets gold -name .DS_Store -delete
+   find build.sbt project modules tests datasets gold -name .DS_Store -print
+   ```
+   Expected: the first command may list files (build-engineer reported `project/.DS_Store` and `project/project/.DS_Store` on 2026-11-14); the third prints nothing.
+8. Status over the scope, exactly as the build runs it (D3(b) item 3).
+   ```sh
+   git status --porcelain=v1 --ignored=matching --untracked-files=all -- build.sbt project modules tests datasets gold
+   ```
+   Expected: only lines starting with `!! `, each one of `datasets/downloads/`, `modules/<name>/target/` (core, entity-resolution, hadoop, rag, services, spark, storage), `project/target/`, `project/project/target/` and `tests/target/`, plus, before `goldSetEvalHeldout` only, `gold/entity-resolution/heldout-v1/er-gold-labels.jsonl`. Not every target line need appear. Any other line means the task will refuse. Use `--ignored=matching`: with `--untracked-files=all`, plain `--ignored` lists every file inside each ignored directory.
+9. Held-out labels file and run order.
+   ```sh
+   ls -la gold/entity-resolution/heldout-v1/er-gold-labels.jsonl
+   git check-ignore -v gold/entity-resolution/heldout-v1/er-gold-labels.jsonl
+   ```
+   Expected before `sbt localPipelineHeldout`: `No such file or directory` (the pipeline refuses while the labels file exists). Run the pipeline before you create labels; to re-run it later, first move the labels file outside the repository (its sha256 is already recorded) and move it back before the evaluation. Expected before `sbt goldSetEvalHeldout`: a regular file (the `ls` mode starts with `-`, not `l`), and `git check-ignore -v` names the L1 line of `.gitignore`.
+10. Launcher, JVM-option and JDK-selector files outside the build's scope.
+    ```sh
+    ls -la .jvmopts .sbtopts .sbtrc .java-version .tool-versions .sdkmanrc .mise.toml mise.toml ~/.sbtrc /etc/sbt/sbtopts /opt/homebrew/etc/sbtopts /usr/local/etc/sbtopts
+    ```
+    Expected: `No such file or directory` for every path, or only files you recognise (inspect them with `cat`). The `.sbtrc` and global `sbtopts` locations are from tool documentation.
+11. Environment, names only, so no value is printed.
+    ```sh
+    env | grep -E '^(SBT_|JAVA_|_JAVA_OPTIONS|JDK_JAVA_OPTIONS|GIT_|SCHOLARCHAIN_|AWS_)' | cut -d= -f1
+    ```
+    Expected: no output, or only names you set on purpose and accept (for example `JAVA_HOME`). Unset (`unset NAME`) any of `SBT_OPTS`, `SBT_NATIVE_CLIENT`, `JAVA_OPTS`, `JAVA_TOOL_OPTIONS`, `_JAVA_OPTIONS`, `JDK_JAVA_OPTIONS`, every `GIT_*`, every `SCHOLARCHAIN_*` and every `AWS_*` in this Terminal first. The tasks strip `GIT_*` from their git calls and `AWS_*` and `SCHOLARCHAIN_*` from the forked JVM, and `goldSetEvalHeldout` refuses `SCHOLARCHAIN_CFG_*`, but the sbt JVM itself reads the JVM-option variables.
+12. Global sbt settings and plugins.
+    ```sh
+    find ~/.sbt -maxdepth 3 \( -name '*.sbt' -o -name '*.scala' \) -not -path '*/boot/*' -print
+    ```
+    Expected: no output, or only files you recognise (global settings and plugins load into every build).
+13. Optional: unexpected files in the allowed classpath directories.
+    ```sh
+    find modules -path '*/target/scala-*/*classes/*' -type f ! -name '*.class' ! -name '*.tasty' | sort
+    find modules -path '*/src/*/resources/*' -type f | sort
+    ```
+    Expected: every file in the first list has a counterpart in the second (same module, same name relative to `classes/` or `test-classes/` and `resources/`). An unexpected file, for example a `core-site.xml`: stop.
+14. Run one task, in the planned order.
+    ```sh
+    time sbt -Dsbt.supershell=false localPipelineHeldout
+    time sbt -Dsbt.supershell=false goldSetEvalHeldout
+    ```
+    Keep stdin, stdout and stderr on the Terminal: no `<`, `>`, `|`, `tee`, `script`, tmux logging or logging IDE terminal (a pseudo-terminal wrapper passes the launch check but can write held-out output to a file). Expected first task lines: `<task>: plain batch sbt with stdout and stderr on a terminal (JDK ...)`, `<task>: git_head=... git_worktree=...`, then `<task>: clean tree in build.sbt project modules tests datasets gold (decision D3(b)): ...`. sbt exits 0 on success and non-zero on any refusal or failure, and the error line names the reason. Never run `sbt clean`, or delete `modules/hadoop/target/`, in this Terminal while `modules/hadoop/target/local-pipeline/er-candidates/heldout/` holds an attempt you have not archived (D10); no hook protects your Terminal.
+    Supershell: `-Dsbt.supershell=false` only turns off sbt's progress display, which could redraw over child output written straight to the Terminal (CR-P5-06). In `launchProblems` no signal reads a `-D` property except `jdk.console`, and the flag is not a refused launcher argument, so by reading the code it does not change the verdict. Unverified: not observed in a real Terminal. If a task refuses with the flag, read the printed reason, then retry without it.
 
 ## Enforcement layers
 
 | Layer | File | Event | Purpose |
 |---|---|---|---|
 | Permissions | `.claude/settings.json` `permissions` | every tool call | explicit allow / ask / deny lists; bypass mode disabled |
-| Dangerous-command guard | `.claude/hooks/guard-dangerous.sh` | PreToolUse `Bash\|Read\|Grep\|Glob\|mcp__aws-api__.*` | Bash: default-deny allowlist (character gate, per-identity rows in `bash-allowlist.tsv`, token tripwires, script provenance); Read/Grep/Glob: secret-read; aws-api MCP: destructive and secret-dump verbs. Never emits allow |
+| Dangerous-command guard | `.claude/hooks/guard-dangerous.sh` | PreToolUse `Bash\|Read\|Grep\|Glob\|mcp__aws-api__.*` | Bash: default-deny allowlist (character gate, per-identity rows in `bash-allowlist.tsv`, token tripwires, script provenance, held-out gold-label fence on git diff/show, human-only held-out evaluation and held-out pipeline, held-out run protection); Read/Grep/Glob: secret-read, the held-out gold-label fence (G9-c) and the held-out evaluation output fence (D15(c) R6); aws-api MCP: destructive and secret-dump verbs. Never emits allow |
 | Bash allowlist (data) | `.claude/hooks/bash-allowlist.tsv` | read by `guard-dangerous.sh` on every Bash call | the Bash column of the authority matrix (see Bash allowlist) |
 | Shell-write audit | `.claude/hooks/audit-bash-writes.sh` | PreToolUse `Bash` (`--pre`), PostToolUse `Bash` (`--post`) | detective backstop (detection after the fact, not prevention): content-hash diff (sha256 plus executable bits; size and mtime ignored, except for the test marker) of every git-visible path and of `.git/config`, `.git/info/exclude`, `.git/info/attributes`, `.git/hooks/*`; `--post` reports changes outside the acting identity's territory and any change to the test marker `.claude/.last-test-run` (content, executable bits, size, or mtime; recorded even when gitignored) made by a command other than exactly `sbt check` / `sbt clean check` (inside those two commands the audit cannot tell markTestRun's update from a touch by test code); `--pre` compares with the session baseline (the state at the end of the previous Bash call, plus the paths `post-write.sh` recorded for authorized writes since) and reports any other change as UNATTRIBUTED (the call is refused, the baseline is reset); sends Bash-changed Scala the identity owns through `format-scala.sh` and records the formatted result. Fails closed (exit 2) on: a missing pre snapshot (`--post`), a corrupt baseline, a session lock not acquired within 5 s, or a baseline that is missing after the session-started marker exists. A missing baseline with no started marker is a new session (baseline created, exit 0) |
 | Post-write recorder | `.claude/hooks/post-write.sh` (with `.claude/hooks/lib-baseline.sh`) | PostToolUse `Write\|Edit\|MultiEdit\|NotebookEdit` | runs `format-scala.sh` first (unchanged behaviour), then re-hashes exactly the written path into the session baseline (lock, temp file + rename), only if the identity is valid and owns the path. Exits 2 without recording when python3 is missing, the identity is invalid, the path is outside the identity's territory, the baseline is missing after session start, the lock is not acquired within 5 s, or the baseline is corrupt. Records nothing and exits with format-scala's status (normally 0) when the payload names no path, the project directory cannot be entered or is not a git work tree, the path is outside the repository, or no Bash call has run yet this session (no baseline, no started marker) |
@@ -351,15 +474,20 @@ Identity comes from the hook payload's `agent_type` field (present inside subage
 
 1. **Character gate.** Every byte is in `A-Z a-z 0-9 . _ / : = @ , + -` or a single ASCII space; no leading, trailing, or doubled space; at most 400 bytes and 24 tokens; no token starts with `=` or contains `==` (zsh `=` expansion). Every shell operator, quote, expansion, redirection, glob, comment, tab, and newline is outside the alphabet, so bash, sh, and zsh all split the command on single spaces and expand nothing.
 2. **Allowlist match.** The space-separated tokens match an ACTIVE row for the acting identity in `.claude/hooks/bash-allowlist.tsv` (typed slots, no backtracking; see Bash allowlist). Unknown identities and `code-reviewer` have no rows.
-3. **Tripwires.** Token-level floor checks on the matched argv: terraform apply/destroy/state, git push and force flags, destructive and mutating AWS verbs, EMR scale or termination, `scripts/cleanup.sh`, test-marker forgery, secret names, and dangerous programs. They fire only if the data file is mis-edited.
+3. **Tripwires.** Token-level floor checks on the matched argv: terraform apply/destroy/state, git push and force flags, destructive and mutating AWS verbs, EMR scale or termination, `scripts/cleanup.sh`, test-marker forgery, held-out gold-set evaluation and held-out pipeline (`sbt goldSetEvalHeldout`, D15(c); `sbt localPipelineHeldout`, decisions-21), secret names, and dangerous programs. They fire only if the data file is mis-edited.
 4. **Path resolution.** Path arguments must resolve inside the repository, outside `.git`, and away from secret material (symlinks included).
 5. **Script provenance.** A row that runs a repository script requires the script and every file in its script directory (`scripts/**`, or `datasets/scripts/**`) to be committed and byte-identical to `HEAD` (raw bytes, `git hash-object --no-filters`, so clean filters cannot mask changes; same executable bit; no untracked, ignored, deleted, or symlinked entries), and the call must run from the repository root. dataset-engineer's own scripts return `ask` instead of deny. The provenance git calls share a 10-second budget; a timeout denies. Factory hook scripts are exempt; they already run as hooks.
 6. **Identity.** `agent_type` absent means the orchestrator. Present but empty, null, the string `null`, a non-string, or not one of the 18 ratified agents: every checked tool call is denied. `enforce-ownership.sh` applies the same rule to Write/Edit/MultiEdit/NotebookEdit (shared function `scholarchain_identity_checked` in `lib-ownership.sh`); the audit and `post-write.sh` treat such identities as owning nothing.
 7. **Build-output precondition.** Every `sbt` row is denied (rule `gitignore-missing`, naming `build-engineer` and decision B6) while the repository root has no regular `.gitignore` file.
+8. **Held-out label fence (G9-c).** `git diff`/`git show` may not name a `gold/` path other than the exact membership, freeze, config, blind-view and queue files, and a content-printing `git diff`/`git show` whose scope includes `gold/` is refused when git lists a held-out label file in that scope.
+9. **Held-out run protection (D10(ii)).** Every `sbt` command with a `clean` token is denied (rule `heldout-run-protected`) while `modules/hadoop/target/local-pipeline/er-candidates/heldout/` exists under the project root the hook receives (`CLAUDE_PROJECT_DIR`). `validate-agent-files.sh --probes` tests both states in its temporary fixture repository, never in the real tree: `service-engineer` `sbt clean check` with the directory absent (no deny) and present (`heldout-run-protected`) (FE-P5-06, decisions-18).
+10. **Human-only held-out runs (D15(c), decisions-21).** Any `sbt` command with a token containing `goldSetEvalHeldout` (rule `heldout-eval-human-only`) or `localPipelineHeldout` (rule `heldout-pipeline-human-only`), in any case, is denied for every identity, the orchestrator included, before allowlist matching; when both appear, the evaluation rule is reported. `--validate-allowlist` fails if an active row names either. The human runs them in a regular Terminal (see Held-out runs under Human gates); hooks and permission rules do not apply there.
 
 The guard emits `deny` (exit 2, with the rule, the identity's allowed shapes, and what to do instead) or `ask`, or no decision. It never emits `allow`, so the `ask` rules in `settings.json` still apply. Agents are expected to write files only with Write/Edit (checked by `enforce-ownership.sh`); no allowlist row is itself a file-writing shell command. The opaque tools named in the allowlist (sbt and the test code it runs, approved scripts) can still write anywhere the OS user can; `audit-bash-writes.sh` detects such writes to git-visible paths only after the fact (see Limitations without an OS-level sandbox).
 
 **Residual risk.** Opaque tools on the allowlist (`sbt`, including test code the calling agent wrote, and approved scripts) can write anything the OS user can. `audit-bash-writes.sh` detects content changes after the fact by sha256, for git-visible, non-ignored paths and the `.git` control files, both during a Bash call (attributed to the caller) and between calls (reported UNATTRIBUTED at the next call). It reports them with exit 2 and tells the agent to stop with `BLOCKED-ON human`. It cannot revert them. Gitignored paths and paths outside the repository are not audited. Bash-changed Scala the identity owns is sent through `format-scala.sh`, and a missing scalafmt or `.scalafmt.conf` yields exit 2. Global aliases or functions in the user's shell profile are outside agent control. The OS-level Bash sandbox is not enabled. `code-reviewer` review of the phase diff remains the final line of defense.
+
+**Held-out label fence (G9-c) and human-only held-out runs (D15(c), decisions-21) residuals.** sbt-run code (including tests) can read any file the OS user can, so code-reviewer reviews any code that names `gold/`. No identity can start `sbt goldSetEvalHeldout` or `sbt localPipelineHeldout`, and the forked child output of both reaches only the human's Terminal. R6 protects held-out evaluation output only: the Read/Grep fences on `target/streams/**/goldsetevalheldout` and `target/local-runs/heldout`, plus the `settings.json` Read denies for the same two paths. The held-out pipeline's candidate data and `summary.txt` under `modules/hadoop/target/local-pipeline/er-candidates/heldout/`, and its sbt envelope log, remain agent-readable; no labels or metrics are in them (decisions-22; no new fence this round). Output the human pastes into a session, a work order or `docs/agent-runs/**` is not fenced; the Phase 5 human gate governs that. Under D5 = L1 the labels are gitignored, so they are not audited and (expected, verified after restart) not searched by repository-wide Grep. Copies of label bytes outside `gold/**` are not fenced.
 
 **Limitations without an OS-level sandbox (B11 off).** The hooks do NOT prevent every unauthorized write. The Bash allowlist decides which programs start; it cannot constrain what an opaque tool does once it runs. `sbt` (including the test code it compiles and runs, which the calling agent may have written) and the approved scripts execute as the same OS user as Claude Code. They can therefore write outside the repository (the user's shell profile, `~/.claude`, directories on `PATH`), modify or delete this audit's snapshots and baselines in `TMPDIR`, start processes that outlive the call, rewrite the test marker, and fabricate evidence files. `audit-bash-writes.sh` is post-hoc detection for git-visible, non-ignored paths and the `.git` control files; it is not prevention, it cannot see ignored paths or anything outside the repository, and it can be blinded by a process that tampers with its state files. The compensating control is `code-reviewer` review of all test code and scripts before they are run, plus human review of each phase diff. Enabling Claude Code's OS-level Bash sandbox (decision B11) would add a filesystem fence for all Bash children; it remains the human's decision and is not enabled.
 
@@ -383,6 +511,8 @@ Rules: never place credentials in `.mcp.json`. Never grant an MCP server to `cod
 ## Approved local placeholders
 
 None ratified yet. Every `.env*` file, including templates, is unreadable by agents under the floor invariant. A placeholder convention (for example, `config/*.example.conf` with dummy values only) requires a matrix amendment that names the path and its owner.
+
+`gold/entity-resolution/<split>-v1/er-config.conf` is evaluation configuration with dummy, non-secret values (amendment G9-a). It is not a secret placeholder; a config that ever needs a secret value requires its own placeholder amendment.
 
 ## Phase evidence format (`docs/agent-runs/`)
 
@@ -413,7 +543,7 @@ Stored: work orders, final reports, deterministic command output, review finding
 | G6 | No agent is named for bounded cloud pipeline runs (`/run-pipeline`). Phases 4 and 6 ask module owners for local or bounded runs, and Phase 15 uses `experiment-engineer`. | Proposed: `deploy-engineer` (operator of approved scripts). Local runs stay with module owners as part of their gates. | Ratify or reassign. |
 | G7 | "Designated test source trees" for `test-engineer` are not designated. Module test trees belong to module owners. | `test-engineer` writes `tests/**` only. | Designate any carve-outs (for example `modules/*/src/test/scala/adversarial/**`). |
 | G8 | **Spec discrepancy.** Phase 1 probe 1 ("Ask `feature-implementer` to edit `build.sbt`") names an agent that is not in the required ScholarChain matrix. The name comes from the reference TaskForge repository. | **Decision recorded (human, 2026-10-28):** probe 1 is run literally with the name `feature-implementer`. No agent of that name exists or is created, and no other agent is substituted. The expected result is that the orchestrator reports that no such agent exists, names `build-engineer` as the owner of `build.sbt`, and returns `BLOCKED-ON human`; no agent is invoked and no edit happens. Any attempted write is refused by `enforce-ownership.sh`. The discrepancy is recorded in `docs/agent-runs/phase-01/human-gate.md`. | none (decision recorded) |
-| G9 | `LICENSE`, `reports/**` other than the final report, packaging files (Dockerfiles), human gold-set labels, and the location of version records have no matrix owner. | `LICENSE` is `HUMAN`. Others are `UNASSIGNED`. | Assign paths and owners when Phase 2, 5, and 17 define them. |
+| G9 | `LICENSE`, `reports/**` other than the final report, packaging files (Dockerfiles), and the location of version records have no matrix owner. Gold set: **resolved by human decisions 2026-11-14 (amendments FE-P5-03, FE-P5-04, FE-P5-05, FE-P5-06, FE-P5-07):** `gold/**` -> `HUMAN` (G9-a); `sbt localPipelineDev` (hadoop-engineer) and `sbt goldSetEvalDev` (entity-resolution-engineer) replace the B10 placeholders, and `sbt localPipelineHeldout` and `sbt goldSetEvalHeldout` are human-only with no row (G9-b, D15(c), decisions-21); held-out labels and held-out evaluation output fenced from every agent tool (G9-c, R6); held-out run protected from `sbt clean` (D10(ii)), tested by two validator fixture checks (FE-P5-06). | `LICENSE` and `gold/**` are `HUMAN`. Others are `UNASSIGNED`. | Assign the remaining paths when Phase 17 defines them. |
 | G10 | `README.md` currently holds the course specification and is owned by `documentation-engineer`, who rewrites it in Phase 17. | Spec cited by commit `d23d307`. | Human should preserve the spec (for example `docs/spec/project-spec.md`, created by `documentation-engineer` under a work order) before Phase 17. |
 | G11 | Rollback has two plausible owners. | In-flight deployment rollback goes to `deploy-engineer`. Rollback of a released revision goes to `incident-responder`. | Ratify the split. |
 | G12 | MCP server packages are unpinned (`uvx` latest, Docker `latest`). | Recorded risk. | Pin versions or digests after verifying them locally. |

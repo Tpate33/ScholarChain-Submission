@@ -68,7 +68,7 @@ case "$owner" in
 the change takes effect only after human ratification and a session restart.
 Acting identity: $identity. Owner: factory-engineer." ;;
   HUMAN)
-    block "'$rel' is human-owned (human gate decisions, LICENSE, personal settings).
+    block "'$rel' is human-owned (human gate decisions, the gold set under gold/: membership, freeze records, evaluation configs, blind views, queues and labels, LICENSE, personal settings).
 No agent or orchestrator tool call may write it. Acting identity: $identity. Owner: human architect." ;;
   GENERATED)
     block "'$rel' is the test marker written only by the sbt markTestRun task after

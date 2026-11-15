@@ -14,7 +14,16 @@
 # their integrity rests on enforce-ownership.sh (factory-only writes) and human ratification.
 # Precondition (NEW-2, a narrowing): every sbt row denies while the repository root has no regular
 # .gitignore file (owner build-engineer, decision B6), naming build-engineer and B6.
-# Read/Grep/Glob: secret-read check on the raw fields and their resolved (symlink-free) paths.
+# Read/Grep/Glob: secret-read check on the raw fields and their resolved (symlink-free) paths, and the
+# held-out gold-label fence (G9-c, FE-P5-03): no Read of gold/**/heldout*/er-gold-labels*, no Grep under
+# gold/, no repository-wide Grep whose glob names gold/heldout/label. Read/Grep: the held-out evaluation
+# output sbt may keep under target/ is fenced (R6, rule heldout-eval-output-read, FE-P5-04).
+# Bash: git diff/show may not name a gold/ path other than the exact non-label files, and a content-printing
+# git diff/show whose scope includes gold/ is refused when git lists a held-out label file in that scope.
+# Bash: sbt goldSetEvalHeldout (D15(c), FE-P5-04) and sbt localPipelineHeldout (decisions-21, FE-P5-07) are human-only:
+# refused for every identity before allowlist matching (rules heldout-eval-human-only and heldout-pipeline-human-only),
+# and a tripwire so --validate-allowlist fails any active row naming either.
+# Bash: every sbt command with a clean token is refused while the held-out pipeline output exists (D10(ii), rule heldout-run-protected).
 # mcp__aws-api__*: destructive-verb and secret-dump token check on cli_command.
 #
 # Never emits "allow": the result is a deny (exit 2, actionable message on stderr), an "ask"
@@ -49,6 +58,25 @@ SECRET_PATH = re.compile(r'(^|/)(\.env([._-][^/]*|rc)?|\.ssh|\.gnupg|\.secrets?|
     r'|id_(rsa|ed25519|ecdsa|dsa)[^/]*|[^/]*\.(pem|key|p12|pfx|jks|keystore)|[^/]*\.tfstate[^/]*)(/|$)'
     r'|(^|/)\.aws/(credentials|config|sso|cli)(/|$)|(^|/)\.docker/config\.json$', re.I)
 SEG_BAD = re.compile(r'(^|/)(\.\.|\.git)(/|$)', re.I)
+# G9-c (FE-P5-03): held-out human gold labels reach no agent tool; only the held-out evaluation, which the
+# human runs in a Terminal (sbt goldSetEvalHeldout, D15(c)), reads them. Patterns apply to lower-cased repo-relative paths.
+HELDOUT_LABELS = re.compile(r'^gold/(.+/)?heldout[^/]*/(.+/)?er-gold-labels[^/]*$')
+GOLD_OK = re.compile(r'^gold/(.+/)?(er-gold-membership\.jsonl(\.sha256)?|er-blind-label-view\.jsonl|er-review-queue\.jsonl|er-config\.conf)$')
+GIT_VIEW = ('--stat', '--name-only', '--name-status')
+HL_DO = ('Held-out labels are read only by the held-out evaluation, which the human runs in a Terminal (sbt goldSetEvalHeldout, D15(c)). '
+         'Membership, freeze, config, blind-view and queue files under gold/ may be Read by exact path; give Grep a '
+         'path inside your own module; use git diff/show with pathspecs outside gold/. Otherwise return STATUS: BLOCKED-ON human.')
+# D15(c) R6 (FE-P5-04): held-out evaluation output that sbt may keep under target/ is for the human only.
+HELDOUT_OUT_READ = re.compile(r'^target/(streams/(.+/)?goldsetevalheldout|local-runs/heldout)(/|$)')
+HELDOUT_OUT_GREP = re.compile(r'^target(/streams(/.*)?|/local-runs(/heldout(/.*)?)?)?$')
+HO_DO = ('Held-out evaluation output is for the human only (decision D15(c)). Read or Grep dev output (target/local-runs/dev/, '
+         'the goldSetEvalDev streams) or your own module instead; if held-out results are needed, return STATUS: BLOCKED-ON human.')
+HE_DO = ("Held-out gold-set evaluation is human-only (decision D15(c)): the human runs 'sbt goldSetEvalHeldout' in a separate Terminal, "
+         "outside every Claude Code session. Do not run, request, or retry it; entity-resolution-engineer may run 'sbt goldSetEvalDev'. "
+         "Name the held-out run as the human's NEXT GATE, or return STATUS: BLOCKED-ON human.")
+HP_DO = ("The held-out local pipeline is human-only (decisions-21): the human runs 'sbt localPipelineHeldout' as plain batch sbt in a regular "
+         "Terminal, outside every Claude Code session. Do not run, request, or retry it; hadoop-engineer may run 'sbt localPipelineDev'. "
+         "Name the held-out run as the human's NEXT GATE, or return STATUS: BLOCKED-ON human.")
 GATE_CH = re.compile(r'[A-Za-z0-9._/:=@,+ -]\Z')
 DESTRUCT = re.compile(r'(delete|terminate|remove|purge|deregister|disable|batch-delete|batch-write|modify|put|create|update|reset|'
     r'schedule|stop|start|run|execute|failover|restore|revoke|retire|set|add|attach|detach|register|cancel|invoke|send|publish|'
@@ -254,9 +282,24 @@ def render(rows):
     s = '; '.join(out) or 'none'
     return (s if len(s) < 700 else s[:700] + ' ...') + ' (full table: .claude/hooks/bash-allowlist.tsv)'
 
+def heldout_human_only_bash(toks):
+    low = [t.lower() for t in toks]
+    if os.path.basename(low[0]) != 'sbt':
+        return None
+    if any('goldsetevalheldout' in t for t in low[1:]):
+        return ('heldout-eval-human-only', 'sbt goldSetEvalHeldout prints held-out metrics and false-positive and false-negative '
+                'listings, so no agent and not the orchestrator runs it (decision D15(c)); no identity has an allowlist row for it.', HE_DO)
+    if any('localpipelineheldout' in t for t in low[1:]):
+        return ('heldout-pipeline-human-only', "sbt localPipelineHeldout runs only as plain batch sbt in the human's own Terminal "
+                '(decisions-21), so no agent and not the orchestrator runs it; no identity has an allowlist row for it.', HP_DO)
+    return None
+
 def tripwire(toks):
     low = [t.lower() for t in toks]
     s, prog = set(low), os.path.basename(low[0])
+    he = heldout_human_only_bash(toks)
+    if he:
+        return he
     if s & {'apply', 'destroy', '-destroy'}:
         return 'terraform-apply-destroy', 'apply/destroy never runs from an agent tool call', 'infra-engineer presents a plan; apply runs only through the human-approved scripts/deploy.sh path.'
     if s & {'state', 'import', 'taint', 'untaint', 'force-unlock', 'console'}:
@@ -279,6 +322,73 @@ def tripwire(toks):
         if secretish(t):
             return 'secret-read', 'token %r names secret material' % t, 'Use Secrets Manager ARNs or ratified placeholder names.'
     return None
+
+def git_rels(p):
+    # git reads REV:path from the repository root, and pathspecs and REV:./path from the shell cwd
+    return {os.path.relpath(os.path.normpath(os.path.join(b, p)), ROOT).lower() for b in (ROOT, CWD)}
+
+def heldout_label_bash(toks):
+    low = [t.lower() for t in toks]
+    if os.path.basename(low[0]) != 'git' or len(low) < 2 or low[1] not in ('diff', 'show'):
+        return None
+    revs, paths, dd = [], [], False
+    for t in toks[2:]:
+        if t == '--':
+            dd = True
+        elif dd:
+            paths.append(t)
+        elif not t.startswith('-'):
+            revs.append(t)
+    blobs = [r.split(':', 1)[1] for r in revs if ':' in r]
+    view = any(t in GIT_VIEW for t in low[2:])
+    for p in blobs + ([] if view else paths):
+        if p and any((r == 'gold' or r.startswith('gold/')) and not GOLD_OK.match(r) for r in git_rels(p)):
+            return ('heldout-label-read', 'git %s naming %r could print human gold-set labels (G9-c).' % (low[1], p), HL_DO)
+    if view or blobs or (paths and not any('.' in git_rels(p) for p in paths)):
+        return None    # names only; one blob or tree checked above; or every pathspec lies outside gold/
+    args = (['show', '--name-only', '--format=', '--no-ext-diff'] if low[1] == 'show' else
+            ['diff', '--name-only', '--no-ext-diff'] + [t for t in toks[2:] if t in ('--cached', '--staged')])
+    try:
+        out = git_out(args + revs + ['--', 'gold'], time.monotonic() + GIT_BUDGET)
+    except subprocess.TimeoutExpired:
+        return ('heldout-label-read', 'git %s could not be checked for held-out gold labels within %d s (G9-c).' % (low[1], GIT_BUDGET), HL_DO)
+    except RuntimeError:
+        return None    # git rejects these arguments, so the real call prints no content either
+    hit = [n.strip() for n in out.decode('utf-8', 'replace').split('\n') if HELDOUT_LABELS.search(n.strip().lower())]
+    if hit:
+        return ('heldout-label-read', 'git %s would print the held-out human gold labels %s (G9-c).' % (low[1], hit[0]), HL_DO)
+    return None
+
+def repo_rels(v):
+    # lower-cased repo-relative readings of a tool path (as given and symlink-resolved, from the shell cwd);
+    # '.' when it is the repository root or one of its ancestors; paths elsewhere are omitted
+    out, lr = set(), ROOT.lower().rstrip(os.sep)
+    ab = os.path.normpath(os.path.join(CWD, v))
+    for p in (ab, os.path.realpath(ab)):
+        r = p.lower().rstrip(os.sep) or os.sep
+        if r == lr or r.startswith(lr + os.sep):
+            out.add(os.path.relpath(r, lr))
+        elif lr.startswith(r.rstrip(os.sep) + os.sep):
+            out.add('.')
+    return out
+
+def gold_check(tool, ti):
+    if tool == 'Glob':
+        return    # Glob lists names, never content
+    v = ti.get('file_path' if tool == 'Read' else 'path')
+    rels = repo_rels(v) if isinstance(v, str) and v else {'.'}
+    for rel in rels:
+        if tool == 'Read' and HELDOUT_LABELS.search(rel):
+            deny('heldout-label-read', 'Read %r: held-out human gold labels are read only by the held-out evaluation the human runs, never by an agent tool (G9-c).' % v, HL_DO)
+        if tool == 'Grep' and (rel == 'gold' or rel.startswith('gold/')):
+            deny('heldout-label-read', 'Grep under gold/ (%r) could print held-out human gold labels (G9-c).' % v, HL_DO)
+        if tool == 'Read' and HELDOUT_OUT_READ.search(rel):
+            deny('heldout-eval-output-read', 'Read %r: sbt keeps held-out evaluation output (metrics, false-positive and false-negative listings) there; it is for the human only (D15(c)).' % v, HO_DO)
+        if tool == 'Grep' and (HELDOUT_OUT_GREP.search(rel) or HELDOUT_OUT_READ.search(rel)):
+            deny('heldout-eval-output-read', 'Grep %r could search held-out evaluation output kept under target/ (D15(c)).' % v, HO_DO)
+    g = ti.get('glob')
+    if tool == 'Grep' and '.' in rels and isinstance(g, str) and re.search(r'gold|heldout|label', g, re.I):
+        deny('heldout-label-read', 'Grep over the repository with glob %r could reach held-out gold-label files (G9-c).' % g, HL_DO)
 
 GIT_BUDGET = 10.0    # seconds for ALL provenance git calls of one hook call (hook timeout is 15 s)
 
@@ -392,6 +502,9 @@ def bash_check(cmd):
             deny('shell-syntax-gate', 'token %r starts with = or contains == (zsh = expansion).' % t, DO_GATE)
     if not (CWD == ROOT or CWD.startswith(ROOT + os.sep)):
         deny('cwd-outside-repo', 'the shell working directory %s is outside the repository.' % CWD, 'Run commands from the repository root.')
+    he = heldout_human_only_bash(toks)
+    if he:
+        deny(*he)
     hits = [(r, c) for r in rows if r['active'] for c in [match(r['items'], toks)] if c is not None]
     if not hits:
         lead = lambda r: [it[1] for it in (r['items'] or [])[:2] if it[0] == 'lit']
@@ -405,11 +518,17 @@ def bash_check(cmd):
     tw = tripwire(toks)
     if tw:
         deny(*tw)
+    hl = heldout_label_bash(toks)
+    if hl:
+        deny(*hl)
     gi = os.path.join(ROOT, '.gitignore')
     if toks[0] == 'sbt' and (os.path.islink(gi) or not os.path.isfile(gi)):
         deny('gitignore-missing', 'sbt writes target/, .bsp/ and other build output; without the repository .gitignore those outputs '
              'are git-visible and the Bash audit would report them (and the test marker rules depend on it). Decision B6 is pending.',
              'Report BLOCKED-ON build-engineer: the ratified .gitignore (decision B6) must be installed before sbt runs.')
+    if toks[0] == 'sbt' and 'clean' in [t.lower() for t in toks[1:]] and os.path.isdir(os.path.join(ROOT, 'modules/hadoop/target/local-pipeline/er-candidates/heldout')):
+        deny('heldout-run-protected', 'sbt clean would delete modules/hadoop/target/local-pipeline/er-candidates/heldout/, the held-out pipeline output the frozen gold membership was drawn from (decision D10).',
+             "Run 'sbt check' instead (no clean). If a clean build is really required, return STATUS: BLOCKED-ON human: the human archives that directory first.")
     for _, caps in hits:
         for c, t in caps:
             if c in PATHLIKE:
@@ -444,6 +563,7 @@ def read_check(tool, ti):
             deny('secret-read', '%s resolves to secret material (%s), e.g. through a symlink.' % (v, rp), 'Name the exact non-secret file you need.')
         if tool != 'Read' and rp in ('/', '/Users', '/home', '/root', '/private', '/var', '/private/var', home, os.path.dirname(home)):
             deny('secret-read', '%s on %s would search a home or system root that contains keys and credentials.' % (tool, rp), 'Search inside the repository or a named non-secret directory.')
+    gold_check(tool, ti)
 
 def mcp_check(tool, ti):
     blob = json.dumps(ti)

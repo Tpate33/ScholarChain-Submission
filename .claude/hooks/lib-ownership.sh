@@ -44,6 +44,10 @@ scholarchain_owner_of() {
     # sbt loads *.sbt in every subproject base as build policy (Phase 2 review F1):
     # only build.sbt and project/** above are writable; every other *.sbt fails closed.
     *.sbt)                                                      echo "UNASSIGNED" ;;
+    # --- human-owned gold set (amendment G9-a, FE-P5-03): per-split membership manifests, freeze records
+    # (*.jsonl.sha256), evaluation configs, blind views, review queues, labels. After *.sbt so
+    # gold/**/*.sbt stays UNASSIGNED (F1); before every agent territory.
+    gold/*)                                                     echo "HUMAN" ;;
     # --- application modules --------------------------------------------------
     modules/core/*)                                             echo "domain-engineer" ;;
     modules/hadoop/*)                                           echo "hadoop-engineer" ;;
@@ -107,6 +111,7 @@ compose.yml
 docker-compose.yaml
 docker-compose.yml
 x/y.scala/x.sbt
+gold/x/y.scala
 modules/core/x/y.scala
 modules/hadoop/x/y.scala
 modules/entity-resolution/x/y.scala
