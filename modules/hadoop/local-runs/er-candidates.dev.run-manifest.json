@@ -1,7 +1,7 @@
 {
   "schemaVersion": "scholarchain.run-manifest.v1",
   "stage": "hadoop.pipeline",
-  "codeVersion": "36ffcf95e585c7def6aa06835a784820936e1b60",
+  "codeVersion": "a961035e8863a1c4b3337557bb17fbab05a1182a",
   "configDigest": "179e02020754eb95b9abc855d55d8209c3e8baa2b46d4696a0b9a857a204ca40",
   "inputSnapshots": [
     {"source": "dblp", "snapshot": "dblp-2026-10-03"},
