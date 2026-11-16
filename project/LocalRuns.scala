@@ -721,8 +721,10 @@ object LocalRuns {
    * pump or drain: lines appear as they are written, also when the bound is reached and the JVM is
    * stopped. The exit code, the timeout decision, and the attempt-directory report do not depend on
    * reading the child's output, so they work the same on both routes.
+   *
+   * Not private since BE-P6-03: `sparkIT` (project/SparkItRuns.scala) reuses it unchanged.
    */
-  private def runForked(
+  def runForked(
       task: String,
       base: File,
       javaHome: Option[File],

@@ -1363,3 +1363,309 @@ UNVERIFIED CONCERNS:
 - `checkWindows.countedWorkCount` counts teams, not counted works, so an authorless counted work with a year is not counted. This is a pre-existing semantic outside the repair scope. Confirm it is the intended definition of countedWorkCount.
 - I did not observe the author's test counts or the 1708-case count at runtime. I checked the arithmetic only.
 ```
+
+---
+
+## CR-P6-15: code-reviewer review of SP-P6-02 step 0 (SparkParquetCompatibilitySuite) (2026-11-16), verbatim
+
+```text
+STATUS: COMPLETE
+OWNER: code-reviewer
+WORK ORDER: CR-P6-15 (Phase 6). Focused read-only review of /Users/taufeeqpatel/Desktop/ScholarChain/modules/spark/src/test/scala/scholarchain/spark/SparkParquetCompatibilitySuite.scala (SP-P6-02 step 0, spark-engineer, untracked on HEAD e59d753).
+FILES CREATED: none
+FILES MODIFIED: none
+COMMANDS RUN: none. I used only Read, Grep and Glob. I read the author report, the work order, the suite, core PartManifest.scala (ObservedFile, PartManifestVerifier.verify/verifyV2/compare, lines 240-439) and core PartManifestV2.scala (all of it). I grepped core for the schema labels and metrics. Glob listed modules/spark/src/**.
+TEST RESULTS: not run, because the reviewer has no Bash. The author reports `sbt check` passing with sparkAnalytics at 3 passed, 0 failed, and 1254 passed overall. I did not observe that run.
+VALIDATION RESULTS:
+1. It is a genuine compatibility test. Verified:
+   - The session is `master("local[1]")` (line 39). Driver host and bind address are 127.0.0.1, the UI is off, and there is 1 shuffle partition (lines 41-48).
+   - Core records go through `Json.encode`/`upickle.write` and then `spark.createDataset(...)(using Encoders.STRING)` (line 161). No Scala 3 case class gets a Spark encoder. The `orderBy("value")` shuffle is followed by decoding and RunId re-derivation (lines 164-180).
+   - Parquet is written from `createDataFrame(java.util.List[Row], StructType)` with an explicit schema, `coalesce(1)` and `ErrorIfExists`. It is read back with `.schema(parquetSchema)` (lines 186-212).
+   - The row count comes straight from the footer: `ParquetFileReader.getRecordCount` (lines 94-99, 214-216), independent of Spark.
+   - The SHA-256 is computed independently with the JDK (line 85). `PartManifestV2.build`, `verifyV2`, `checkRunManifest`, `PartManifests.decode` and `PartManifests.verify` are all exercised over bytes observed with `ObservedFile.of` (lines 249-270).
+   - Counter-test 1 is real. `verifyV2` passes `f.format.lineDelimited` into `compare`, and `compare` emits "a non-empty file must end in LF" only when `lineDelimited && byteCount > 0 && !endsWithLf` (PartManifest.scala:352, 430-431). If `verifyV2` ignored the format, the assertion at line 288 would fail. If it applied the LF rule to Parquet, the empty-error assertion at line 267 would fail. `rowCount = max(observed, 1)` keeps `build` valid whether or not the bytes contain an LF.
+   - Counter-test 2 is real. `dropRight(1)` changes both byteCount and sha256, and both messages match PartManifest.scala:415 and 427.
+2. Hygiene. Verified:
+   - Every write goes under `Files.createTempDirectory` (line 35): the warehouse, spark.local.dir, hadoop.tmp.dir, parquet-out and run directories.
+   - `afterAll` stops the session in a try/finally and then deletes the tree (lines 54-56).
+   - There are no reads of target/, ~/ScholarChain-archive, gold/ or any held-out path. Every Files.walk/list/readAllBytes runs under tmp.
+   - The run directory holds only the 4 files written with java.nio, and the asserted path list confirms there are no stray .crc files.
+   - The only output is two `println` lines on stdout, and nothing is written outside tmp. Nothing depends on randomness or time except the tmp name.
+3. Test-data honesty: acceptable.
+   - The `ResearcherMetricsV2` label is required because `fileChecks` refuses any label that is not a current schema (PartManifestV2.scala:162-169). It is disclosed in a comment (lines 229-230).
+   - By design, `verifyV2` never inspects Parquet content (PartManifestV2.scala:15-18), so the label does not hide a defect this test could detect.
+   - The synthetic RunManifest values (codeVersion "0"*40, the synthetic digest, snapshot dblp-synthetic-1) pass core validation and stay in tmp. They cannot reach a published run.
+   - See finding N1 for the real gap the label sits next to.
+4. Ownership: verified. Glob shows only `modules/spark/src/test/scala/scholarchain/spark/SparkParquetCompatibilitySuite.scala` added, besides the existing .gitkeep files. The session-start git status shows no modified tracked files: no build, core or main change. The two docs/agent-runs files are the orchestrator's.
+5. Author risks. None blocks local step 1. All three are EMR-gate items:
+   - **Hadoop version split.** sparkAnalytics must not import `hadoop` (CLAUDE.md module graph) and reads only local Parquet, so the 3.3.4 vs 3.4.1 split has no effect locally. It matters only for S3A and EMR-supplied (`Provided`) Hadoop.
+   - **Scala binary for EMR.** Scala 3 can consume only the `_2.13` Spark artifacts. If EMR 7.x Spark is Scala 2.12, the jar will not run there. That is a hard blocker for the EMR gate and needs the human F2 decision before any cluster work. It does not affect local runs. The `startsWith("2.13.")` assertion (line 149) pins the current state on purpose and will flag any change.
+   - **Loopback hostname warning.** It is cosmetic for local[1]. See finding N2.
+VERDICT: APPROVE
+FINDINGS:
+spark-engineer:
+- **N1 (nit).** /Users/taufeeqpatel/Desktop/ScholarChain/modules/spark/src/test/scala/scholarchain/spark/SparkParquetCompatibilitySuite.scala:229-239 and :220.
+  - Failure input: a future Spark job publishes `metrics/part-*.parquet` labelled `scholarchain.researcher-metrics.v2` whose columns are not the ResearcherMetricsV2 fields, like this test's (researcherKey, year, jointPublicationCount). `verifyV2` accepts it, because core does not tie `recordSchemaVersion` to a Parquet column schema.
+  - Impact: none in this test, and the label is disclosed. The realistic `metrics/` path plus the real label could be copied into step-1 producer code as if it were a verified layout.
+  - Expected follow-up: step-1 producer tests, as part of the output-invariant gate, should assert that each Parquet part's StructType matches its labelled record schema. Optionally, use a neutral directory name here, such as `compat/part-00000.parquet`.
+- **N2 (nit).** Same file, lines 23-24 (Scaladoc: "bound to the loopback address ... No network").
+  - Failure input: on this machine Spark logged that the hostname resolves to loopback and advertised the executor host as 10.0.0.231 (author report, RISKS).
+  - Impact: the doc claim is stronger than what was observed. Spark opens loopback listeners and does a local hostname lookup. There is no evidence of outbound traffic.
+  - Expected fix: reword the comment to "loopback listeners only; no outbound network". Pinning SPARK_LOCAL_IP needs build-engineer, which is not required for step 1.
+UNVERIFIED CONCERNS:
+- **afterAll after a beforeAll failure.** If `getOrCreate` throws inside `beforeAll`, cleanup depends on MUnit calling `afterAll` after a failed `beforeAll`. I could not confirm that from the repository. It matters only for temp-dir leakage when the session fails to start.
+- **Bind address.** The author says the RPC and block manager bound to 127.0.0.1 and nothing bound to 10.0.0.231. I did not observe this.
+- **Reported results.** The `sbt check` counts and per-test timings come from the author's report, not from my own run.
+ASSUMPTIONS: The file on disk is the one the author ran. The core sources at HEAD e59d753 are the ones it compiled against.
+RISKS: Scala 2.13 vs EMR Scala 2.12 (F2) is the most serious open item for the EMR gate. Hadoop 3.3.4 vs 3.4.1 is a second, smaller one for S3A. Neither affects local step 1.
+MANUAL ACTION REQUIRED: The human reviews and commits the test file. The human decides F2 (Spark, Scala and Hadoop runtime target) before any EMR work.
+BLOCKED-ON OWNER: none
+BLOCKED-ON EVIDENCE: none
+NEXT GATE: Human acceptance of SP-P6-02 step 0. Then the step-1 work order. Its opt-in invocation gap (`sparkIT` needs build-engineer plus factory-engineer row activation), as recorded by the orchestrator in prompt-sp-p6-02-step-0.md, is outside this review.
+```
+
+---
+
+## CR-P6-16: code-reviewer review of BE-P6-03 (opt-in sparkIT task) (2026-11-16), verbatim
+
+```text
+STATUS: COMPLETE
+OWNER: code-reviewer
+WORK ORDER: CR-P6-16 (Phase 6). Focused, read-only, adversarial review of BE-P6-03 (build-engineer), the opt-in `sparkIT` task. Files reviewed: /Users/taufeeqpatel/Desktop/ScholarChain/build.sbt, /Users/taufeeqpatel/Desktop/ScholarChain/project/SparkItRuns.scala, /Users/taufeeqpatel/Desktop/ScholarChain/project/spark-it.properties, and /Users/taufeeqpatel/Desktop/ScholarChain/project/LocalRuns.scala (runForked at lines 716-803). Inputs read: be-p6-03-report.md and prompt-be-p6-03-sparkit.md.
+FILES CREATED: none
+FILES MODIFIED: none
+COMMANDS RUN: none. I have no Bash tool. I used only Read, Grep and Glob. I read nothing under gold/, target/, the held-out paths or the archive.
+TEST RESULTS: none observed by me. The author's `sbt check` result (exit 0, 1254 passed, verifySparkItGuards 91 cases) comes from a background run, and no reviewer or orchestrator observed its output (see F1).
+VALIDATION RESULTS:
+- Check 1, opt-in separation: verified, with one gap (F3).
+  - `checkSteps` (build.sbt:523-534) keeps the previous order and adds `verifySparkItGuards` before `markTestRun`. I compared it with the order recorded in sp-p6-02-step-0-report.md:28.
+  - `markTestRun` and `testOutcome` read only `Test / executeTests` (build.sbt:199-204, 426-430).
+  - SparkIT has its own source directory, `src/it` (build.sbt:310). `SparkIT/definedTestNames` comes from SparkIT's own compile analysis.
+  - The guard's SBT slot accepts only `<project>/{compile,Test/compile,test,scalafmt,Test/scalafmt,scalafmtCheck}` (guard-dangerous.sh:94, 164-165), and SBTTEST accepts only `<project>/test` (166-167). No active allowlist row can name a SparkIT-scoped key, so no agent shape reaches SparkIT. `sbt test` exiting 0 shows that the unscoped `test` resolves to Test.
+- Check 2, portability: verified. guardSelfTest parses only the committed config (SparkItRuns.scala:1147-1153). It does one NOFOLLOW stat of the archive root. `Files.isDirectory` and `Files.exists` return false rather than throwing, and the result only goes into a log line (1154-1169), so it cannot fail `check`. All fixtures are in `Files.createTempDirectory` (851). Fixture preflights pass `inherited = Map.empty`.
+- Check 3, archive path: verified as implemented.
+  - The root is `user.home` plus the committed relative value (270-279). No user name is committed. The run IDs and the snapshot match dev-run-01.md.
+  - Real path equals itself (293-298). On case-insensitive APFS this also refuses a differently cased value, because `toRealPath` returns the on-disk case and the layout listing compares exact case.
+  - Every refusal listed in the report is present: inside or containing the repo (301-304), inside any target directory with canonicalised targets (305-309), exact layout, `_SUCCESS` regular, `_UNVERIFIED` absent with NOFOLLOW, `_parts.json`, held-out, gold and target/streams segments refused case-insensitively, `SCHOLARCHAIN_CFG_*` refused (167-175, 514).
+  - The time-of-check to time-of-use window between the preflight and the fork needs a concurrent writer. I accept it as residual.
+  - Gap: the contents of the run directories are not checked (F5).
+- Check 4, forked JVM: verified.
+  - Only fixed `-D` properties are passed (446-455).
+  - Strip prefixes are AWS_, SCHOLARCHAIN_ and GIT_, and isolation variables are added after stripping (LocalRuns.scala:755-759).
+  - Stdin is closed (773). The bound is 120 s, then destroy, a 10 s grace, then destroyForcibly (782-794). The working directory is the attempt directory (747).
+  - The attempt directory is created with `createDirectory` (410). Run files are written with CREATE_NEW.
+  - Nothing is deleted outside temp directories: `deleteTree` is used only on self-test fixtures.
+- Check 5, pass semantics: verified as specified (461-481). Partial-run detection is limited (see Unverified concerns).
+- Check 6: verified. Only the visibility of `runForked` changed (725-727). `stripPrefixes` already defaulted to `DefaultStrippedPrefixes` (line 89), and erDecisionGroupingDev already passes GIT_ (1783). The diff stat (4 lines) is consistent with this.
+- Check 7: mostly verified. Coverage gaps are in F4.
+- Check 8: F2.
+- Check 9: F1.
+ASSUMPTIONS:
+- In sbt 1.11.7, `inConfig(SparkIT)(Defaults.testSettings)` defines `executeTests`, `bgRun`, `bgRunMain`, `fgRun`, `fgRunMain` and `console` in SparkIT. This is based on knowledge of sbt Defaults, not on a run.
+- sbt-scalafmt 2.5.5 `scalafmtCheckAll` is `scalafmtCheck.?.all(anyConfigsInThisProject)`, defined only for Compile and Test. This is based on knowledge of the plugin source, not on a run.
+- The previous `check` order is the one recorded in sp-p6-02-step-0-report.md:28. I could not run git diff.
+RISKS:
+- The archive is read-only by convention only, as the author disclosed.
+- The 120 s bound has not been measured against real suites.
+- Because of the time-of-check to time-of-use window, an archive change between the preflight and the fork is not seen.
+MANUAL ACTION REQUIRED:
+- The human decides whether integration attempt outputs need protection from `sbt clean` (F6). Any guard change would go to factory-engineer by work order. I propose no constitutional edit.
+BLOCKED-ON OWNER: none
+BLOCKED-ON EVIDENCE: none
+NEXT GATE:
+1. Build-engineer, in a fresh context, re-runs `sbt check` in the foreground with a 600000 ms Bash timeout after addressing the minor findings (or after deciding to accept them), and reports the exact counts verbatim.
+2. The orchestrator archives that output.
+3. A focused code-reviewer re-check.
+4. FE-P6-04 activation of `sbt sparkIT`.
+VERDICT: REQUEST_CHANGES
+FINDINGS:
+
+Owner build-engineer:
+
+F1 (major, evidence, not code). Location: /Users/taufeeqpatel/Desktop/ScholarChain/docs/agent-runs/phase-06/be-p6-03-report.md:19, 40, 119.
+- What happened: the only `sbt check` for this diff ran as a background task. The audit records the Bash call when it returns, so `markTestRun` updated `.claude/.last-test-run` after the audited call ended. verify-tests-ran.sh (R1-b) then classified the marker as untrusted, and the next orchestrator call was refused as UNATTRIBUTED.
+- Why the evidence is not enough: the orchestrator says it did not observe the output (report line 11). `verify-tests-ran.sh --check` only compares mtimes. It cannot show that this marker came from a passing run. So the definition of done (CLAUDE.md: `sbt check` passes, with observed counts) is not established to the project's own standard, even if the agent's account is probably true.
+- Failure input: any background `sbt check`. A delayed write by test code would look identical.
+- Impact: the commit would rest on test evidence that the hooks reject.
+- Remedy: a fresh foreground `sbt check` with the Bash timeout parameter set to 600000 ms. The run took 212 s, well under the 600 s tool maximum. The report's claim that a run over 180 s "must run in the background" is wrong.
+- No hook change is needed. Attributing background sbt runs would weaken R1-b, and that would be a factory-engineer constitutional matter. The orchestrator has no sbt row, so the re-run must be done by a subagent with @SBT-ALL, preferably build-engineer.
+
+F2 (minor). Location: build.sbt:305-308; checkSteps entry `scalafmtCheckAll` at build.sbt:527.
+- What is wrong: SparkIT sources (modules/spark/src/it/scala) are outside the format gate. `scalafmtCheckAll` covers only the configurations that define `scalafmtCheck` (Compile and Test). SparkIT extends Test, so at most `SparkIT/scalafmtCheck` delegates to Test's check, which re-checks the Test sources, not src/it.
+- Failure input: a badly formatted file under src/it written outside the agent Write/Edit path, for example by the human, an IDE, or test-time code. `sbt check` still passes.
+- Impact: the definition of done no longer covers formatting of all repository Scala. The risk is low today because no src/it source exists yet.
+- Simplest fix:
+  - add the plugin's per-configuration settings to SparkIT (`inConfig(SparkIT)(ScalafmtPlugin.scalafmtConfigSettings)`, using the 2.5.5 signature, which needs confirming in the plugin jar)
+  - add `sparkAnalytics/SparkIT/scalafmtCheck` as an explicit step before `Test/compile`
+  - add one verifySparkItGuards case asserting that the step is in checkSteps.
+- Alternatively, the human accepts the gap explicitly until the first src/it suite lands.
+
+F3 (minor). Location: build.sbt:308-328; claim at be-p6-03-report.md:63 ("This closes unbounded side routes").
+- What is wrong: only `test`, `testOnly`, `testQuick`, `run` and `runMain` refuse. `Defaults.testSettings` also defines `sparkAnalytics/SparkIT/executeTests`, plus `bgRun`, `bgRunMain`, `fgRun`, `fgRunMain` and `console` in SparkIT.
+- Failure input: `sbt sparkAnalytics/SparkIT/executeTests`, run by a human, an IDE or BSP, or an interactive shell. It compiles and runs the integration suites through sbt's test framework with no archive preflight, no 120 s bound, no attempt directory and no zero-test refusal.
+- Mitigation: no active allowlist row can produce this shape (guard SBT slot, guard-dangerous.sh:94, 164-165), so agents cannot reach it. Hence minor.
+- Fix: also override `executeTests`, `bgRun`, `bgRunMain`, `fgRun` and `fgRunMain` in SparkIT to refuse, and correct the claim. sparkIT forks its own JUnitCore and does not use `SparkIT/executeTests`.
+
+F4 (minor). Location: SparkItRuns.scala:53 and 651-657 (the "tests every refusal" claim); report point 8 ("removing that check makes its case fail").
+Refusals that no self-test case covers:
+- the `MaxConfigBytes` size refusal (263-264)
+- a symbolic-link `project/` directory (259)
+- outputRoot "not a directory", where a regular file is placed at `modules/spark/target/spark-it` (394-399)
+- verdict "exit 1 without a 'Tests run' summary" (473-478)
+- the build.sbt wiring of every `refuseSbtRoute` override (311-327).
+
+Failure input: delete any one of these checks, or the `SparkIT / test := ...` line. `verifySparkItGuards` still passes (91 cases), and `sbt test` still exits 0 because Test resolves first.
+Impact: regressions go undetected, and the claim is overstated. Fix: add one case per item. For the route overrides, a meta-build-level check, for example via `Project.extract(state)` on whether the SparkIT test key's task throws, or at minimum a documented limitation.
+
+F5 (minor). Location: SparkItRuns.scala:364-374. layoutProblems checks only the three marker names inside each run directory. It never lists or link-checks the rest of the run directory.
+- Failure input: an archive run directory holding a part file that is a symbolic link, for example into modules/hadoop/target/local-pipeline/er-candidates/heldout/... or gold/**. `rsync -a` preserves symbolic links.
+- Impact: the preflight passes, the integration tests follow the link and read held-out bytes, and any echo of them reaches the sbt task log under target/streams/**/sparkIT, which agents can read. The `_parts.json` checksum check in the tests would fail only after the read.
+- Fix: a bounded NOFOLLOW walk of each run directory that refuses any symbolic link or non-regular, non-directory entry. It needs names and types only, no content.
+
+F6 (minor). Location: SparkItRuns.scala:43 ("earlier attempts are never reused or deleted"); report line 80.
+- What is wrong: `sbt clean check`, which is active for every @SBT-ALL identity, deletes modules/spark/target/ including every `spark-it/attempt-<n>/`. Unlike the held-out hadoop directory (guard rule heldout-run-protected), no guard protects these attempts.
+- Impact: result.txt and run-config.properties, which may be cited as integration evidence, can be destroyed by a routine command. The claim is true only of the sparkIT task itself.
+- Fix: reword the claim ("sparkIT never deletes; `sbt clean` does"). Require that integration evidence be copied into the phase report. A protection rule would be a human decision routed to factory-engineer.
+
+Nit (build-engineer):
+- SparkItRuns.scala:428-432: `used.max + 1` overflows at `attempt-2147483647` and produces `attempt--2147483648`.
+- LocalRuns.namesHeldout (1032) does not match `held.out`, which SegmentChars permits. This is pre-existing and shared.
+
+UNVERIFIED CONCERNS:
+- Partial-run detection (check 5). JUnitCore's `OK (n tests)` uses the JUnit run count, which I believe includes assumption-failed tests. If a munit suite calls `assume(...)`, for example "skip if the archive is absent", or a `.flaky` test fails while `MUNIT_FLAKY_OK` is inherited (it is not stripped; only AWS_, SCHOLARCHAIN_ and GIT_ are), the skipped bodies count toward n and the run reads as PASS. A class whose `munitTests()` is empty contributes 0 while other classes keep n > 0. Classes that sbt's munit fingerprint does not detect (no-arg constructor required, abstract excluded) are silently not passed to JUnitCore.
+  - I could not check the munit 1.1.1 and JUnit 4.13.2 behaviour from here.
+  - Suggested hardening: a small JUnit RunListener main that reports run, ignored and assumption-failure counts per class, with PASS requiring zero assumption failures and a run count above zero for every class.
+  - The inherited @RunWith(MUnitRunner) on munit.Suite is what makes JUnitCore run munit suites at all. I believe this but did not verify it in the jar.
+- The forked JVM sets java.io.tmpdir under the attempt, but Hadoop's `hadoop.tmp.dir` defaults to `/tmp/hadoop-${user.name}`, not java.io.tmpdir. Spark or Hadoop local file-system code could write scratch data outside the attempt directory. Not verified.
+- A test that prints `OK (5 tests)` and then calls `System.exit(0)` would yield a fake PASS, because the verdict takes the last captured summary line. Only adversarial test code could do this, and code review of src/it suites covers it.
+- `testFull` may exist in sbt 1.11.7 as another SparkIT route (see F3). Not verified.
+- The 91-case count and the PASS of verifyHeldoutGuards (23+17) and verifyErDevRunGuards (128) come from the unobserved background run (F1). I did not count the cases by hand.
+```
+
+---
+
+## CR-P6-17: code-reviewer re-review of BE-P6-03 repair 01 (sparkIT) (2026-11-16), verbatim
+
+```text
+STATUS: COMPLETE
+OWNER: code-reviewer
+WORK ORDER: CR-P6-17 (Phase 6). A focused, read-only re-review of BE-P6-03 repair 01 (build-engineer) against CR-P6-16. The work is uncommitted on HEAD e59d753. Files reviewed:
+- /Users/taufeeqpatel/Desktop/ScholarChain/build.sbt
+- /Users/taufeeqpatel/Desktop/ScholarChain/project/SparkItRuns.scala
+- /Users/taufeeqpatel/Desktop/ScholarChain/project/SparkItJUnitRunner.java
+- /Users/taufeeqpatel/Desktop/ScholarChain/project/spark-it.properties
+- /Users/taufeeqpatel/Desktop/ScholarChain/project/LocalRuns.scala (runForked, lines 727-803)
+
+Inputs read: repair-08.md, CR-P6-16 in review-report.md (lines 1429-1543), prompt-be-p6-03-repair-01.md, and the generated marker /Users/taufeeqpatel/Desktop/ScholarChain/.claude/.last-test-run.
+FILES CREATED: none
+FILES MODIFIED: none
+COMMANDS RUN: none. I have no Bash tool and used only Read, Grep and Glob. I read nothing under gold/, target/, the held-out paths, the archive, phase-05/human-gate.md or the saved sbt output under ~/.claude. I ran no Grep under gold/ or target/.
+TEST RESULTS: none observed by me. The marker file agrees with the author's quoted final line: git_head e59d753…, worktree dirty, suites=90, tests_passed=1254, failed 0, errored 0, skipped 0, written_at 2026-11-16T21:44:00Z.
+VALIDATION RESULTS:
+1. F1 is closed. The only `sbt check` evidence now comes from one foreground, audited run, executed last, after every mutation was reverted:
+   - The orchestrator's next Bash call was not refused (no UNATTRIBUTED marker change).
+   - `verify-tests-ran --check` reported OK.
+   - The marker's content matches the reported counts.
+   - The agent observed the run and reported the counts verbatim, which is the CLAUDE.md standard. The orchestrator did not read the full output, but CR-P6-16 F1 did not require that.
+2. F2 is closed.
+   - build.sbt:316 applies `inConfig(SparkIT)(ScalafmtPlugin.scalafmtConfigSettings(SparkIT))`.
+   - checkSteps (build.sbt:533-545) runs `sparkAnalytics/SparkIT/scalafmtCheck` (SparkItRuns.scala:139) before `Test/compile`.
+   - `formatGateProblems` (SparkItRuns.scala:976-1007) checks four things in the loaded build: the setting is in SparkIT's own scope, it depends on SparkIT `unmanagedSources`, the SparkIT source directories contain modules/spark/src/it/scala, and the step order. A checkSteps counter-test is included.
+   - scalafmtCheck reads sources only and does not compile. No src/it file exists yet (Glob shows only src/main/.gitkeep, src/test/.gitkeep and one Test suite). The archive is not touched.
+3. F3 is closed for the 13 keys.
+   - build.sbt:322-334 has one refusal per line. `refuseSbtRoute` and `refusedInput` (SparkItRuns.scala:903-913) throw at execution.
+   - `routeWiringProblems` (937-968) takes the last setting in the exact SparkIT scope from `structure.settings`. It requires a build.sbt source position whose lines contain the refusal call. It also requires every RunCapableKey defined in SparkIT to be refused.
+   - Removing a refusal line falls back to Defaults.scala and is caught (the author observed this; the logic matches). An override in a later line, a `~=` transform, or a setting from project/*.scala is also caught.
+   - `testGrouping`, `definedTests` and `SparkIT/compile` only compute or compile. `tests` depends on `sparkAnalytics % Test` (test->compile), so it never sees SparkIT classes.
+   - The check is not trivially satisfiable by accident. It is satisfiable on purpose (nit N1).
+   - BSP is a remaining route I could not verify (Unverified concerns).
+4. F4 is closed. Each new case fails if its check is removed:
+   - Without the size check, the 70 KB comment-padded file parses, so the refusal case fails.
+   - Without the `project/` link check, NOFOLLOW applies only to the last component, the file reads as regular, and the case fails.
+   - Without the output-root-file check, `createDirectories` throws, the Try reports "EXCEPTION…", the substring is missing, and the case fails.
+   - Without the exit check in "exit 1 without a result file", "ended with exit 1" is missing.
+   - Without route or format wiring, the allowed case or the counter-tests fail.
+   - Without MUNIT_ stripping, the predicate case fails.
+   - Without the runner's MUNIT refusal, the real fork exits 2 with the nonce consumed instead of exit 4 with the nonce present.
+5. F5 is closed. `runTreeProblems` (SparkItRuns.scala:442-489) uses `walkFileTree` with no FOLLOW_LINKS:
+   - Links reach `visitFile` with link attributes and are refused by their own path. Their targets are never resolved or shown.
+   - Entries that are neither regular files nor directories are refused as special files.
+   - The depth bound is maxDepth+1, so entries at depth 5 are visited and flagged. The entry bound terminates the walk. `visitFileFailed` and `postVisitDirectory` errors are reported.
+   - It runs only on run directories that layoutProblems already confirmed are real directories.
+   - All fixtures live under `Files.createTempDirectory`. The held-out-named link target is a string under that temp directory, and the test asserts it is never created. `deleteTree` deletes links, never their targets.
+6. F6 is closed. The wording at SparkItRuns.scala:46-49, 521-533 and 891 says that `sbt clean` removes attempt folders. No "never deleted" claim remains (Grep). The `sbt sparkIT` row is still `inactive:B10-alias-pending` (bash-allowlist.tsv:105). No protection rule was added, which matches the human's direction.
+7. Pass rule: verified, with one unverified munit concern.
+   - Nonce:
+     - 32 SecureRandom bytes, written create-new in runner/ (613-623).
+     - The runner refuses on MUNIT_* (exit 4) before touching the nonce.
+     - It reads and deletes the nonce before `Class.forName` of JUnitCore or any test class (Runner.java:86-118). No JVM option loads classpath code earlier. The nonce is never logged; the fork log line shows only the nonce file path.
+   - Result file and parse:
+     - The runner writes the result file CREATE_NEW after the last class, so a file pre-planted by test code gives exit 3.
+     - `readResult` requires the file to exist, be regular and NOFOLLOW, and be at most 1 MiB.
+     - `parseResult` (667-704) requires the format line, the nonce on the first and last lines, a final LF, class or error lines only, and a matching classes= count.
+   - Verdict (714-754):
+     - exit 0 and nonce consumed;
+     - missing, extra and repeated classes are each refused;
+     - any error line is refused;
+     - per class: run>0, failures 0, ignored 0, assumptionFailures 0.
+   - These cases each produce NOT a pass:
+     - System.exit (no file)
+     - a printed summary (stdout is never parsed; a summary line inside the file is malformed)
+     - a forged nonce
+     - a truncated file or a missing complete= line
+     - MUNIT_* (exit 4, checked by a real fork)
+     - a missing JUnit (exit 2, checked by a real fork)
+   - Runner:
+     - It uses JUnit reflectively and has no nested class (`runnerClassBytes` checks `getDeclaredClasses` and `$1`, plus the class-file magic).
+     - It is compiled and run on the same JDK, because `javaHome` is unset and runForked falls back to sbt's `java.home`. A mismatch would also fail the self-test's fork.
+     - The runner directory goes first on the classpath. The nonce resource there is deleted before any test code loads.
+   - Residual (disclosed by the author, not a defect): deliberately adversarial test code in the same JVM can defeat any in-process rule. Examples are a shutdown hook that rewrites the result file and then calls `Runtime.halt(0)`, or a heap dump. Code review of src/it remains the control.
+8. No regressions found.
+   - LocalRuns.scala: only the earlier `runForked` visibility change; this repair changes nothing there.
+   - checkSteps keeps the earlier order plus the two SparkIT steps. sparkIT is not in check.
+   - sparkAnalytics depends on core only. The Spark and Scala settings (build.sbt:299-309) are unchanged in kind.
+   - The routine self-test does one stat of the archive root.
+   - verifyHeldoutGuards 23+17, verifyErDevRunGuards 128 and erDecisionGroupingDev: reported unchanged. I did not count the cases by hand.
+   - Both carried nits are recorded and still present (SparkItRuns.scala:549; LocalRuns.namesHeldout).
+ASSUMPTIONS:
+- sbt's `structure.settings` order is application order, so the last setting is the effective one for `:=`.
+- In sbt 1.11.7, the SparkIT config id `SparkIT` resolves on the command line.
+- JUnit 4.13.2 `Result.getAssumptionFailureCount` exists. If it does not, the runner records an error line and fails closed.
+RISKS:
+- The runner is unobserved against real munit or JUnit until the first `sbt sparkIT`.
+- Time-of-check to time-of-use between the preflight and the fork. A hard link to other bytes inside a run directory is not detectable by names and types (it needs a deliberate act).
+- Hadoop `hadoop.tmp.dir` may write outside the attempt directory (carried).
+- The socket case is skipped, with only a log line, on systems that cannot create it.
+MANUAL ACTION REQUIRED:
+- Human: review and commit.
+- After the first real run, copy attempt-<n>/junit-result.txt and result.txt into the Phase 6 evidence.
+BLOCKED-ON OWNER: none
+BLOCKED-ON EVIDENCE: none
+NEXT GATE: FE-P6-04. factory-engineer prepares the standalone `sbt sparkIT` activation for human ratification and a session restart. Then spark-engineer adds the first src/it suite, and the first real run's evidence is archived.
+VERDICT: APPROVE
+FINDINGS:
+Owner build-engineer (all nits, none blocking):
+- N1 (nit). Location: /Users/taufeeqpatel/Desktop/ScholarChain/project/SparkItRuns.scala:955-960. The wiring check is a text match on the setting's build.sbt line range. Failure input: `SparkIT / test := (Test / test).value // refuseSbtRoute("test")` passes the check while running tests. Impact: only a deliberate build.sbt edit can defeat it, and code review controls that. Optional fix: also match the setting's source line against the exact `SparkIT / <key> := SparkItRuns.refuse…("<key>")` shape.
+- N2 (nit, carried). Location: SparkItRuns.scala:549. `used.max + 1` overflows at attempt-2147483647.
+- N3 (nit, carried, pre-existing and shared). `LocalRuns.namesHeldout` does not match `held.out`, which SegmentChars permits.
+UNVERIFIED CONCERNS:
+- BSP route. I believe sbt 1.4+ includes `BuildServerProtocol.configSettings` in `Defaults.configSettings`, so `inConfig(SparkIT)(Defaults.testSettings)` would make SparkIT a BSP build target. I also believe BSP `buildTarget/run` (`runMainClassTask`) forks a main class from `fullClasspath` directly, without the `run` or `runMain` keys, so the refusals would not apply. Failure input: an IDE or Metals run request on a main class in src/it. Only a human can do this; agents cannot. Suggested hardening (build-engineer): `SparkIT / bspEnabled := false`, and add `bspEnabled` to the wiring check. Not verified against the sbt 1.11.7 source.
+- munit `.only`. I believe that when one test is marked `.only`, munit silently filters out the other tests in that suite without reporting them as ignored. The class would then show run>0 with ignored=0 and pass with fewer tests. This would be an accidental skip that the human's "no tests skipped" direction is meant to exclude. I could not check whether munit 1.1.1 reports or refuses `.only`, for example under `CI=true`. A possible hardening: set `CI=true` in the child environment if munit then refuses `.only`, or review src/it for `.only`.
+- The special-file case and the runner forks are as the author describes and depend on the OS. I did not observe them.
+```
+
+---
+
+## CR-P6-18: code-reviewer review of FE-P6-04 (inactive sbt sparkIT row) (2026-11-16), summary of the verbatim report
+
+The harness flagged the hand-back as matching an instruction-shaped pattern (settings-json); the report only states that no `settings.json` rule names sparkIT.
+
+- STATUS: COMPLETE. VERDICT: APPROVE. Commands run: none (Read and Grep only; nothing under gold/, target/, the archive or phase-05/human-gate.md).
+- Check 1 (row scope and justification): verified. bash-allowlist.tsv:105 is `spark-engineer`, `inactive:FE-P6-04-ratification-pending`, `allow`, `-`, `sbt sparkIT`; no other row names sparkIT; every justification claim matches build.sbt (98, 471, 533-545) and SparkItRuns.scala (89, 99, 106-107, 110, 223, 238, 327, 381, 442, 526, 714, 854, 1065) and spark-it.properties 15-18.
+- Check 2 (probe verdicts, guard-dangerous.sh): verified for the inactive state (dormant check at 510-515 gives entry-inactive for the four [FE-P6-04 T] probes) and for the active state after edits (a)-(e) (the bare command matches with no decision = ALLOW; trailing-token forms give no-allowlist-entry). Same-in-both-states refusals, the semicolon gate (493), held-out rules first (505) and every other identity verified. settings.json has no rule naming sparkIT and no broad sbt allow; build.sbt:321-334 refuses every SparkIT run-capable route.
+- Check 3: no coverage lost from turning the old B10 probe (probes.tsv:125) into a comment; the payload is re-probed at 742 with the stricter `entry-inactive` substring.
+- Check 4: only bash-allowlist.tsv, probes.tsv and docs/agents.md changed among constitutional files; held-out rules and Phase 5/D21 probes intact.
+- Check 5 / RISKS: provenance `-` and no HEAD check in SparkItRuns.scala, so activating before BE-P6-03 is committed would run uncommitted build code. Test code under src/it is opaque (disclosed).
+- Recommended order: (1) commit BE-P6-03 with the inactive FE-P6-04 change (or BE-P6-03 first); (2) ratify FE-P6-04 and record the BE-P6-03 commit SHA in human-gate.md; (3) in a fresh session route activation edits (a)-(e) to factory-engineer, adding the BE-P6-03 commit hash to the justification (F2), then validator and --probes; (4) human commits the activation alone with a clean build.sbt and project/, then restarts; (5) only then spark-engineer runs `sbt sparkIT`.
+- Findings (factory-engineer): F1 (nit) the justification "writes only modules/spark/target/spark-it/attempt-<n>/" understates the write set (SparkIT compile output, sbt task streams, the spark-it/ root); suggested "task outputs only under … (plus sbt compile output)". F2 (minor) the row cites CR-P6-16/17 with no commit hash, unlike the FE-P6-01 row; add the BE-P6-03 commit SHA at activation.
+- Unverified: the HEAD text of old probes.tsv:125 (no git access); the 728/38 probe PASS (author- and orchestrator-reported).

@@ -129,7 +129,7 @@ The **global floor** applies to every identity, including the orchestrator. It c
 
 ### Bash allowlist (machine-checked)
 
-Default deny. A Bash call runs only if it passes the character gate in `guard-dangerous.sh` and matches an ACTIVE row for the acting identity. This table mirrors `.claude/hooks/bash-allowlist.tsv` row for row (120 rows; source sha256 `19fa3b7fd04a8d332fe4a3b47a8c830ba0c3925ea9293fc0d30b00327a6ac9f9`). Group rows (`@GIT`, `@SBT-ALL`, `@AWS-RO`) are included by identities whose row names the group. `code-reviewer` has no rows. INACTIVE rows never match; each names the decision that activates it. The environment lists (`@env`, `@env-nonprod`) are empty until Phase 12 ratifies them.
+Default deny. A Bash call runs only if it passes the character gate in `guard-dangerous.sh` and matches an ACTIVE row for the acting identity. This table mirrors `.claude/hooks/bash-allowlist.tsv` row for row (120 rows; source sha256 `510c7e498f2c223a233359ddd1fdf2f51f299a0b44fdc5d522c14c6cd31acf4f`). Group rows (`@GIT`, `@SBT-ALL`, `@AWS-RO`) are included by identities whose row names the group. `code-reviewer` has no rows. INACTIVE rows never match; each names the decision that activates it. The environment lists (`@env`, `@env-nonprod`) are empty until Phase 12 ratifies them.
 
 Directives: `@projects` = core hadoop entityResolution sparkAnalytics storage rag services; `@env` = (empty); `@env-nonprod` = (empty).
 
@@ -202,7 +202,7 @@ Directives: `@projects` = core hadoop entityResolution sparkAnalytics storage ra
 | `spark-engineer` | active | allow | - | `@GIT` | matrix row |
 | `spark-engineer` | active | allow | - | `@SBT-ALL` | sbt check |
 | `spark-engineer` | active | allow | - | `sbt <SBT:sparkAnalytics> <SBT:sparkAnalytics>? <SBT:sparkAnalytics>? <SBT:sparkAnalytics>?` | own-module tasks (E2) |
-| `spark-engineer` | inactive:B10-alias-pending | allow | - | `sbt sparkIT` | Phase 6 local Spark integration test |
+| `spark-engineer` | inactive:FE-P6-04-ratification-pending | allow | - | `sbt sparkIT` | Phase 6 opt-in local Spark integration task (amendment FE-P6-04; BE-P6-03, BE-P6-03 repair 01; reviewed CR-P6-16, CR-P6-17 APPROVE): root task, no arguments, over the verified dev archive at <user.home>/<archive.root.home-relative> from project/spark-it.properties holding exactly the three pinned run directories (curated, decisions, assignments); NOFOLLOW layout check and bounded NOFOLLOW tree walk; refuses held-out, gold/, target/streams/ and target/local-runs/heldout segments and any inherited SCHOLARCHAIN_CFG_*; one forked JVM with inherited AWS_*, SCHOLARCHAIN_*, GIT_* and MUNIT_* removed; 120 s bound; writes only modules/spark/target/spark-it/attempt-<n>/ (create-once; removed by sbt clean); never part of check; writes no test marker; PASS only from the runner's nonce-bound per-class result file |
 | `storage-engineer` | active | allow | - | `@GIT` | matrix row |
 | `storage-engineer` | active | allow | - | `@SBT-ALL` | sbt check |
 | `storage-engineer` | active | allow | - | `sbt <SBT:storage> <SBT:storage>? <SBT:storage>? <SBT:storage>?` | own-module tasks (E2) |

@@ -6,9 +6,9 @@
 //   - AWS_*: only the NAMES of inherited variables are used: blanked in forked test and
 //     runMain JVMs (awsIsolationEnv) and removed from the local-run JVMs
 //     (project/LocalRuns.scala). Values are never read.
-//   - SCHOLARCHAIN_CFG_*: only the NAMES are checked, by goldSetEvalDev / goldSetEvalHeldout
-//     and erDecisionGroupingDev, which refuse to run while any is set. Local-run JVMs never
-//     inherit any SCHOLARCHAIN_*.
+//   - SCHOLARCHAIN_CFG_*: only the NAMES are checked, by goldSetEvalDev / goldSetEvalHeldout,
+//     erDecisionGroupingDev and sparkIT, which refuse to run while any is set. Local-run JVMs
+//     and the sparkIT JVM never inherit any SCHOLARCHAIN_*.
 //   - SCHOLARCHAIN_CONFIG_FILES: never read by the build; the two evaluation tasks set it in
 //     their forked JVM to the committed gold/entity-resolution/<split>-v1/er-config.conf, and
 //     erDecisionGroupingDev to the committed modules/entity-resolution/local-runs/er-dev.conf
@@ -18,11 +18,15 @@
 //   - PATH: used only to locate `git` (markTestRun and the local runs).
 //   - GIT_*: only the NAMES are used: project/LocalRuns.scala removes every inherited GIT_*
 //     variable from its git processes (so none can redirect the held-out checks), and
-//     erDecisionGroupingDev also removes them from its forked JVMs. The
+//     erDecisionGroupingDev and sparkIT also remove them from their forked JVMs. The
 //     verifyHeldoutGuards and verifyErDevRunGuards fixtures set GIT_CONFIG_GLOBAL,
 //     GIT_CONFIG_NOSYSTEM and GIT_CEILING_DIRECTORIES in their own git processes on a
 //     temporary repository only.
-// No other variable is read.
+//   - MUNIT_*: only the NAMES are used: sparkIT removes every inherited MUNIT_* (for example
+//     MUNIT_FLAKY_OK) from its forked JVM, and its runner refuses to run while any is present.
+// No other variable is read. (sparkIT and verifySparkItGuards also read the `user.home` JVM
+// system property of sbt, not an environment variable, to resolve the archive root configured
+// in project/spark-it.properties.)
 
 // Build-policy guard (review F1). A strict val: it runs while sbt initializes this file
 // to discover projects, before any subproject *.sbt file is evaluated, and aborts the
@@ -90,6 +94,26 @@ lazy val verifyHeldoutGuards =
   taskKey[Unit](
     "Tests the held-out launch and clean-tree refusals on synthetic signals and a temporary git repo"
   )
+// Opt-in local Spark integration tests (BE-P6-03): no arguments; see project/SparkItRuns.scala.
+lazy val sparkIT =
+  taskKey[Unit](
+    "Bounded, opt-in Spark integration tests (modules/spark/src/it/scala) over the verified dev " +
+      "archive configured in project/spark-it.properties; output under modules/spark/target/spark-it/"
+  )
+lazy val verifySparkItGuards =
+  taskKey[Unit](
+    "Tests the sparkIT refusals, pass rule and SparkIT route/format wiring on constants, " +
+      "temporary directories and the loaded build; never reads the archive"
+  )
+
+// SparkIT: the integration-test configuration of sparkAnalytics. It extends Test (test classes,
+// munit/JUnit and the Provided Spark jars are on its classpath) but has its own source directory
+// modules/spark/src/it/. No routine command compiles or runs it: `Test/compile`, `test` and
+// `sparkAnalytics/test` are Test-scoped, markTestRun reads Test/executeTests only, and the SparkIT
+// routes test, testOnly, testQuick, executeTests, run, runMain, bgRun, bgRunMain, fgRun, fgRunMain,
+// console, consoleQuick and consoleProject refuse. Only `sbt sparkIT` compiles and runs it; `check`
+// only format-checks its sources (sparkAnalytics/SparkIT/scalafmtCheck, which does not compile).
+lazy val SparkIT = config("sparkit").extend(Test)
 
 ThisBuild / versionLedger := Ledger.load((ThisBuild / baseDirectory).value)
 ThisBuild / organization := "scholarchain"
@@ -275,12 +299,39 @@ lazy val hadoop = project
 lazy val sparkAnalytics = project
   .in(file("modules/spark"))
   .dependsOn(core)
+  .configs(SparkIT)
   .settings(commonSettings)
   .settings(jobAssembly("spark-jobs"))
   .settings(
     name := "scholarchain-spark-analytics",
     libraryDependencies += sparkSql.value % Provided,
     Test / javaOptions ++= java17Opens
+  )
+  // BE-P6-03: the opt-in SparkIT configuration (see its definition above). Compiling and running
+  // happen only in sparkIT.
+  .settings(inConfig(SparkIT)(Defaults.testSettings))
+  // CR-P6-16 F2: the sbt-scalafmt 2.5.5 per-configuration settings (signature
+  // `scalafmtConfigSettings(configuration: Configuration)`, as the compiler reports it), so
+  // `sparkAnalytics/SparkIT/scalafmtCheck` checks modules/spark/src/it/scala; `check` runs it.
+  .settings(inConfig(SparkIT)(ScalafmtPlugin.scalafmtConfigSettings(SparkIT)))
+  // CR-P6-16 F3: every SparkIT route that would compile and run the suites outside sparkIT
+  // refuses (SparkItRuns.RefusedRoutes; verifySparkItGuards checks this wiring in the loaded
+  // build). `testFull` is not a key in sbt 1.11.7. One setting per line: the self-test reads it.
+  .settings(
+    SparkIT / sourceDirectory := baseDirectory.value / "src" / "it",
+    SparkIT / test := SparkItRuns.refuseSbtRoute("test"),
+    SparkIT / executeTests := SparkItRuns.refuseSbtRoute("executeTests"),
+    SparkIT / console := SparkItRuns.refuseSbtRoute("console"),
+    SparkIT / consoleQuick := SparkItRuns.refuseSbtRoute("consoleQuick"),
+    SparkIT / consoleProject := SparkItRuns.refuseSbtRoute("consoleProject"),
+    SparkIT / testOnly := SparkItRuns.refusedInput[Unit]("testOnly").evaluated,
+    SparkIT / testQuick := SparkItRuns.refusedInput[Unit]("testQuick").evaluated,
+    SparkIT / run := SparkItRuns.refusedInput[Unit]("run").evaluated,
+    SparkIT / runMain := SparkItRuns.refusedInput[Unit]("runMain").evaluated,
+    SparkIT / fgRun := SparkItRuns.refusedInput[Unit]("fgRun").evaluated,
+    SparkIT / fgRunMain := SparkItRuns.refusedInput[Unit]("fgRunMain").evaluated,
+    SparkIT / bgRun := SparkItRuns.refusedInput[JobHandle]("bgRun").evaluated,
+    SparkIT / bgRunMain := SparkItRuns.refusedInput[JobHandle]("bgRunMain").evaluated
   )
 
 lazy val storage = project
@@ -414,6 +465,43 @@ lazy val root = project
       (ThisBuild / baseDirectory).value,
       streams.value.log
     ),
+    // BE-P6-03: opt-in Spark integration tests. Not part of `check`; writes no marker; uses only
+    // the sparkAnalytics project (core and Spark). A dynamic task, so the configuration and archive
+    // checks run before sbt compiles the SparkIT classpath; they run again before the fork.
+    sparkIT := Def.taskDyn {
+      val buildBase = (ThisBuild / baseDirectory).value
+      val home = sys.props.get("user.home")
+      val inherited = sys.env
+      val targets = target.all(ScopeFilter(inAnyProject)).value
+      val sparkTarget = (sparkAnalytics / target).value
+      SparkItRuns.beforeCompile(buildBase, home, inherited, targets, sparkTarget, streams.value.log)
+      Def.task {
+        SparkItRuns.sparkIT(
+          buildBase,
+          home,
+          inherited,
+          targets,
+          sparkTarget,
+          javaHome.value,
+          (sparkAnalytics / SparkIT / fullClasspath).value.map(_.data),
+          (sparkAnalytics / SparkIT / definedTestNames).value,
+          java17Opens,
+          awsIsolationEnv(target.value / "no-aws"),
+          streams.value.log
+        )
+      }
+    }.value,
+    verifySparkItGuards := SparkItRuns.guardSelfTest(
+      (ThisBuild / baseDirectory).value,
+      sys.props.get("user.home"),
+      (sparkAnalytics / thisProject).value.dependencies.map(_.project.project),
+      checkSteps,
+      java17Opens,
+      Project.extract(state.value).structure,
+      (sparkAnalytics / thisProjectRef).value,
+      javaHome.value,
+      streams.value.log
+    ),
     // Synthetic held-out output-route check (decisions-17/19), run by `check`. The probe's task
     // streams are closed when it completes, before the scan reads every sbt target directory.
     heldoutRouteProbe := LocalRuns.routeProbe(
@@ -441,10 +529,21 @@ lazy val root = project
 // --- Aliases -----------------------------------------------------------------------
 
 addCommandAlias("fmt", "; scalafmtSbt ; scalafmtAll")
-addCommandAlias(
-  "check",
-  "; verifyBuildSources ; verifyVersionLedger ; scalafmtSbtCheck ; scalafmtCheckAll ; Test/compile ; verifyHeldoutOutputRoute ; verifyHeldoutGuards ; verifyErDevRunGuards ; markTestRun"
+// The steps of `check`, in order (verifySparkItGuards reads them: sparkIT is never one of them).
+lazy val checkSteps = Seq(
+  "verifyBuildSources",
+  "verifyVersionLedger",
+  "scalafmtSbtCheck",
+  "scalafmtCheckAll",
+  SparkItRuns.FormatCheckStep, // CR-P6-16 F2: modules/spark/src/it/scala
+  "Test/compile",
+  "verifyHeldoutOutputRoute",
+  "verifyHeldoutGuards",
+  "verifyErDevRunGuards",
+  "verifySparkItGuards",
+  "markTestRun"
 )
+addCommandAlias("check", checkSteps.mkString("; ", " ; ", ""))
 addCommandAlias("packageJobs", "; hadoop/assembly ; sparkAnalytics/assembly")
 addCommandAlias("dockerLocal", "; services/Docker/publishLocal")
 // localPipelineDev/Heldout and goldSetEvalDev/Heldout are root tasks, not aliases: see the

@@ -122,7 +122,7 @@ BLOCK	guard-dangerous.sh	[entry] entry dependency-updater: sbt dependencyUpdates
 ALLOW	guard-dangerous.sh	[entry] entry build-engineer: sbt packageJobs	{"tool_name": "Bash", "tool_input": {"command": "sbt packageJobs"}, "agent_type": "build-engineer"}	
 ASK	guard-dangerous.sh	[entry] entry build-engineer: sbt dockerLocal	{"tool_name": "Bash", "tool_input": {"command": "sbt dockerLocal"}, "agent_type": "build-engineer"}	
 BLOCK	guard-dangerous.sh	[entry] entry storage-engineer: sbt storageIT	{"tool_name": "Bash", "tool_input": {"command": "sbt storageIT"}, "agent_type": "storage-engineer"}	
-BLOCK	guard-dangerous.sh	[entry] entry spark-engineer: sbt sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT"}, "agent_type": "spark-engineer"}	
+# [entry] spark-engineer sbt sparkIT: superseded by the FE-P6-04 section at the end of this file (row now inactive:FE-P6-04-ratification-pending; was inactive:B10-alias-pending)
 ALLOW	guard-dangerous.sh	[entry] entry infra-engineer: aws sts get-caller-identity --profile scholarchain-readonly	{"tool_name": "Bash", "tool_input": {"command": "aws sts get-caller-identity --profile scholarchain-readonly"}, "agent_type": "infra-engineer"}	
 BLOCK	guard-dangerous.sh	[entry] entry infra-engineer: aws sts get-caller-identity	{"tool_name": "Bash", "tool_input": {"command": "aws sts get-caller-identity"}, "agent_type": "infra-engineer"}	
 BLOCK	guard-dangerous.sh	[entry] entry infra-engineer: aws sts get-caller-identity --profile default	{"tool_name": "Bash", "tool_input": {"command": "aws sts get-caller-identity --profile default"}, "agent_type": "infra-engineer"}	
@@ -729,3 +729,49 @@ BLOCK	guard-dangerous.sh	[FE-P6-01] documentation-engineer sbt erDecisionGroupin
 BLOCK	guard-dangerous.sh	[FE-P6-01] incident-responder sbt erDecisionGroupingDev	{"tool_name": "Bash", "tool_input": {"command": "sbt erDecisionGroupingDev"}, "agent_type": "incident-responder"}	no-allowlist-entry
 BLOCK	guard-dangerous.sh	[FE-P6-01] dependency-updater sbt erDecisionGroupingDev	{"tool_name": "Bash", "tool_input": {"command": "sbt erDecisionGroupingDev"}, "agent_type": "dependency-updater"}	no-allowlist-entry
 BLOCK	guard-dangerous.sh	[FE-P6-01] ORCHESTRATOR sbt erDecisionGroupingDev	{"tool_name": "Bash", "tool_input": {"command": "sbt erDecisionGroupingDev"}}	no-allowlist-entry
+# FE-P6-04 (Phase 6): sbt sparkIT, spark-engineer only, row INACTIVE (inactive:FE-P6-04-ratification-pending), mode allow.
+# The row stays inactive until the human ratifies FE-P6-04 and a later work order flips STATUS to active (then session restart).
+# Drafted by reading guard-dangerous.sh (dormant check: an inactive row whose spec starts with two literals refuses any command
+# with those two leading tokens as entry-inactive); observed by factory-engineer's --probes run on the inactive row.
+# Transition (to apply in the same change as the STATUS field): rows tagged [FE-P6-04 T] describe the INACTIVE state. On
+# activation the owner row becomes ALLOW (empty substring) and the three trailing-token rows keep BLOCK with entry-inactive
+# replaced by no-allowlist-entry (the one-row spec needs exactly two tokens). Every other FE-P6-04 row gives the same verdict
+# and rule in both states (other identities have no row; the other shapes never share the row's two leading tokens; SBT:<project>
+# admits only compile, Test/compile, test, scalafmt, Test/scalafmt and scalafmtCheck).
+# --- FE-P6-04 owner row and trailing tokens (state-dependent; inactive state)
+BLOCK	guard-dangerous.sh	[FE-P6-04 T] spark-engineer sbt sparkIT (inactive: entry-inactive; ALLOW after activation)	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT"}, "agent_type": "spark-engineer"}	entry-inactive
+BLOCK	guard-dangerous.sh	[FE-P6-04 T] spark-engineer sbt sparkIT check (inactive: entry-inactive; no-allowlist-entry after activation)	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT check"}, "agent_type": "spark-engineer"}	entry-inactive
+BLOCK	guard-dangerous.sh	[FE-P6-04 T] spark-engineer sbt sparkIT twice (inactive: entry-inactive; no-allowlist-entry after activation)	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT sparkIT"}, "agent_type": "spark-engineer"}	entry-inactive
+BLOCK	guard-dangerous.sh	[FE-P6-04 T] spark-engineer trailing -D property (inactive: entry-inactive; no-allowlist-entry after activation)	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT -Dscholarchain.sparkit.archiveRoot=x"}, "agent_type": "spark-engineer"}	entry-inactive
+# --- FE-P6-04 spark-engineer refused shapes (same verdict in both states)
+BLOCK	guard-dangerous.sh	[FE-P6-04] spark-engineer sbt clean sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt clean sparkIT"}, "agent_type": "spark-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04] spark-engineer sbt check sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt check sparkIT"}, "agent_type": "spark-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04] spark-engineer project-scoped sparkAnalytics/sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkAnalytics/sparkIT"}, "agent_type": "spark-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04] spark-engineer sparkAnalytics/SparkIT/test	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkAnalytics/SparkIT/test"}, "agent_type": "spark-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04] spark-engineer sparkAnalytics/SparkIT/executeTests	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkAnalytics/SparkIT/executeTests"}, "agent_type": "spark-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04] spark-engineer case sbt SPARKIT	{"tool_name": "Bash", "tool_input": {"command": "sbt SPARKIT"}, "agent_type": "spark-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04] spark-engineer absolute sbt path	{"tool_name": "Bash", "tool_input": {"command": "/usr/local/bin/sbt sparkIT"}, "agent_type": "spark-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04] spark-engineer semicolon chaining	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT; sbt check"}, "agent_type": "spark-engineer"}	shell-syntax-gate
+# --- FE-P6-04 held-out rules fire before allowlist matching (same verdict in both states)
+BLOCK	guard-dangerous.sh	[FE-P6-04] spark-engineer sbt sparkIT goldSetEvalHeldout	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT goldSetEvalHeldout"}, "agent_type": "spark-engineer"}	heldout-eval-human-only
+BLOCK	guard-dangerous.sh	[FE-P6-04] spark-engineer sbt sparkIT localPipelineHeldout	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT localPipelineHeldout"}, "agent_type": "spark-engineer"}	heldout-pipeline-human-only
+BLOCK	guard-dangerous.sh	[FE-P6-04] spark-engineer sbt localPipelineHeldout sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt localPipelineHeldout sparkIT"}, "agent_type": "spark-engineer"}	heldout-pipeline-human-only
+# --- FE-P6-04 every other identity, sbt sparkIT (same verdict in both states)
+BLOCK	guard-dangerous.sh	[FE-P6-04] factory-engineer sbt sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT"}, "agent_type": "factory-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04] build-engineer sbt sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT"}, "agent_type": "build-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04] domain-engineer sbt sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT"}, "agent_type": "domain-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04] dataset-engineer sbt sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT"}, "agent_type": "dataset-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04] hadoop-engineer sbt sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT"}, "agent_type": "hadoop-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04] entity-resolution-engineer sbt sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT"}, "agent_type": "entity-resolution-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04] storage-engineer sbt sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT"}, "agent_type": "storage-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04] rag-engineer sbt sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT"}, "agent_type": "rag-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04] service-engineer sbt sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT"}, "agent_type": "service-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04] test-engineer sbt sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT"}, "agent_type": "test-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04] code-reviewer sbt sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT"}, "agent_type": "code-reviewer"}	reviewer-read-only
+BLOCK	guard-dangerous.sh	[FE-P6-04] infra-engineer sbt sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT"}, "agent_type": "infra-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04] deploy-engineer sbt sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT"}, "agent_type": "deploy-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04] experiment-engineer sbt sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT"}, "agent_type": "experiment-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04] documentation-engineer sbt sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT"}, "agent_type": "documentation-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04] incident-responder sbt sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT"}, "agent_type": "incident-responder"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04] dependency-updater sbt sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT"}, "agent_type": "dependency-updater"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04] ORCHESTRATOR sbt sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT"}}	no-allowlist-entry
