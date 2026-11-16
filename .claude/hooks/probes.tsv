@@ -729,20 +729,32 @@ BLOCK	guard-dangerous.sh	[FE-P6-01] documentation-engineer sbt erDecisionGroupin
 BLOCK	guard-dangerous.sh	[FE-P6-01] incident-responder sbt erDecisionGroupingDev	{"tool_name": "Bash", "tool_input": {"command": "sbt erDecisionGroupingDev"}, "agent_type": "incident-responder"}	no-allowlist-entry
 BLOCK	guard-dangerous.sh	[FE-P6-01] dependency-updater sbt erDecisionGroupingDev	{"tool_name": "Bash", "tool_input": {"command": "sbt erDecisionGroupingDev"}, "agent_type": "dependency-updater"}	no-allowlist-entry
 BLOCK	guard-dangerous.sh	[FE-P6-01] ORCHESTRATOR sbt erDecisionGroupingDev	{"tool_name": "Bash", "tool_input": {"command": "sbt erDecisionGroupingDev"}}	no-allowlist-entry
-# FE-P6-04 (Phase 6): sbt sparkIT, spark-engineer only, row INACTIVE (inactive:FE-P6-04-ratification-pending), mode allow.
-# The row stays inactive until the human ratifies FE-P6-04 and a later work order flips STATUS to active (then session restart).
-# Drafted by reading guard-dangerous.sh (dormant check: an inactive row whose spec starts with two literals refuses any command
-# with those two leading tokens as entry-inactive); observed by factory-engineer's --probes run on the inactive row.
-# Transition (to apply in the same change as the STATUS field): rows tagged [FE-P6-04 T] describe the INACTIVE state. On
-# activation the owner row becomes ALLOW (empty substring) and the three trailing-token rows keep BLOCK with entry-inactive
-# replaced by no-allowlist-entry (the one-row spec needs exactly two tokens). Every other FE-P6-04 row gives the same verdict
-# and rule in both states (other identities have no row; the other shapes never share the row's two leading tokens; SBT:<project>
-# admits only compile, Test/compile, test, scalafmt, Test/scalafmt and scalafmtCheck).
-# --- FE-P6-04 owner row and trailing tokens (state-dependent; inactive state)
-BLOCK	guard-dangerous.sh	[FE-P6-04 T] spark-engineer sbt sparkIT (inactive: entry-inactive; ALLOW after activation)	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT"}, "agent_type": "spark-engineer"}	entry-inactive
-BLOCK	guard-dangerous.sh	[FE-P6-04 T] spark-engineer sbt sparkIT check (inactive: entry-inactive; no-allowlist-entry after activation)	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT check"}, "agent_type": "spark-engineer"}	entry-inactive
-BLOCK	guard-dangerous.sh	[FE-P6-04 T] spark-engineer sbt sparkIT twice (inactive: entry-inactive; no-allowlist-entry after activation)	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT sparkIT"}, "agent_type": "spark-engineer"}	entry-inactive
-BLOCK	guard-dangerous.sh	[FE-P6-04 T] spark-engineer trailing -D property (inactive: entry-inactive; no-allowlist-entry after activation)	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT -Dscholarchain.sparkit.archiveRoot=x"}, "agent_type": "spark-engineer"}	entry-inactive
+# FE-P6-04 (Phase 6): sbt sparkIT, spark-engineer only, row ACTIVE, mode allow (activation FE-P6-05; build committed in
+# e8c6ecc; effective only after human ratification and a session restart). The guard emits no decision for the bare command;
+# settings.json has no rule naming it, so Claude Code's normal permission flow decides.
+# Drafted by reading guard-dangerous.sh; observed by factory-engineer's --probes runs on the inactive row (FE-P6-04) and the active row (FE-P6-05).
+# Transition (applied in FE-P6-05, in the same change as the STATUS field): rows tagged [FE-P6-04 T] now describe the ACTIVE
+# state. The owner row changed from BLOCK entry-inactive to ALLOW (empty substring); the three trailing-token rows keep BLOCK,
+# with entry-inactive replaced by no-allowlist-entry (the one-row spec needs exactly two tokens, and the dormant check considers
+# inactive rows only). Every other FE-P6-04 row gives the same verdict and rule in both states (other identities have no row;
+# the other shapes never share the row's two leading tokens; SBT:<project> admits only compile, Test/compile, test, scalafmt,
+# Test/scalafmt and scalafmtCheck). Rows tagged [FE-P6-05] were added at activation.
+# --- FE-P6-04 owner row and trailing tokens (state-dependent; active state)
+ALLOW	guard-dangerous.sh	[FE-P6-04 T] spark-engineer sbt sparkIT (active, allow; was BLOCK entry-inactive)	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT"}, "agent_type": "spark-engineer"}
+BLOCK	guard-dangerous.sh	[FE-P6-04 T] spark-engineer sbt sparkIT check (active: extra token, no-allowlist-entry; was entry-inactive)	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT check"}, "agent_type": "spark-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04 T] spark-engineer sbt sparkIT twice (active: extra token, no-allowlist-entry; was entry-inactive)	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT sparkIT"}, "agent_type": "spark-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-04 T] spark-engineer trailing -D property (active: extra token, no-allowlist-entry; was entry-inactive)	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT -Dscholarchain.sparkit.archiveRoot=x"}, "agent_type": "spark-engineer"}	no-allowlist-entry
+# --- FE-P6-05 further spark-engineer refused shapes in the active state (extra tokens, combined tasks, variants)
+BLOCK	guard-dangerous.sh	[FE-P6-05] spark-engineer sbt sparkIT test	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT test"}, "agent_type": "spark-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-05] spark-engineer sbt sparkIT sparkAnalytics/test	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT sparkAnalytics/test"}, "agent_type": "spark-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-05] spark-engineer sbt sparkAnalytics/compile sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkAnalytics/compile sparkIT"}, "agent_type": "spark-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-05] spark-engineer sbt Test/compile sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt Test/compile sparkIT"}, "agent_type": "spark-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-05] spark-engineer leading -D property	{"tool_name": "Bash", "tool_input": {"command": "sbt -Dscholarchain.sparkit.archiveRoot=x sparkIT"}, "agent_type": "spark-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-05] spark-engineer lower-case sbt sparkit	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkit"}, "agent_type": "spark-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-05] spark-engineer sbt sparkAnalytics/SparkIT/compile	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkAnalytics/SparkIT/compile"}, "agent_type": "spark-engineer"}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-05] spark-engineer sbt sparkIT goldsetevalheldout (held-out rule, any case)	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT goldsetevalheldout"}, "agent_type": "spark-engineer"}	heldout-eval-human-only
+BLOCK	guard-dangerous.sh	[FE-P6-05] ORCHESTRATOR sbt sparkIT check	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT check"}}	no-allowlist-entry
+BLOCK	guard-dangerous.sh	[FE-P6-05] build-engineer sbt sparkIT check	{"tool_name": "Bash", "tool_input": {"command": "sbt sparkIT check"}, "agent_type": "build-engineer"}	no-allowlist-entry
 # --- FE-P6-04 spark-engineer refused shapes (same verdict in both states)
 BLOCK	guard-dangerous.sh	[FE-P6-04] spark-engineer sbt clean sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt clean sparkIT"}, "agent_type": "spark-engineer"}	no-allowlist-entry
 BLOCK	guard-dangerous.sh	[FE-P6-04] spark-engineer sbt check sparkIT	{"tool_name": "Bash", "tool_input": {"command": "sbt check sparkIT"}, "agent_type": "spark-engineer"}	no-allowlist-entry
