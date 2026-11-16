@@ -6,17 +6,22 @@
 //   - AWS_*: only the NAMES of inherited variables are used: blanked in forked test and
 //     runMain JVMs (awsIsolationEnv) and removed from the local-run JVMs
 //     (project/LocalRuns.scala). Values are never read.
-//   - SCHOLARCHAIN_CFG_*: only the NAMES are checked, by goldSetEvalDev / goldSetEvalHeldout,
-//     which refuse to run while any is set. Local-run JVMs never inherit any SCHOLARCHAIN_*.
+//   - SCHOLARCHAIN_CFG_*: only the NAMES are checked, by goldSetEvalDev / goldSetEvalHeldout
+//     and erDecisionGroupingDev, which refuse to run while any is set. Local-run JVMs never
+//     inherit any SCHOLARCHAIN_*.
 //   - SCHOLARCHAIN_CONFIG_FILES: never read by the build; the two evaluation tasks set it in
-//     their forked JVM to the committed gold/entity-resolution/<split>-v1/er-config.conf.
+//     their forked JVM to the committed gold/entity-resolution/<split>-v1/er-config.conf, and
+//     erDecisionGroupingDev to the committed modules/entity-resolution/local-runs/er-dev.conf
+//     followed by its generated target/local-runs/dev/er-run-roots.conf.
 //   - SCHOLARCHAIN_ROUTE_PROBE_MARKER: never read by the build; set by heldoutRouteProbe in
 //     its synthetic child JVM only (random marker, see verifyHeldoutOutputRoute).
 //   - PATH: used only to locate `git` (markTestRun and the local runs).
 //   - GIT_*: only the NAMES are used: project/LocalRuns.scala removes every inherited GIT_*
-//     variable from its git processes (so none can redirect the held-out checks). Its
-//     verifyHeldoutGuards fixture sets GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM and
-//     GIT_CEILING_DIRECTORIES in its own git processes on a temporary repository only.
+//     variable from its git processes (so none can redirect the held-out checks), and
+//     erDecisionGroupingDev also removes them from its forked JVMs. The
+//     verifyHeldoutGuards and verifyErDevRunGuards fixtures set GIT_CONFIG_GLOBAL,
+//     GIT_CONFIG_NOSYSTEM and GIT_CEILING_DIRECTORIES in their own git processes on a
+//     temporary repository only.
 // No other variable is read.
 
 // Build-policy guard (review F1). A strict val: it runs while sbt initializes this file
@@ -58,6 +63,18 @@ lazy val goldSetEvalHeldout =
     "Gold-set evaluation, held-out split (gold/entity-resolution/heldout-v1/); human Terminal " +
       "only, as plain batch sbt: refuses under sbt --client/sbtn, an sbt server or shell, " +
       "BSP/IDE, or redirected stdout/stderr, and on a D3(b)-unclean tree"
+  )
+// Dev decision and grouping run (BE-P6-01): no arguments, dev split only; see LocalRuns.
+lazy val erDecisionGroupingDev =
+  taskKey[Unit](
+    "Bounded dev-only ER decision run then grouping run (DecisionRunMain, GroupingRunMain) on the " +
+      "complete localPipelineDev attempt, into target/local-runs/dev/er-{decisions,assignments}/"
+  )
+lazy val verifyErDevRunGuards =
+  taskKey[Unit](
+    "Tests the fixed arguments, paths, held-out refusals, curated-run selection, code-scope " +
+      "check, preflight refusals and stage states of erDecisionGroupingDev on constants, " +
+      "temporary directories and a temporary git repository"
   )
 // Synthetic held-out output-route check (decisions-17/19), part of `check`. No key name may
 // contain the held-out evaluation task's name (guard rule heldout-eval-human-only).
@@ -375,6 +392,28 @@ lazy val root = project
     goldSetEval := LocalRuns.chooseSplit("goldSetEval"),
     goldSetEvalDev := goldSetEvalRun(LocalRuns.Dev).value,
     goldSetEvalHeldout := goldSetEvalRun(LocalRuns.Heldout).value,
+    // BE-P6-01: dev decision run, then dev grouping run. Not part of `check`; writes no marker.
+    // BE-P6-02: a dynamic task, so the source and code-scope checks run before sbt compiles the
+    // entityResolution classpath; the preflight repeats them after compiling, before any fork.
+    erDecisionGroupingDev := Def.taskDyn {
+      val buildBase = (ThisBuild / baseDirectory).value
+      val inherited = sys.env
+      LocalRuns.erDevBeforeCompile(buildBase, inherited, streams.value.log)
+      Def.task {
+        LocalRuns.erDecisionGroupingDev(
+          buildBase,
+          javaHome.value,
+          (entityResolution / Compile / fullClasspath).value.map(_.data),
+          awsIsolationEnv(target.value / "no-aws"),
+          inherited,
+          streams.value.log
+        )
+      }
+    }.value,
+    verifyErDevRunGuards := LocalRuns.erDevGuardSelfTest(
+      (ThisBuild / baseDirectory).value,
+      streams.value.log
+    ),
     // Synthetic held-out output-route check (decisions-17/19), run by `check`. The probe's task
     // streams are closed when it completes, before the scan reads every sbt target directory.
     heldoutRouteProbe := LocalRuns.routeProbe(
@@ -404,7 +443,7 @@ lazy val root = project
 addCommandAlias("fmt", "; scalafmtSbt ; scalafmtAll")
 addCommandAlias(
   "check",
-  "; verifyBuildSources ; verifyVersionLedger ; scalafmtSbtCheck ; scalafmtCheckAll ; Test/compile ; verifyHeldoutOutputRoute ; verifyHeldoutGuards ; markTestRun"
+  "; verifyBuildSources ; verifyVersionLedger ; scalafmtSbtCheck ; scalafmtCheckAll ; Test/compile ; verifyHeldoutOutputRoute ; verifyHeldoutGuards ; verifyErDevRunGuards ; markTestRun"
 )
 addCommandAlias("packageJobs", "; hadoop/assembly ; sparkAnalytics/assembly")
 addCommandAlias("dockerLocal", "; services/Docker/publishLocal")

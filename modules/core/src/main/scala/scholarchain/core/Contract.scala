@@ -26,6 +26,11 @@ import upickle.default.ReadWriter
  *     one pair); requires canonical pair order and researcher or work endpoints. v1 is rejected: no
  *     v1 decision was ever accepted into a curated output. The decision ID formula
  *     ([[MatchDecisionId]], hash tag `scholarchain.match-decision.v1`) is unchanged.
+ *   - Phase 6 (DE-P6-01), new records: `researcher-assignment.v1` (C1), `work-assignment.v1` (C2),
+ *     `authorship-record.v2` (C3) and `part-manifest.v1` (C5). `authorship-record.v2` is its own
+ *     record type (`AuthorshipRecordV2`); `authorship-record.v1` is NOT retired: its contract,
+ *     codec and frozen example are unchanged and it still decodes, and [[AuthorshipRecords.decode]]
+ *     reads either version. Grouping-based writers write v2 only.
  */
 object SchemaVersions {
   val WorkRecord = "scholarchain.work-record.v3"
@@ -52,6 +57,10 @@ object SchemaVersions {
   val CandidateBlock = "scholarchain.candidate-block.v1"
   val IdentityLink = "scholarchain.identity-link.v1"
   val SourceAuthorProfile = "scholarchain.source-author-profile.v1"
+  val ResearcherAssignment = "scholarchain.researcher-assignment.v1"
+  val WorkAssignment = "scholarchain.work-assignment.v1"
+  val AuthorshipRecordV2 = "scholarchain.authorship-record.v2"
+  val PartManifest = "scholarchain.part-manifest.v1"
 
   /** Superseded versions that no decoder accepts (kept to make the rejection explicit). */
   val retired: Map[String, Vector[String]] = Map(
@@ -85,7 +94,11 @@ object SchemaVersions {
     "MatchCandidate" -> MatchCandidate,
     "CandidateBlock" -> CandidateBlock,
     "IdentityLink" -> IdentityLink,
-    "SourceAuthorProfile" -> SourceAuthorProfile
+    "SourceAuthorProfile" -> SourceAuthorProfile,
+    "ResearcherAssignment" -> ResearcherAssignment,
+    "WorkAssignment" -> WorkAssignment,
+    "AuthorshipRecordV2" -> AuthorshipRecordV2,
+    "PartManifest" -> PartManifest
   )
 }
 

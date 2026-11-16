@@ -741,6 +741,299 @@ class ConfigLoaderSuite extends munit.FunSuite {
     } finally { Files.deleteIfExists(f); Files.deleteIfExists(g) }
   }
 
+  /**
+   * The exact digest input of the base configuration, frozen before the Phase 6 optional keys were
+   * added (DE-P6-01). A configuration that sets none of the optional keys must keep this JSON and
+   * therefore its digest, so existing run manifests keep their configDigest.
+   */
+  val baseDigestInput: String =
+    """{"configSchemaVersion":"scholarchain.config.v2","environment":"test","aws":{"region":"us-east-1","accountId":"000000000000"},"storage":{"rawBucket":"example-raw-bucket","curatedBucket":"example-curated-bucket","contextBucket":"example-context-bucket","vectorBucket":"example-vector-bucket","vectorIndex":"example-index","dynamoTablePrefix":"example-","neptuneEndpoint":"neptune.example.invalid","openSearchEndpoint":null},"models":{"llmModelId":"example-llm","embeddingModelId":"example-embedding","embeddingDimension":8},"graph":{"windows":[{"startYear":2000,"endYear":2005},{"startYear":2006,"endYear":2010}],"policyVersion":"graph-policy-1.0.0","identityVersion":"v1"},"bridge":{"algorithm":"betweenness-sampled","sampleSize":64,"randomSeed":7,"maxIterations":10},"community":{"algorithm":"label-propagation","maxIterations":20},"entityResolution":{"policyVersion":"er-policy-1.0.0","acceptThreshold":0.9,"rejectThreshold":0.2,"llmBandLower":0.4,"llmBandUpper":0.7,"promptVersion":"er-adjudication-prompt.v1"},"runtime":{"maxPathHops":4,"retrievalTopK":10,"defaultWindow":{"startYear":2015,"endYear":2024}}}"""
+
+  test("an existing config keeps its exact digest input and digest (frozen)") {
+    val c = loadOk(filesEnv, files("base.conf" -> base))
+    assertEquals(upickle.default.write(c), baseDigestInput)
+    assertEquals(
+      ScholarChainConfig.digest(c),
+      scholarchain.core.Canonical.sha256HexUtf8(baseDigestInput)
+    )
+  }
+
+  // ---------------------------------------------------------------- Phase 6 optional keys (C4)
+
+  private val groupingLines =
+    """entityResolution.groupingPolicyVersion = "er-grouping.v1"
+      |entityResolution.decisionRunRoot = "s3://example-curated-bucket/er/decisions"
+      |entityResolution.assignmentRunRoot = "/var/tmp/scholarchain/er/assignments"
+      |""".stripMargin
+
+  test("C4: existing configs load unchanged; the optional keys are unset and keep the digest") {
+    for (text <- Vector(base, jsonBase, dottedBase)) {
+      val c = loadOk(filesEnv, files("base.conf" -> text))
+      assertEquals(c.entityResolution.groupingPolicyVersion, None)
+      assertEquals(c.entityResolution.decisionRunRoot, None)
+      assertEquals(c.entityResolution.assignmentRunRoot, None)
+      assertEquals(upickle.default.write(c), baseDigestInput)
+    }
+    // Explicit nulls are the same as unset.
+    val nulls =
+      base + "entityResolution.groupingPolicyVersion = null\nentityResolution.decisionRunRoot = null\n"
+    assertEquals(
+      ScholarChainConfig.digest(loadOk(filesEnv, files("base.conf" -> nulls))),
+      scholarchain.core.Canonical.sha256HexUtf8(baseDigestInput)
+    )
+  }
+
+  test("C4: the optional keys load from files and from the environment, and change the digest") {
+    val c = loadOk(filesEnv, files("base.conf" -> (base + groupingLines)))
+    assertEquals(c.entityResolution.groupingPolicyVersion, Some("er-grouping.v1"))
+    assertEquals(
+      c.entityResolution.decisionRunRoot,
+      Some("s3://example-curated-bucket/er/decisions")
+    )
+    assertEquals(c.entityResolution.assignmentRunRoot, Some("/var/tmp/scholarchain/er/assignments"))
+    assertNotEquals(
+      ScholarChainConfig.digest(c),
+      scholarchain.core.Canonical.sha256HexUtf8(baseDigestInput)
+    )
+    assertEquals(
+      ConfigKeys.envNameOf(EntityResolutionConfig.GroupingPolicyVersionKey),
+      "SCHOLARCHAIN_CFG_ENTITY_RESOLUTION__GROUPING_POLICY_VERSION"
+    )
+    assertEquals(
+      ConfigKeys.envNameOf(EntityResolutionConfig.DecisionRunRootKey),
+      "SCHOLARCHAIN_CFG_ENTITY_RESOLUTION__DECISION_RUN_ROOT"
+    )
+    assertEquals(
+      ConfigKeys.envNameOf(EntityResolutionConfig.AssignmentRunRootKey),
+      "SCHOLARCHAIN_CFG_ENTITY_RESOLUTION__ASSIGNMENT_RUN_ROOT"
+    )
+    val viaEnv = loadOk(
+      filesEnv ++ Map(
+        "SCHOLARCHAIN_CFG_ENTITY_RESOLUTION__GROUPING_POLICY_VERSION" -> "er-grouping.v2",
+        "SCHOLARCHAIN_CFG_ENTITY_RESOLUTION__DECISION_RUN_ROOT" -> "s3://example-curated-bucket/d"
+      ),
+      files("base.conf" -> (base + groupingLines))
+    )
+    assertEquals(viaEnv.entityResolution.groupingPolicyVersion, Some("er-grouping.v2"))
+    assertEquals(viaEnv.entityResolution.decisionRunRoot, Some("s3://example-curated-bucket/d"))
+    // An empty environment value unsets an optional key.
+    val unset = loadOk(
+      filesEnv + ("SCHOLARCHAIN_CFG_ENTITY_RESOLUTION__GROUPING_POLICY_VERSION" -> ""),
+      files("base.conf" -> (base + groupingLines))
+    )
+    assertEquals(unset.entityResolution.groupingPolicyVersion, None)
+  }
+
+  test("F4: grouping-scope keys never change the digest of a non-grouping stage") {
+    val baseDigest = scholarchain.core.Canonical.sha256HexUtf8(baseDigestInput)
+    val plain = loadOk(filesEnv, files("base.conf" -> base))
+    val grouped = loadOk(filesEnv, files("base.conf" -> (base + groupingLines)))
+    // The frozen base digest is unchanged, and equals the non-grouping digest without the keys.
+    assertEquals(ScholarChainConfig.digest(plain), baseDigest)
+    assertEquals(ScholarChainConfig.digestWithoutGrouping(plain), baseDigest)
+    // Adding, changing or moving grouping keys keeps the decision-stage digest.
+    assertNotEquals(ScholarChainConfig.digest(grouped), baseDigest)
+    assertEquals(ScholarChainConfig.digestWithoutGrouping(grouped), baseDigest)
+    val moved = grouped.copy(entityResolution =
+      grouped.entityResolution.copy(
+        groupingPolicyVersion = Some("er-grouping.v2"),
+        assignmentRunRoot = Some("/var/tmp/elsewhere")
+      )
+    )
+    assertEquals(ScholarChainConfig.digestWithoutGrouping(moved), baseDigest)
+    // Every other value still changes it.
+    assertNotEquals(
+      ScholarChainConfig.digestWithoutGrouping(
+        grouped.copy(entityResolution = grouped.entityResolution.copy(acceptThreshold = 0.95))
+      ),
+      baseDigest
+    )
+    assertEquals(
+      ScholarChainConfig.GroupingScopeKeys,
+      Vector(
+        "entityResolution.groupingPolicyVersion",
+        "entityResolution.decisionRunRoot",
+        "entityResolution.assignmentRunRoot"
+      )
+    )
+    assertEquals(ScholarChainConfig.withoutGrouping(grouped), plain)
+  }
+
+  test("F4: the grouping run has its own config digest (frozen input)") {
+    val baseDigest = scholarchain.core.Canonical.sha256HexUtf8(baseDigestInput)
+    val grouped = loadOk(filesEnv, files("base.conf" -> (base + groupingLines)))
+    val frozenInput =
+      s"""{"schema":"scholarchain.grouping-config-digest.v1","baseConfigDigest":"$baseDigest","groupingPolicyVersion":"er-grouping.v1"}"""
+    assertEquals(
+      GroupingRunSettings.configDigest(grouped),
+      Right(scholarchain.core.Canonical.sha256HexUtf8(frozenInput))
+    )
+    // The grouping policy version changes it; the run roots (locations) do not.
+    val v2 = grouped.copy(entityResolution =
+      grouped.entityResolution.copy(groupingPolicyVersion = Some("er-grouping.v2"))
+    )
+    assertNotEquals(GroupingRunSettings.configDigest(v2), GroupingRunSettings.configDigest(grouped))
+    val moved = grouped.copy(entityResolution =
+      grouped.entityResolution.copy(assignmentRunRoot = Some("/var/tmp/elsewhere"))
+    )
+    assertEquals(GroupingRunSettings.configDigest(moved), GroupingRunSettings.configDigest(grouped))
+    // Upstream values change it; a configuration without the grouping keys is refused.
+    val other = grouped.copy(environment = "other")
+    assertNotEquals(
+      GroupingRunSettings.configDigest(other),
+      GroupingRunSettings.configDigest(grouped)
+    )
+    assert(
+      GroupingRunSettings.configDigest(loadOk(filesEnv, files("base.conf" -> base))).isLeft
+    )
+  }
+
+  test("C4: set values are validated: token, separate from the match policy, run locations") {
+    def withLine(line: String) = loadBase(base + line + "\n")
+    assertEquals(
+      invalidKeys(withLine("entityResolution.groupingPolicyVersion = \"has space\"")),
+      Set(EntityResolutionConfig.GroupingPolicyVersionKey)
+    )
+    assertEquals(
+      invalidKeys(withLine("entityResolution.groupingPolicyVersion = \"er-policy-1.0.0\"")),
+      Set(EntityResolutionConfig.GroupingPolicyVersionKey),
+      "the grouping policy is versioned separately from the match policy"
+    )
+    assertEquals(
+      invalidKeys(withLine("entityResolution.groupingPolicyVersion = 3")),
+      Set(EntityResolutionConfig.GroupingPolicyVersionKey)
+    )
+    for (
+      bad <- Vector(
+        "relative/path",
+        "s3://Bad_Bucket/x",
+        "s3://example-curated-bucket/a/",
+        "s3://example-curated-bucket//a",
+        "/tmp/../etc",
+        "/tmp/./x",
+        "/",
+        "/tmp/with space",
+        "https://example.invalid/x",
+        "C:\\\\runs"
+      )
+    )
+      assertEquals(
+        invalidKeys(withLine(s"entityResolution.decisionRunRoot = \"$bad\"")),
+        Set(EntityResolutionConfig.DecisionRunRootKey),
+        bad
+      )
+    for (
+      good <- Vector("s3://example-curated-bucket", "s3://example-curated-bucket/er/d", "/tmp/er")
+    )
+      assert(withLine(s"entityResolution.decisionRunRoot = \"$good\"").isRight, good)
+    assertEquals(
+      invalidKeys(
+        ConfigLoader.load(
+          filesEnv + ("SCHOLARCHAIN_CFG_ENTITY_RESOLUTION__ASSIGNMENT_RUN_ROOT" -> "rel"),
+          files("base.conf" -> base)
+        )
+      ),
+      Set(EntityResolutionConfig.AssignmentRunRootKey)
+    )
+  }
+
+  test("C4: the decision and assignment roots never equal or contain each other") {
+    def roots(d: String, a: String) =
+      loadBase(
+        base + s"entityResolution.decisionRunRoot = \"$d\"\nentityResolution.assignmentRunRoot = \"$a\"\n"
+      )
+    for (
+      (d, a) <- Vector(
+        "/r" -> "/r",
+        "/r" -> "/r/a",
+        "/r/d" -> "/r",
+        "s3://example-curated-bucket" -> "s3://example-curated-bucket/a"
+      )
+    )
+      assertEquals(
+        invalidKeys(roots(d, a)),
+        Set(EntityResolutionConfig.AssignmentRunRootKey),
+        s"$d $a"
+      )
+    assert(roots("/r/d", "/r/dd").isRight, "a shared name prefix is not containment")
+    assert(roots("/r/d", "/r/a").isRight)
+  }
+
+  test("C4: the grouping feature refuses a configuration without its keys; others are unaffected") {
+    val plain = loadOk(filesEnv, files("base.conf" -> base))
+    assertEquals(
+      GroupingRunSettings.from(plain),
+      Left(
+        Vector(
+          ConfigError.MissingKey(
+            EntityResolutionConfig.GroupingPolicyVersionKey,
+            "SCHOLARCHAIN_CFG_ENTITY_RESOLUTION__GROUPING_POLICY_VERSION"
+          ),
+          ConfigError.MissingKey(
+            EntityResolutionConfig.DecisionRunRootKey,
+            "SCHOLARCHAIN_CFG_ENTITY_RESOLUTION__DECISION_RUN_ROOT"
+          ),
+          ConfigError.MissingKey(
+            EntityResolutionConfig.AssignmentRunRootKey,
+            "SCHOLARCHAIN_CFG_ENTITY_RESOLUTION__ASSIGNMENT_RUN_ROOT"
+          )
+        )
+      )
+    )
+    val full = loadOk(filesEnv, files("base.conf" -> (base + groupingLines)))
+    assertEquals(
+      GroupingRunSettings.from(full),
+      Right(
+        GroupingRunSettings(
+          "er-grouping.v1",
+          "er-policy-1.0.0",
+          "v1",
+          "s3://example-curated-bucket/er/decisions",
+          "/var/tmp/scholarchain/er/assignments"
+        )
+      )
+    )
+    val partial = full.copy(entityResolution = full.entityResolution.copy(assignmentRunRoot = None))
+    assertEquals(
+      GroupingRunSettings.from(partial).left.map(_.map(_.message)),
+      Left(
+        Vector(
+          ConfigError
+            .MissingKey(
+              EntityResolutionConfig.AssignmentRunRootKey,
+              "SCHOLARCHAIN_CFG_ENTITY_RESOLUTION__ASSIGNMENT_RUN_ROOT"
+            )
+            .message
+        )
+      )
+    )
+    assertEquals(
+      EntityResolutionConfig
+        .requireKey(full.entityResolution, EntityResolutionConfig.DecisionRunRootKey),
+      Right("s3://example-curated-bucket/er/decisions")
+    )
+    assert(
+      EntityResolutionConfig
+        .requireKey(full.entityResolution, "entityResolution.policyVersion")
+        .left
+        .exists(_.isInstanceOf[ConfigError.UnknownKey])
+    )
+    // In-memory configurations get the same rules.
+    val clash = full.copy(entityResolution =
+      full.entityResolution.copy(groupingPolicyVersion = Some("er-policy-1.0.0"))
+    )
+    assert(
+      GroupingRunSettings
+        .from(clash)
+        .left
+        .exists(_.exists {
+          case ConfigError.InvalidValue(k, _, _) =>
+            k == EntityResolutionConfig.GroupingPolicyVersionKey
+          case _ => false
+        })
+    )
+  }
+
   test("config digest is deterministic and sensitive to every value") {
     val c = loadOk(filesEnv, files("base.conf" -> base))
     val d = ScholarChainConfig.digest(c)

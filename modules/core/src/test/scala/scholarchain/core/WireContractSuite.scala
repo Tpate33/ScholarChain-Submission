@@ -265,7 +265,12 @@ class WireContractSuite extends munit.FunSuite {
       "MatchCandidate",
       "CandidateBlock",
       "IdentityLink",
-      "SourceAuthorProfile"
+      "SourceAuthorProfile",
+      // Phase 6 (DE-P6-01): frozen in AssignmentWireSuite.
+      "ResearcherAssignment",
+      "WorkAssignment",
+      "AuthorshipRecordV2",
+      "PartManifest"
     )
     assertEquals(frozenTypes, SchemaVersions.all.keySet)
   }

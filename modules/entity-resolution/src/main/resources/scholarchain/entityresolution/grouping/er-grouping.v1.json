@@ -1,0 +1,110 @@
+{
+  "schemaVersion": "er-grouping-file.v1",
+  "groupingPolicyVersion": "er-grouping.v1",
+  "supportedMatchPolicies": ["er-policy.v8"],
+  "description": "er-grouping.v1 groups the pairwise decisions of one published decision run into canonical researcher and work assignments. It adds no score, weight, feature or threshold, never changes a decision, never edits a source record and makes no model call. Grouping quality is unevaluated: no evaluation covers canonical groups.",
+  "linkOutcome": "ACCEPTED",
+  "mergeOrder": {
+    "pathRank": ["exact-id", "deterministic-bibliographic", "probabilistic", "llm-adjudicated"],
+    "tieBreak": ["confidence-descending", "source-id-utf8-ascending", "target-id-utf8-ascending"],
+    "definition": "researchers and works are grouped separately; every member starts as a group of one; only ACCEPTED decisions are links; links are merged one at a time in this order (path rank, then confidence descending, then sourceId and targetId by UTF-8 bytes; a pair appears at most once per kind, so the order is total); a link whose ends are already in one group is kept as a redundant supporting link; otherwise every veto rule is evaluated on the two groups and every rule that fires is recorded; the link is merged only when none fires"
+  },
+  "vetoRules": [
+    {
+      "id": "N1",
+      "kind": "researcher",
+      "schemes": [],
+      "reasonCode": "grouping.veto.negative-decision",
+      "definition": "a REJECTED or CONFLICT decision exists between a member of one group and a member of the other; UNRESOLVED never vetoes",
+      "mirrors": "the decision itself",
+      "stricterThanPairwise": false
+    },
+    {
+      "id": "N1",
+      "kind": "work",
+      "schemes": [],
+      "reasonCode": "grouping.veto.negative-decision",
+      "definition": "a REJECTED or CONFLICT decision exists between a member of one group and a member of the other; UNRESOLVED never vetoes",
+      "mirrors": "the decision itself",
+      "stricterThanPairwise": false
+    },
+    {
+      "id": "T1",
+      "kind": "researcher",
+      "schemes": ["orcid", "dblp-pid"],
+      "reasonCode": "grouping.veto.t1-disagreement",
+      "definition": "some cross pair (x in one group, y in the other) both assert the scheme and their canonical value sets are disjoint; the reason code is suffixed with the scheme",
+      "mirrors": "er-policy.v8 step 2 (T1 disagreement, nothing overrides it)",
+      "stricterThanPairwise": false
+    },
+    {
+      "id": "T1",
+      "kind": "work",
+      "schemes": ["doi", "arxiv"],
+      "reasonCode": "grouping.veto.t1-disagreement",
+      "definition": "some cross pair both assert the scheme and their comparable value sets are disjoint (arxiv compared by base submission ID); the reason code is suffixed with the scheme",
+      "mirrors": "er-policy.v8 step 2 (T1 disagreement, nothing overrides it)",
+      "stricterThanPairwise": false
+    },
+    {
+      "id": "BD",
+      "kind": "researcher",
+      "schemes": ["openalex-author", "s2-author"],
+      "reasonCode": "grouping.veto.blocking-disagreement",
+      "definition": "some cross pair disagrees on the scheme and that pair has no accepting T1 agreement of its own (it shares no orcid and no dblp-pid value); the reason code is suffixed with the scheme",
+      "mirrors": "er-policy.v8 steps 3, 4, 6a, 7 and 8 per pair: only a T1 agreement of the pair overrides a blocking disagreement",
+      "stricterThanPairwise": false
+    },
+    {
+      "id": "BD",
+      "kind": "work",
+      "schemes": ["dblp-key", "scopus-eid"],
+      "reasonCode": "grouping.veto.blocking-disagreement",
+      "definition": "some cross pair disagrees on the scheme and that pair has no accepting T1 agreement of its own: it shares a doi of which at least one shared value has no preprint prefix, or it shares a doi or an arxiv base submission ID while both sides are pure preprints (publication stage evidence); the reason code is suffixed with the scheme",
+      "mirrors": "er-policy.v8 step 6a override per pair (the exact accepting T1 agreement of the pairwise policy)",
+      "stricterThanPairwise": false
+    },
+    {
+      "id": "SW",
+      "kind": "researcher",
+      "schemes": [],
+      "reasonCode": "grouping.veto.same-work",
+      "definition": "a mention in one group and a mention in the other are on the same work ID",
+      "mirrors": "er-policy.v8 context.same_work (step 5 and step 7 same-work rule)",
+      "stricterThanPairwise": false
+    },
+    {
+      "id": "HN",
+      "kind": "researcher",
+      "schemes": [],
+      "reasonCode": "grouping.veto.homonym-number",
+      "definition": "a DBLP-sourced member in one group and a DBLP-sourced member in the other have equal base names (folded given parts and family words of the parsed name, homonym number removed) and two different DBLP homonym numbers; a number against no number never fires",
+      "mirrors": "er-policy.v8 name.homonym_suffix_both and name.homonym_suffix_agree (steps 5 and 7), narrowed to the same base name and DBLP-sourced names",
+      "stricterThanPairwise": false
+    },
+    {
+      "id": "ST",
+      "kind": "work",
+      "schemes": [],
+      "reasonCode": "grouping.veto.publication-stage",
+      "definition": "a member of one group is a pure preprint and a member of the other is a pure published record (publication stage evidence of its own identifiers); a backstop that er-policy.v8 decisions cannot trigger",
+      "mirrors": "er-policy.v8 publicationStage",
+      "stricterThanPairwise": false
+    }
+  ],
+  "endpointCheck": "grouping.invariant.endpoint-veto",
+  "endpointCheckDefinition": "for every ACCEPTED decision no veto rule may fire on its two endpoints alone; otherwise the curated inputs differ from the ones decided and the run is refused",
+  "anchorOrder": ["orcid", "dblp-pid", "openalex-author", "member"],
+  "anchorDefinition": "an identifier value is collided when members of more than one final group assert it (unresolved members included); in anchor order a group takes the first scheme of which it holds exactly one distinct value that is not collided; otherwise its member ID that is smallest by UTF-8 bytes (namespace member); an orcid anchor gives the ORCID-form researcher ID, every other anchor the versioned ScholarChain form; reason codes grouping.anchor.<namespace> and grouping.anchor-collision.<scheme>",
+  "collisionScope": "all-final-groups",
+  "statusRules": [
+    "resolved: the member's final group has two or more members",
+    "singleton: a group of one with no pending, vetoed or conflict decision (REJECTED only is fine), any anchor",
+    "singleton t1-anchored: a group of one with a pending, vetoed or conflict decision whose anchor is its own non-collided orcid or dblp-pid",
+    "unresolved: every other group of one; no researcher ID"
+  ],
+  "representativeOrder": ["dblp", "doi", "openalex", "orcid-work"],
+  "representativeRule": "namespace-order-then-utf8",
+  "representativeDefinition": "the representative of a work group is its member of the first namespace in representative order, the smallest work ID by UTF-8 bytes among several; the canonical work ID is the representative's own work ID; an unknown namespace refuses the run",
+  "graphEligibility": "a work group with a DBLP member is counted: its DBLP representative is counted and every other member is member-of-counted; every member of any other group is enrichment-only; teams exist only for counted works that have mentions; authorship records exist for every identified mention on every representative"
+}

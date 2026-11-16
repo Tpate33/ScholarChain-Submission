@@ -63,7 +63,10 @@ enum ConfigError {
 /** Value kinds of configuration keys. */
 enum ValueKind {
   case Token, Text, OptionalText, Bucket, Region, AccountId, PositiveInt, AnyLong, Probability,
-    Window, Windows, IdentityVersion
+    Window, Windows, IdentityVersion, OptionalToken, OptionalLocation
+
+  /** Optional kinds may be unset (absent, `null`, or an empty environment value). */
+  def optional: Boolean = this == OptionalText || this == OptionalToken || this == OptionalLocation
 }
 
 /** One configuration key: dotted path, kind, and its environment variable name. */
@@ -75,7 +78,11 @@ final case class ConfigKey(path: String, kind: ValueKind) {
  * The frozen key table of configuration schema `scholarchain.config.v2`. History: v2 (Phase 5) adds
  * the required keys `entityResolution.llmBandLower`, `entityResolution.llmBandUpper`, and
  * `entityResolution.promptVersion`; `scholarchain.config.v1` files are rejected (they lack those
- * keys, and no deployed configuration used v1).
+ * keys, and no deployed configuration used v1). Phase 6 (DE-P6-01, C4) adds three OPTIONAL keys to
+ * v2: `entityResolution.groupingPolicyVersion`, `entityResolution.decisionRunRoot` and
+ * `entityResolution.assignmentRunRoot`. Every existing v2 file loads unchanged and keeps its
+ * digest; the features that need the keys refuse a configuration without them
+ * ([[GroupingRunSettings.from]]).
  */
 object ConfigKeys {
   val EnvPrefix = "SCHOLARCHAIN_CFG_"
@@ -122,6 +129,9 @@ object ConfigKeys {
     ConfigKey("entityResolution.llmBandLower", Probability),
     ConfigKey("entityResolution.llmBandUpper", Probability),
     ConfigKey("entityResolution.promptVersion", Token),
+    ConfigKey("entityResolution.groupingPolicyVersion", OptionalToken),
+    ConfigKey("entityResolution.decisionRunRoot", OptionalLocation),
+    ConfigKey("entityResolution.assignmentRunRoot", OptionalLocation),
     ConfigKey("runtime.maxPathHops", PositiveInt),
     ConfigKey("runtime.retrievalTopK", PositiveInt),
     ConfigKey("runtime.defaultWindow", Window)
@@ -436,7 +446,7 @@ object ConfigLoader {
   }
 
   private def envValue(key: ConfigKey, raw: String): Either[String, Raw] = key.kind match {
-    case ValueKind.OptionalText => Right(if (raw.isEmpty) Raw.NullValue else Raw.Str(raw))
+    case k if k.optional => Right(if (raw.isEmpty) Raw.NullValue else Raw.Str(raw))
     case _ if raw.isEmpty => Left("empty value")
     case ValueKind.PositiveInt =>
       raw.toIntOption
@@ -471,7 +481,7 @@ object ConfigLoader {
     def raw(path: String): Option[(Raw, String)] = {
       val key = ConfigKeys.byPath(path)
       values.get(path) match {
-        case None | Some((Raw.NullValue, _)) if key.kind != ValueKind.OptionalText =>
+        case None | Some((Raw.NullValue, _)) if !key.kind.optional =>
           errors += ConfigError.MissingKey(path, key.envName); None
         case other => other
       }
@@ -495,6 +505,22 @@ object ConfigLoader {
         case Some((Raw.Str(s), _)) if s.nonEmpty && s.trim == s => Some(s)
         case Some((_, src)) => fail(path, src, "expected non-empty trimmed text or null"); None
       }
+    def optChecked(path: String, problem: String => Option[String]): Option[String] =
+      values.get(path) match {
+        case None | Some((Raw.NullValue, _)) => None
+        case Some((Raw.Str(s), src)) =>
+          problem(s) match {
+            case None => Some(s)
+            case Some(why) => fail(path, src, s"'$s' $why"); None
+          }
+        case Some((_, src)) => fail(path, src, "expected a string or null"); None
+      }
+    def optToken(path: String): Option[String] =
+      optChecked(
+        path,
+        s => if (StableId.isToken(s)) None else Some("is not a token [A-Za-z0-9._-]+")
+      )
+    def optLocation(path: String): Option[String] = optChecked(path, RunLocation.problem)
     def positiveInt(path: String): Int =
       raw(path) match {
         case Some((Raw.Num(n, _), src)) =>
@@ -586,7 +612,10 @@ object ConfigLoader {
         rejectThreshold = probability("entityResolution.rejectThreshold"),
         llmBandLower = probability("entityResolution.llmBandLower"),
         llmBandUpper = probability("entityResolution.llmBandUpper"),
-        promptVersion = token("entityResolution.promptVersion")
+        promptVersion = token("entityResolution.promptVersion"),
+        groupingPolicyVersion = optToken(EntityResolutionConfig.GroupingPolicyVersionKey),
+        decisionRunRoot = optLocation(EntityResolutionConfig.DecisionRunRootKey),
+        assignmentRunRoot = optLocation(EntityResolutionConfig.AssignmentRunRootKey)
       ),
       runtime = RuntimeConfig(
         maxPathHops = positiveInt("runtime.maxPathHops"),
@@ -594,7 +623,8 @@ object ConfigLoader {
         defaultWindow = window("runtime.defaultWindow")
       )
     )
-    // Cross-key rules (reject < llmBandLower < llmBandUpper < accept) once every key is valid.
+    // Cross-key rules (reject < llmBandLower < llmBandUpper < accept; grouping policy differs
+    // from the match policy; the two run roots are disjoint) once every key is valid.
     if (errors.isEmpty)
       EntityResolutionConfig.problems(config.entityResolution).foreach { case (key, reason) =>
         errors += ConfigError.InvalidValue(key, "resolved configuration", reason)

@@ -165,4 +165,55 @@ class LeakageStructureSuite extends munit.FunSuite {
       MatchPolicy.resourceText(MatchPolicy.DefaultResource).fold(e => fail(e), identity).toLowerCase
     Vector("gold", "label", "review").foreach(w => assert(!text.contains(w), w))
   }
+
+  // ---- ER-P6-05: the grouping layer (extends the checks above; none is relaxed) ----
+
+  private val groupingPackages = Vector("grouping", "decisions")
+
+  test("the scan sees the grouping and decision packages, and they are on the matching path") {
+    val rels = sources.map(_._1)
+    groupingPackages.foreach(p =>
+      assert(rels.exists(_.startsWith(p + "/")), s"no sources under $p/")
+    )
+    assert(rels.contains("grouping/Grouping.scala"))
+    // The matching-path test above covers every package except review and evaluation, so it
+    // scans grouping and decisions; this pins that they are not exempt.
+    assert(groupingPackages.forall(p => p != "review" && p != "evaluation"))
+  }
+
+  test("the grouping package never names review, evaluation, gold data or labels") {
+    sources.filter { case (rel, _) => inPackage(rel, "grouping") }.foreach { case (rel, src) =>
+      val c = code(src)
+      Vector("""\breview\b""", """\bevaluation\b""", """(?i)\bgold""", """(?i)\blabels?\b""")
+        .foreach(p => assert(p.r.findFirstIn(c).isEmpty, s"$rel matches $p"))
+      goldNames.foreach(n => assert(!c.contains(n), s"$rel names $n"))
+    }
+  }
+
+  test("grouping and decision sources read no clock and no randomness") {
+    val forbidden = Vector(
+      "Instant.now",
+      "currentTimeMillis",
+      "nanoTime",
+      "LocalDate.now",
+      "LocalDateTime.now",
+      "ZonedDateTime.now",
+      "Clock.",
+      "Random",
+      "UUID"
+    )
+    sources
+      .filter { case (rel, _) => groupingPackages.exists(p => inPackage(rel, p)) }
+      .foreach { case (rel, src) =>
+        val c = code(src)
+        forbidden.foreach(f => assert(!c.contains(f), s"$rel uses $f"))
+      }
+  }
+
+  test("the grouping policy resource mentions no labels, gold data, or review decisions") {
+    val text = scholarchain.entityresolution.grouping.GroupingPolicy.resourceText
+      .fold(e => fail(e), identity)
+      .toLowerCase
+    Vector("gold", "label", "review").foreach(w => assert(!text.contains(w), w))
+  }
 }

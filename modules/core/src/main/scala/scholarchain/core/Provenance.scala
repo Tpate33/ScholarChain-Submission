@@ -147,7 +147,10 @@ final case class SnapshotRef(source: SourceType, snapshot: String) derives ReadW
  * @param codeVersion
  *   full 40-hex git commit SHA of the code that runs
  * @param configDigest
- *   [[scholarchain.core.config.ScholarChainConfig.digest]] of the resolved config
+ *   [[scholarchain.core.config.ScholarChainConfig.digestWithoutGrouping]] of the resolved config
+ *   for every stage except grouping (it equals
+ *   [[scholarchain.core.config.ScholarChainConfig.digest]] when no grouping-scope key is set); a
+ *   grouping run records [[scholarchain.core.config.GroupingRunSettings.configDigest]]
  * @param parameters
  *   stage parameters; keys are tokens
  * @param attempt

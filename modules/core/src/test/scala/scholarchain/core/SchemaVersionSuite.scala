@@ -8,8 +8,17 @@ class SchemaVersionSuite extends munit.FunSuite {
     errs.exists(_.isInstanceOf[ValidationError.UnsupportedSchemaVersion])
 
   test("schema version constants are frozen and distinct") {
-    assertEquals(SchemaVersions.all.size, 24)
-    assertEquals(SchemaVersions.all.values.toSet.size, 24)
+    assertEquals(SchemaVersions.all.size, 28)
+    assertEquals(SchemaVersions.all.values.toSet.size, 28)
+    assertEquals(SchemaVersions.ResearcherAssignment, "scholarchain.researcher-assignment.v1")
+    assertEquals(SchemaVersions.WorkAssignment, "scholarchain.work-assignment.v1")
+    assertEquals(SchemaVersions.AuthorshipRecordV2, "scholarchain.authorship-record.v2")
+    assertEquals(SchemaVersions.PartManifest, "scholarchain.part-manifest.v1")
+    assertEquals(
+      SchemaVersions.AuthorshipRecord,
+      "scholarchain.authorship-record.v1",
+      "v1 stays readable, not retired (DE-P6-01)"
+    )
     assertEquals(SchemaVersions.WorkRecord, "scholarchain.work-record.v3")
     assertEquals(SchemaVersions.CoauthorPairCandidate, "scholarchain.coauthor-pair-candidate.v2")
     assertEquals(SchemaVersions.MatchCandidate, "scholarchain.match-candidate.v1")
@@ -48,7 +57,11 @@ class SchemaVersionSuite extends munit.FunSuite {
       MatchCandidate.contract,
       CandidateBlock.contract,
       IdentityLink.contract,
-      SourceAuthorProfile.contract
+      SourceAuthorProfile.contract,
+      ResearcherAssignment.contract,
+      WorkAssignment.contract,
+      AuthorshipRecordV2.contract,
+      PartManifest.contract
     )
     assertEquals(contracts.map(_.recordType).toSet, SchemaVersions.all.keySet)
     contracts.foreach { c =>
