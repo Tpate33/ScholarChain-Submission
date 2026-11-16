@@ -1,8 +1,10 @@
 package scholarchain.core.config
 
+import scala.collection.immutable.SortedMap
+
 import upickle.default.ReadWriter
 
-import scholarchain.core.{Canonical, StableId, TimeWindow}
+import scholarchain.core.{Canonical, PartFormat, PathBounds, StableId, TimeWindow}
 
 /**
  * Resolved ScholarChain configuration. Every value comes from versioned config files and
@@ -19,7 +21,8 @@ final case class ScholarChainConfig(
     bridge: BridgeConfig,
     community: CommunityConfig,
     entityResolution: EntityResolutionConfig,
-    runtime: RuntimeConfig
+    runtime: RuntimeConfig,
+    analysis: AnalysisConfig = AnalysisConfig()
 ) derives ReadWriter
 
 final case class AwsConfig(region: String, accountId: String) derives ReadWriter
@@ -59,7 +62,224 @@ final case class BridgeConfig(
     maxIterations: Int
 ) derives ReadWriter
 
-final case class CommunityConfig(algorithm: String, maxIterations: Int) derives ReadWriter
+/**
+ * @param randomSeed
+ *   optional (Phase 6, DE-P6-02; analysis scope, see [[ScholarChainConfig.AnalysisScopeKeys]]):
+ *   seed of a randomized community algorithm; when set it is recorded as the `randomSeed` parameter
+ *   of every community membership
+ */
+final case class CommunityConfig(
+    algorithm: String,
+    maxIterations: Int,
+    randomSeed: Option[Long] = None
+) derives ReadWriter
+
+/**
+ * Analysis-stage settings (Phase 6, DE-P6-02; additive, optional keys within
+ * `scholarchain.config.v2`, the same precedent as the grouping keys of DE-P6-01). They are optional
+ * at load time, so every existing configuration loads unchanged and keeps its exact digest (an
+ * unset key is omitted from the digest input). They are validated when set, and the analysis
+ * feature refuses a configuration without them ([[AnalysisRunSettings.from]]).
+ *
+ * @param maxPathHops
+ *   `analysis.maxPathHops`: longest stored shortest path (hops), >= 1
+ * @param maxPathsPerPair
+ *   `analysis.maxPathsPerPair`: most shortest paths stored per researcher pair and window, >= 1
+ * @param maxEvidenceWorksPerHop
+ *   `analysis.maxEvidenceWorksPerHop`: most evidence works shown per path hop, >= 1
+ * @param exportFormat
+ *   `analysis.exportFormat`: part format of the analysis exports, `parquet` or `jsonl`
+ */
+final case class AnalysisConfig(
+    maxPathHops: Option[Int] = None,
+    maxPathsPerPair: Option[Int] = None,
+    maxEvidenceWorksPerHop: Option[Int] = None,
+    exportFormat: Option[String] = None
+) derives ReadWriter
+
+object AnalysisConfig {
+  val MaxPathHopsKey = "analysis.maxPathHops"
+  val MaxPathsPerPairKey = "analysis.maxPathsPerPair"
+  val MaxEvidenceWorksPerHopKey = "analysis.maxEvidenceWorksPerHop"
+  val ExportFormatKey = "analysis.exportFormat"
+  val CommunityRandomSeedKey = "community.randomSeed"
+
+  /** Every problem of the set analysis keys as (configuration key, reason), empty when valid. */
+  def problems(c: AnalysisConfig): Vector[(String, String)] =
+    if (c == null) Vector("analysis" -> "missing")
+    else {
+      def positive(key: String, v: Option[Int]): Vector[(String, String)] =
+        Option(v).flatten.toVector.flatMap(n =>
+          if (n >= 1) Vector.empty else Vector(key -> s"$n is below 1")
+        )
+      positive(MaxPathHopsKey, c.maxPathHops) ++
+        positive(MaxPathsPerPairKey, c.maxPathsPerPair) ++
+        positive(MaxEvidenceWorksPerHopKey, c.maxEvidenceWorksPerHop) ++
+        Option(c.exportFormat).flatten.toVector.flatMap { f =>
+          if (scholarchain.core.PartFormat.AnalysisExportFormats.exists(_.tag == f)) Vector.empty
+          else
+            Vector(
+              ExportFormatKey -> s"'$f' is not an analysis export format (${scholarchain.core.PartFormat.AnalysisExportFormats.map(_.tag).mkString(", ")})"
+            )
+        }
+    }
+}
+
+/**
+ * Settings of a collaboration-analysis run (Phase 6, DE-P6-02, contracts C3, C4 and the config
+ * contract), resolved from configuration. Every value is required here, so the analysis feature
+ * refuses a configuration that lacks any analysis key, while other features load without them.
+ *
+ * Windows (C4): `graph.windows`, in configured order; non-empty, each with startYear <= endYear
+ * (the loader), and distinct (here). Windows may overlap. Nothing hardcodes a window.
+ *
+ * @param bridgeParameters
+ *   `maxIterations`, `randomSeed` and `sampleSize` from `bridge.*`, as decimal text
+ * @param communityParameters
+ *   `maxIterations` from `community.maxIterations` and, when set, `randomSeed` from
+ *   `community.randomSeed`, as decimal text
+ * @param configDigest
+ *   [[AnalysisRunSettings.configDigest]] of the configuration these settings were resolved from
+ *   (DE-P6-02 repair 01, CR-P6-13 finding 1). The analysis run manifest and every record lineage
+ *   must record exactly this value ([[scholarchain.core.AnalysisValidation.checkRunChain]]).
+ *
+ * The constructor is private: settings exist only through [[AnalysisRunSettings.from]], so the
+ * digest always describes the analysis settings it travels with (a changed setting is a changed
+ * configuration, hence a changed digest and a changed analysis run ID).
+ */
+final case class AnalysisRunSettings private (
+    windows: Vector[TimeWindow],
+    graphPolicyVersion: String,
+    identityVersion: String,
+    bridgeAlgorithm: String,
+    bridgeParameters: SortedMap[String, String],
+    communityAlgorithm: String,
+    communityParameters: SortedMap[String, String],
+    pathBounds: PathBounds,
+    exportFormat: PartFormat,
+    configDigest: String
+)
+
+object AnalysisRunSettings {
+
+  /** Schema tag of the analysis config digest input; part of the digested JSON. */
+  val DigestSchema = "scholarchain.analysis-config-digest.v1"
+
+  /** The analysis digest input. Frozen field order. */
+  private final case class DigestInput(
+      schema: String,
+      baseConfigDigest: String,
+      communityRandomSeed: Option[Long],
+      maxPathHops: Int,
+      maxPathsPerPair: Int,
+      maxEvidenceWorksPerHop: Int,
+      exportFormat: String
+  ) derives ReadWriter
+
+  /**
+   * The config digest of an analysis run (its own scope, recorded in the analysis run manifest and
+   * in every record's lineage): SHA-256 hex of the compact JSON
+   * `{"schema":DigestSchema,"baseConfigDigest":`[[ScholarChainConfig.digestWithoutGrouping]]`,"communityRandomSeed":...,"maxPathHops":...,"maxPathsPerPair":...,"maxEvidenceWorksPerHop":...,"exportFormat":...}`.
+   *
+   * Digest scope: the base digest covers every value outside the grouping and analysis scopes,
+   * including the values the analysis reads from them (`graph.windows`, `graph.policyVersion`,
+   * `graph.identityVersion`, `bridge.*`, `community.algorithm`, `community.maxIterations`); the
+   * analysis-scope keys are added explicitly. The grouping-scope keys are not inputs: the analysis
+   * reads the grouping policy from the grouping run, recorded in the lineage. Refuses a
+   * configuration that [[from]] refuses.
+   */
+  def configDigest(c: ScholarChainConfig): Either[Vector[ConfigError], String] =
+    from(c).map(_.configDigest)
+
+  /** The digest of a configuration whose analysis keys are all set (called by [[from]] only). */
+  private def digestOf(
+      c: ScholarChainConfig,
+      bounds: PathBounds,
+      format: PartFormat
+  ): String =
+    Canonical.sha256HexUtf8(
+      upickle.default.write(
+        DigestInput(
+          DigestSchema,
+          ScholarChainConfig.digestWithoutGrouping(c),
+          c.community.randomSeed,
+          bounds.maxHops,
+          bounds.maxPathsPerPair,
+          bounds.maxEvidenceWorksPerHop,
+          format.tag
+        )
+      )
+    )
+
+  /**
+   * Missing analysis keys as [[ConfigError.MissingKey]], then every rule of the section. On success
+   * the settings carry their own [[configDigest]].
+   */
+  def from(c: ScholarChainConfig): Either[Vector[ConfigError], AnalysisRunSettings] =
+    if (
+      c == null || c.graph == null || c.bridge == null || c.community == null || c.analysis == null
+    )
+      Left(Vector(ConfigError.MissingKey("analysis", ConfigKeys.envNameOf("analysis"))))
+    else {
+      import AnalysisConfig.*
+      val a = c.analysis
+      def required[A](key: String, v: Option[A]): Either[ConfigError, A] =
+        Option(v).flatten.toRight(ConfigError.MissingKey(key, ConfigKeys.envNameOf(key)))
+      val hops = required(MaxPathHopsKey, a.maxPathHops)
+      val perPair = required(MaxPathsPerPairKey, a.maxPathsPerPair)
+      val perHop = required(MaxEvidenceWorksPerHopKey, a.maxEvidenceWorksPerHop)
+      val format = required(ExportFormatKey, a.exportFormat)
+      val missing = Vector(hops, perPair, perHop, format).collect { case Left(e) => e }
+      def invalid(key: String, why: String) =
+        ConfigError.InvalidValue(key, "resolved configuration", why)
+      val windows = Option(c.graph.windows).getOrElse(Vector.empty)
+      val rules =
+        problems(a).map { case (k, why) => invalid(k, why) } ++
+          (if (windows.isEmpty) Vector(invalid("graph.windows", "at least one window is required"))
+           else Vector.empty) ++
+          windows.zipWithIndex.flatMap { case (w, i) =>
+            TimeWindow.check(s"graph.windows[$i]", w).map(e => invalid("graph.windows", e.message))
+          } ++
+          (if (windows.distinct.size != windows.size)
+             Vector(invalid("graph.windows", "windows must be distinct"))
+           else Vector.empty) ++
+          (if (StableId.isToken(c.graph.policyVersion)) Vector.empty
+           else Vector(invalid("graph.policyVersion", "missing or not a token"))) ++
+          (if (c.graph.identityVersion != null && c.graph.identityVersion.matches("v[0-9]+"))
+             Vector.empty
+           else Vector(invalid("graph.identityVersion", "must match v[0-9]+"))) ++
+          (if (StableId.isToken(c.bridge.algorithm)) Vector.empty
+           else Vector(invalid("bridge.algorithm", "missing or not a token"))) ++
+          (if (StableId.isToken(c.community.algorithm)) Vector.empty
+           else Vector(invalid("community.algorithm", "missing or not a token")))
+      val errors = missing ++ rules
+      if (errors.nonEmpty) Left(errors)
+      else {
+        val bounds = PathBounds(hops.toOption.get, perPair.toOption.get, perHop.toOption.get)
+        val exportFormat = PartFormat.fromTag(format.toOption.get).get
+        Right(
+          new AnalysisRunSettings(
+            windows = windows,
+            graphPolicyVersion = c.graph.policyVersion,
+            identityVersion = c.graph.identityVersion,
+            bridgeAlgorithm = c.bridge.algorithm,
+            bridgeParameters = SortedMap(
+              "maxIterations" -> c.bridge.maxIterations.toString,
+              "randomSeed" -> c.bridge.randomSeed.toString,
+              "sampleSize" -> c.bridge.sampleSize.toString
+            ),
+            communityAlgorithm = c.community.algorithm,
+            communityParameters = SortedMap(
+              "maxIterations" -> c.community.maxIterations.toString
+            ) ++ c.community.randomSeed.map(s => "randomSeed" -> s.toString),
+            pathBounds = bounds,
+            exportFormat = exportFormat,
+            configDigest = digestOf(c, bounds, exportFormat)
+          )
+        )
+      }
+    }
+}
 
 /**
  * Entity-resolution settings (config schema `scholarchain.config.v2`). Every value is supplied by
@@ -369,11 +589,36 @@ object ScholarChainConfig {
       )
 
   /**
-   * The config digest of every stage except grouping, recorded in
-   * [[scholarchain.core.RunManifest.configDigest]]: [[digest]] of [[withoutGrouping]](c). Setting,
-   * changing or removing a grouping-scope key never changes it, and for a configuration that sets
-   * no grouping-scope key it equals [[digest]], so every existing run manifest keeps its
-   * configDigest.
+   * The analysis scope (Phase 6, DE-P6-02): settings read only by the collaboration-analysis stage.
+   * Like the grouping scope, they are never an input of the run identity of an upstream stage
+   * (curated input, decision and grouping runs).
    */
-  def digestWithoutGrouping(c: ScholarChainConfig): String = digest(withoutGrouping(c))
+  val AnalysisScopeKeys: Vector[String] = Vector(
+    AnalysisConfig.CommunityRandomSeedKey,
+    AnalysisConfig.MaxPathHopsKey,
+    AnalysisConfig.MaxPathsPerPairKey,
+    AnalysisConfig.MaxEvidenceWorksPerHopKey,
+    AnalysisConfig.ExportFormatKey
+  )
+
+  /** `c` with every analysis-scope key unset. */
+  def withoutAnalysis(c: ScholarChainConfig): ScholarChainConfig =
+    if (c == null) c
+    else
+      c.copy(
+        community = Option(c.community).map(_.copy(randomSeed = None)).orNull,
+        analysis = AnalysisConfig()
+      )
+
+  /**
+   * The config digest of every stage except grouping and analysis, recorded in
+   * [[scholarchain.core.RunManifest.configDigest]]: [[digest]] of [[withoutGrouping]] and
+   * [[withoutAnalysis]] of `c`. Setting, changing or removing a grouping-scope or analysis-scope
+   * key never changes it, and for a configuration that sets neither it equals [[digest]], so every
+   * existing run manifest (decision and grouping runs included) keeps its configDigest. The
+   * analysis-scope part was added in DE-P6-02; it changes no existing value, because no earlier
+   * configuration could set an analysis-scope key.
+   */
+  def digestWithoutGrouping(c: ScholarChainConfig): String =
+    digest(withoutAnalysis(withoutGrouping(c)))
 }

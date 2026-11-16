@@ -1164,3 +1164,202 @@ UNVERIFIED CONCERNS:
 ```
 
 Orchestrator note: the harness flagged both FE-P6-01 and CR-P6-12 hand-backs as matching an instruction-shaped pattern (settings-json). Both only discuss whether a `settings.json` allow rule exists; no settings change is proposed or made in this work order.
+
+---
+
+## CR-P6-13: code-reviewer review of DE-P6-02 (Spark-facing core contracts C1-C7) (2026-11-16), verbatim
+
+```text
+STATUS: COMPLETE
+OWNER: code-reviewer
+WORK ORDER: CR-P6-13 (Phase 6). Focused, read-only, adversarial review of DE-P6-02 (domain-engineer), the Spark-facing core contracts C1-C7 in modules/core/** (uncommitted on HEAD 6be1f1d).
+FILES CREATED: none
+FILES MODIFIED: none
+COMMANDS RUN: none. I used only Read, Grep and Glob. I read nothing under gold/, no held-out path, nothing under target/streams or target/local-runs/heldout, and not docs/agent-runs/phase-05/human-gate.md.
+TEST RESULTS: none run by me (the reviewer cannot run commands). The author reports `sbt check` passed with 1226 tests, 0 failed, 88 suites. I did not observe that output.
+VALIDATION RESULTS:
+- Ownership (item 9): the git status snapshot shows changes only under modules/core/** plus the orchestrator's evidence under docs/agent-runs/phase-06/. build.sbt and project/** are unmodified, so there is no new dependency. Core has no Parquet import.
+- I could not see the text before the change because I have no git. To judge v1 compatibility I relied on reading the code and on the existing tests.
+
+VERDICT: REQUEST_CHANGES (one verified major finding)
+
+FINDINGS:
+
+domain-engineer
+
+1. MAJOR. The analysis config digest is never checked against the settings it claims to describe.
+   - Location: modules/core/src/main/scala/scholarchain/core/AnalysisValidation.scala:962-1049 (`checkRunChain`); modules/core/src/main/scala/scholarchain/core/config/ScholarChainConfig.scala:142-152 (`AnalysisRunSettings` has no digest field).
+   - The problem: `expected.configDigest` is copied from `analysisManifest.configDigest` (line 998). It is never compared with `AnalysisRunSettings.configDigest(config)` for the configuration whose `settings` the validator recomputes against. `settings` cannot carry that digest.
+   - Failure input: an analysis run manifest (and lineages) that records `ScholarChainConfig.digestWithoutGrouping(c)`, which is what every non-grouping stage records, or any 64-hex value. The fixture itself uses `"9" * 64` (AnalysisFixtures.scala:72), and the happy path at AnalysisValidationSuite.scala:29 accepts it.
+   - Impact: `RunId.of` hashes `configDigest` (StableIds.scala:614), and the analysis manifest's parameters hold only the three run-chain keys. So two analysis runs that differ only in `analysis.maxPathHops`, `maxPathsPerPair`, `maxEvidenceWorksPerHop`, `exportFormat` or `community.randomSeed` would get the same run ID. That means a run-directory collision (overwrite or silent reuse), and every record's lineage would name a config that does not identify its analysis settings. This breaks the provenance invariant without any error.
+   - Fix: make `checkRunChain` require the expected analysis digest, either as a parameter or as a field filled by `AnalysisRunSettings.from`/`configDigest`, and refuse a mismatch. Add a test that fails without the check.
+
+2. MINOR. The validator's inputs are not tied to the run chain.
+   - Location: AnalysisValidation.scala:124-161 (`checkGraphInput`) and 426-452 (`checkIdentity`).
+   - The problem: nothing checks that the teams, works and researchers carry `provenance.runId` equal to the grouping run ID, or that the `decisions` carry the lineage's `decisionRunId`. `checkGraphInput` also does not require a team for every counted work.
+   - Failure input: decisions from another decision run, or a teams vector missing one counted work.
+   - Impact: identity confidence is validated against the wrong run, or P_r is silently undercounted. The run chain looks complete when it is not.
+   - Fix: check the provenance run IDs against the manifests, and require one team per counted work.
+
+3. MINOR. Two load manifests that differ only in roles get the same load ID.
+   - Location: StableIds.scala:903-931 (`StoreLoadId`); StoreLoad.scala:103.
+   - The problem: `targetRole` is not an input of `loadId`.
+   - Failure input: `StoreLoadManifest.build(S3, pm, sha, Map(p -> "researcher-vertices"))` and `build(S3, pm, sha, Map(p -> "edges"))` produce equal `loadId`s.
+   - Impact: the storage loader's idempotency key collides, so a second load with a different role map can be skipped or misattributed.
+   - Fix: hash the sorted (path, role) pairs, or document that `loadId` identifies the part set only and require loaders to key on roles too.
+
+4. MINOR. Which shortest paths get stored is not deterministic.
+   - Location: AnalysisValidation.scala:775-791 (`checkPaths`, per pair).
+   - The problem: any subset of up to `maxPathsPerPair` shortest paths passes. Ordinals only order the subset that was stored.
+   - Failure input: a pair with three shortest paths and `maxPathsPerPair` = 1. Storing either the smallest-ID or the largest-ID path validates.
+   - Impact: re-running with the same inputs and config can store different evidence, so evidence is not reproducible.
+   - Fix: define the rule (for example, the n smallest `pathId`s among all shortest paths) and check it. At dev scale the validator can enumerate the shortest paths.
+
+5. NIT. Scale.
+   - Location: AnalysisValidation.scala:266-272.
+   - `models(...)` is rebuilt in each of the eight checks. Pair expansion costs O(sum of n_w^2) per window, so one consortium-size team (thousands of authors) multiplies quickly.
+   - This is fine for the dev run (41 teams). Build the models once and pass them to the checks before sample scale.
+
+6. NIT. There are two path-hop bounds with no cross-check: `runtime.maxPathHops`, which already existed, and the new `analysis.maxPathHops` (ScholarChainConfig.scala:93-98, ConfigLoader.scala:146). The runtime can ask for more hops than any stored path has. Document the relation or refuse runtime > analysis.
+
+Checked and found sound:
+- Item 1, graph scope: only counted works enter the graph; enrichment-only, member-of-counted and unknown works are refused (tested at AnalysisValidationSuite:37-56). T, A and M include unresolved coauthors in separate fields; C, W and edges use identified researchers only, and W = T − U is enforced both in the contract and in the recomputation. `GroupingEvaluation` has the single value `unevaluated`. Every record carries lineage and provenance. P-7 appears only in a comment saying it is deferred. Teams come from the grouping run (41 teams = 41 counted works in dev). PublicationTeam requires distinct researcherIds, so teamSize = i + u holds for grouping output (Grouping.scala:1101-1103).
+- Item 2, identity confidence: a missing `kind`, a null confidence, an "estimated" kind and a value on an unknown are all refused. The missing-Option test (AnalysisContractSuite:126-151) is written so that either upickle behaviour leads to a refusal.
+- Item 3, integrity: jsonl keeps the LF row-count and final-LF checks (gated by `lineDelimited`, which is true for every v1 file). parquet and csv are compared only by bytes and sha256; their rows come from the footer or the writer. 12 bytes ("PAR1" + 4-byte footer length + "PAR1") is a sound lower bound that never rejects a valid file. `fromV1` is equivalent to v1 (tested). The dispatcher cannot apply the wrong version's rules: each contract accepts only its own schemaVersion, both use allowUnknownKeys(false), and v2 requires `format`.
+- Item 4, backward compatibility: v1 metrics, edge and part-manifest codecs and constants are unchanged. DecisionExport and GroupingExport still call `PartManifestVerifier.verify` (v1).
+- Item 5, digests: `analysis` and `randomSeed` have defaults, so they are omitted from the JSON. The frozen base-digest test is ConfigLoaderSuite:752-759 and 1049-1063. `DevRunInputsSuite` compares digests computed through `digestWithoutGrouping` and `GroupingRunSettings.configDigest` with the committed dev manifests that hold 61655dc1… and 48484593…. If the reported `sbt check` pass holds, both digests are unaffected. Nothing hardcodes a window, threshold or bucket.
+- Item 6, stable IDs: netstrings plus distinct tags and prefixes; pairs ordered by unsigned UTF-8 bytes; IDs anchored on the smallest member, so they do not depend on algorithm labels. Sharing the edge ID between v1 and v2 is intended and safe, because both use the same logical key.
+- Item 7, recomputation: A as an IEEE double division, the participation coefficient (S counts the researcher's own community), the coreness peeling (k is monotone, so decrements below k are harmless), union-find components and the bounded BFS are all correct.
+- Item 8, tests: the fixtures are synthetic. No new test reads target/, the home directory, the archive or gold/. The only temp files are pre-existing ConfigLoaderSuite tests (lines 282-314 and 727-742), which write to java.io.tmpdir and delete in `finally`. The new analysis tests write no files.
+
+Open questions for SP-P6-01:
+1. Consume the archived, verified bytes, as the human directed. Verify each part against `_parts.json` with `PartManifests.verify` and `checkGroupingRunParts` first. Do not re-pin.
+2. The pair set must be decided explicitly. At dev scale, all connected pairs within `maxHops` per window are tractable; larger runs need a configured rule. It should go together with the deterministic path selection in finding 4.
+3. Neptune CSV belongs to storage-engineer (the matrix gives it Neptune loaders and adapters). Spark exports the canonical v2 records.
+4. Algorithms: GraphFrames provides components, label propagation and BFS/shortestPaths, but no betweenness and no k-core. Plan sampled Brandes and k-core peeling under bridge.* and community.*. Leave `community.randomSeed` unset if the chosen algorithm is deterministic. I did not verify version compatibility.
+5. Do not migrate now. Moving windows, bridge.* and community.* out of the base digest would change the frozen digest and force an ER re-pin, which contradicts the human direction. Today these values only make the analysis digest depend on them, and no check ties the analysis base digest to the ER manifests. Record the inconsistency (community.randomSeed is analysis scope, community.algorithm is base scope) and schedule a versioned digest-scope migration before the next ER re-run.
+6. Fractional edge weights are not needed for the specification's count metrics. Defer them (they would need edge v3 and metrics v3).
+7. Keep reading the archived decision run. A confidence projection in the grouping output would change ER outputs and force a re-run.
+8. Blocking for SP-P6-01: core is Scala 3, and sparkAnalytics depends on it. The Spark Scala version (2.13 via cross-version, or 2.12) must be decided by the human and build-engineer first.
+
+ASSUMPTIONS:
+- The orchestrator's git status is the complete change set.
+- The author's reported `sbt check` pass is used only as context, never as evidence for a finding.
+RISKS:
+- I could not view the pre-change v1 verifier text, so "messages and order unchanged" rests on reading the code plus the existing v1 tests.
+- The ER re-pin need (BE-P6-02 code-scope check) remains, as the author reported.
+MANUAL ACTION REQUIRED: Route finding 1 (major) and findings 2-6 to domain-engineer, then run a focused re-review. The human decides open questions 2, 4, 5 and 8 before SP-P6-01.
+BLOCKED-ON OWNER: none
+BLOCKED-ON EVIDENCE: none
+NEXT GATE: domain-engineer repair of finding 1 (and ideally 2-4), `sbt check`, then a focused re-review by code-reviewer.
+UNVERIFIED CONCERNS:
+- If upickle 4 reads a missing Option key as None, an unknown confidence with the `value` or `unknownReason` key absent may decode. Refusal still holds (kind is required and the reason rule applies), but this is weaker than the documented wire form with explicit nulls.
+- JSON with duplicate `schemaVersion` keys in a part manifest: ujson and upickle should both take the last value consistently. Not observed.
+- Whether GraphFrames and Spark versions support the planned algorithms on the chosen Scala version.
+- The author's test counts were not observed by me.
+```
+
+---
+
+## CR-P6-14: code-reviewer re-review of DE-P6-02 repair 01 (2026-11-16), verbatim
+
+```text
+STATUS: COMPLETE
+OWNER: code-reviewer
+WORK ORDER: CR-P6-14 (Phase 6). Focused, read-only re-review of the DE-P6-02 repair 01 diff (domain-engineer) in modules/core/**, uncommitted on HEAD 6be1f1d, against CR-P6-13 findings 1-4.
+FILES CREATED: none
+FILES MODIFIED: none
+COMMANDS RUN: none. I used only Read and Grep. I read nothing under gold/, no held-out path, nothing under target/, and not docs/agent-runs/phase-05/human-gate.md. No Grep under gold/ or target/.
+TEST RESULTS: I ran no tests (the reviewer cannot run commands). The author reports `sbt check` passed with 1251 tests, 0 failed, 89 suites (core 557). I did not observe that output.
+VALIDATION RESULTS:
+- Finding 1 is closed.
+  - `AnalysisRunSettings` has a private constructor plus a `configDigest` field. The only construction site is `from` (ScholarChainConfig.scala:261), which fills the field from `digestOf` (:195-212). `digestOf` hashes the same `DigestInput` as before: base `digestWithoutGrouping(c)`, `community.randomSeed` and the four `analysis.*` values.
+  - `checkRunChain` refuses `analysisManifest.configDigest != settings.configDigest` (AnalysisValidation.scala:1241-1246). Every lineage is compared with an expected lineage whose `configDigest` is `settings.configDigest` (:1234, :1292).
+  - Tests:
+    - AnalysisValidationSuite:565-585: each of the five AnalysisScopeKeys changes the digest and `RunId.of`, the old manifest is refused, and `digestWithoutGrouping` does not move.
+    - :587-606: the base digest, `"9"*64` and `"0"*64` are refused, even with records restamped to match the bad manifest.
+    - The fixture now uses the real digest (AnalysisFixtures:156).
+  - `digestWithoutGrouping` (:622-623) and `GroupingRunSettings.configDigest` (:507-518) have the same inputs as I reviewed in CR-P6-13. No consumer outside core uses the changed APIs (Grep over the other modules, tests/ and project/: no matches).
+- Finding 2 is closed.
+  - `checkGraphInput(input, groupingManifest)` (AnalysisValidation.scala:172-241) binds:
+    - teams, works and researchers to `provenance.runId` = `RunId.of(groupingManifest)`, with a null provenance treated as foreign;
+    - works' and researchers' `decisionRunId` to the manifest's `decisionRunId`, with a missing parameter refused;
+    - duplicate teams (refused), and a counted work that has mentions but no team (refused).
+  - `checkIdentity` (:509-539) binds researchers to the grouping run and decisions to the decision run before it derives anything. Tests are at AnalysisValidationSuite:88-194.
+- Finding 3 is closed. `StoreLoadId.of` (StableIds.scala:911-944) uses tag `scholarchain.store-load.v2` and hashes the item count, then (path, role) for each item in UTF-8 path order. It refuses empty or null items, non-token roles and duplicate paths. Both call sites pass (path, role) (StoreLoad.scala:104-109, :236-241). The contract recomputes the ID with roles, so a relabelled role is refused. Tests: AnalysisWireSuite:208-252 and PartManifestV2Suite:303-326.
+- Finding 4 is closed.
+  - How `selectShortestPaths` works (AnalysisValidation.scala:971-1012):
+    - A breadth-first search from the target, bounded by maxHops, stops after the level where it reaches the source. That gives the true distance to the target for every node at distance at most d(source).
+    - A depth-first walk from the source then follows only neighbours at r-1, taken in ascending `compareUtf8` order, and stops after K paths.
+  - Why it is correct:
+    - Every node at distance r >= 1 has a neighbour at r-1, so the walk never reaches a dead end.
+    - All the candidate sequences have the same length and the same first node, so a depth-first walk with sorted children emits them in lexicographic order, which is `EvidencePath.nodeOrder`.
+    - The walk never lists all shortest paths. Its cost is about O(V+E) for the search plus K·maxHops·deg·log(deg) for the walk.
+  - I checked the tie fixtures by hand:
+    - Diamond n1-{n2,n3,n4}-n6: K=1 gives [n1,n2,n6], K=2 adds [n1,n3,n6], K=3 and K=5 give all three.
+    - Two levels: the only 3-hop paths are n1-n2-n4-n6, n1-n2-n5-n6 and n1-n3-n4-n6. No 2-hop path exists, and the n4-n5 edge only adds longer walks. maxHops=2 gives an empty result.
+    - The ORCID checksums of n1..n6 are valid (ISO 7064 11-2 gives 1, X, 8, 6, 4, 2), and the IDs sort as stated.
+    - Main fixture: K=1 stores A-B-C only (AnalysisValidationSuite:424-431).
+  - The exhaustive enumerator is a private test helper (EvidencePathSelectionSuite:99-122) and does not appear in main code. 61 pairs × 4 hop bounds × 7 values of K = 1708 cases, which matches the report.
+  - `checkPaths` (:832-952) refuses:
+    - paths for unlisted pairs, including the reversed orientation, because the pair contract requires canonical order;
+    - benchmark researchers who are not identified;
+    - stored sets or ordinals that differ from `selectShortestPaths`, including a listed, connected pair that has no stored paths.
+  - `checkRunChain` binds `benchmarkPairsDigest` (required key) and `provenance.runId` = grouping run (:1221, :1247-1258).
+- Item 5, no regressions:
+  - The v1 schema constants are unchanged (Contract.scala:95-97 only adds `BenchmarkPairList`).
+  - Findings 5 and 6 are untouched: `models(...)` is still rebuilt in each check, and there is still no runtime-vs-analysis hop cross-check.
+  - No new config key: no `benchmark` key under config/.
+  - The new and changed test files contain no target/, user.home, archive, gold/ or file I/O references, and the fixture config is in memory.
+
+VERDICT: APPROVE
+
+FINDINGS:
+
+domain-engineer (all nits; none blocks)
+
+1. NIT. Two `StoreLoadId.of` refusals have no direct test.
+   - Location: StableIds.scala:932-935; AnalysisWireSuite.scala:249 tests only the duplicate-path refusal.
+   - Failure input: delete the non-token-role branch (:934) or the empty-items branch (:932-933). Every test still passes.
+     - The contract's own token check (StoreLoad.scala:229) still catches a bad role in a manifest.
+     - `StoreLoadId.of(…, Vector(p -> "not a token"))` and `of(…, Vector.empty)` are never asserted.
+   - Impact: the regression would go undetected.
+   - Fix: add two `isLeft` assertions.
+
+2. NIT. The provenance of the benchmark pair list is only partly bound.
+   - Location: Analysis.scala:1307-1324 (contract) and AnalysisValidation.scala:1253.
+   - Only `runId`, `sourceRecordId`, derived source and null model/prompt are checked. `snapshot` and `sourceSchemaVersion` are not.
+   - Failure input: a list with `snapshot = "x"` and an arbitrary `sourceSchemaVersion` passes every check.
+   - Impact: the list's provenance can be misleading, though its pairs and its digest binding stay correct.
+   - Fix: require `snapshot` to be one of the grouping manifest's input snapshots and `sourceSchemaVersion` = `SchemaVersions.ResearcherAssignment`, or document that these fields are free text.
+
+3. NIT. The missing-team rule trusts the researcher assignments to be complete.
+   - Location: AnalysisValidation.scala:212-217.
+   - Failure input: a grouping input that is missing both a counted work's team and every researcher assignment of that work passes `checkGraphInput`. P_r is then undercounted for that work's authors.
+   - Why this is only a nit: catching this is the job of the accepted grouping gate (`AssignmentValidation.checkCoverage` against the curated expected author lists) and of part-manifest verification of the consumed bytes (`checkGroupingRunParts`).
+   - Fix: state in the doc comment at :63-65 or :155-171 that `checkGroupingRunParts` must pass on the archived bytes before `checkGraphInput`. SP-P6-01 should call them in that order.
+
+Recommendations on the two decisions the author flagged:
+- Team rule: accept the narrowing. The rule is one team per counted work that has at least one mention, and no team for a counted work without authors.
+  - It matches the accepted grouping output exactly. `Grouping.teamRecords` (Grouping.scala:1093-1094) emits teams only for counted works with `authors.nonEmpty`. `AssignmentValidation.checkTeams` (:600-603) uses the same rule. `PublicationTeam` requires `teamSize >= 1`.
+  - Read literally, "exactly one canonical team per counted work" would refuse a valid grouping run that contains an authorless DBLP work.
+  - A counted work with mentions but no team cannot slip through `checkGraphInput` while its assignments are present. The remaining route is nit 3, which upstream gates cover.
+  - Record the precise wording in human-gate.md.
+- One list per grouping run: accept. Binding `provenance.runId` to the grouping run is the conservative choice: it ties every pair ID to the run that issued it. Researcher IDs have no cross-run identity guarantee in the contracts, so a list carried silently into another run could name IDs that changed meaning. Re-issuing a list for a new grouping run is cheap and visibly changes `benchmarkPairsDigest` and the run ID.
+  - Before SP-P6-01, someone still has to decide where the real list lives and who owns it. Today any such path would be UNASSIGNED, so it needs a matrix amendment by factory-engineer and human ratification.
+
+ASSUMPTIONS:
+- The git status snapshot is the complete change set. I had no git, so "unchanged" claims for digest inputs and v1 behaviour rest on reading the current code against my CR-P6-13 reading, plus the existing frozen-digest and DevRunInputsSuite tests the author reports as passing.
+- The author's `sbt check` counts are context only, never evidence for a verdict.
+RISKS:
+- Spark must reproduce `selectShortestPaths` exactly: the same set and order, with ties broken by unsigned UTF-8 node order. A GraphFrames shortestPaths call does not give this by itself.
+- Findings 5 and 6 and the upstream digest-scope inconsistency remain open, as recorded.
+MANUAL ACTION REQUIRED: Human: decide the team-rule wording and the one-list-per-grouping-run binding (both recommended for acceptance above). Decide the location and owner of the real benchmark pair list (matrix amendment). Optionally route nits 1-3 to domain-engineer.
+BLOCKED-ON OWNER: none
+BLOCKED-ON EVIDENCE: none
+NEXT GATE: human acceptance of the repair and the two decisions, then the contract commit scope and SP-P6-01 planning.
+UNVERIFIED CONCERNS:
+- I assume Scala 3 makes the synthesized `copy` and `apply` of a case class with a private constructor private too, so a caller cannot build `AnalysisRunSettings` with a forged `configDigest` through `copy`. I found no `copy` use on it in the repository, but I did not observe compiler behaviour.
+- `checkWindows.countedWorkCount` counts teams, not counted works, so an authorless counted work with a year is not counted. This is a pre-existing semantic outside the repair scope. Confirm it is the intended definition of countedWorkCount.
+- I did not observe the author's test counts or the 1708-case count at runtime. I checked the arithmetic only.
+```

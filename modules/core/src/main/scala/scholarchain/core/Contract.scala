@@ -31,6 +31,28 @@ import upickle.default.ReadWriter
  *     record type (`AuthorshipRecordV2`); `authorship-record.v1` is NOT retired: its contract,
  *     codec and frozen example are unchanged and it still decodes, and [[AuthorshipRecords.decode]]
  *     reads either version. Grouping-based writers write v2 only.
+ *   - Phase 6 (DE-P6-02), the collaboration-analysis contracts. New record types, each its own
+ *     contract, with no superseded version retired:
+ *     - `researcher-metrics.v2` (C1, [[ResearcherMetricsV2]]): P_r..W_r per researcher and window,
+ *       unresolved coauthor occurrences in separate fields, identity confidence (C5) and lineage;
+ *       the graph-structure fields of v1 move to their own C3 records. `researcher-metrics.v1`
+ *       ([[ResearcherMetrics]]) keeps its contract, codec and frozen example and still decodes;
+ *       analysis writers write v2 only.
+ *     - `coauthor-edge.v2` (C2, [[CoauthorEdgeV2]]): identified endpoints, per-year weights inside
+ *       the window and every supporting counted work. Same edge ID formula as v1
+ *       ([[CoauthorEdgeId]], tag `scholarchain.coauthor-edge.v1`). `coauthor-edge.v1` still
+ *       decodes.
+ *     - C3: `component-membership.v1`, `community-membership.v1`, `bridge-measure.v1`,
+ *       `coreness.v1`, `evidence-path.v1` (bounded shortest-path support, also the C6 evidence
+ *       path).
+ *     - C4: `analysis-window.v1`. C6: `semantic-summary-input.v1`.
+ *     - `part-manifest.v2` (integrity per format: jsonl, parquet, csv). `part-manifest.v1` is NOT
+ *       retired: its contract, verifier and frozen example are unchanged, every v1 reader keeps
+ *       working, and [[PartManifests.decode]] reads either version.
+ *     - C7: `store-load-manifest.v1`, a control record that names parts of a part manifest.
+ *     - `benchmark-pairs.v1` ([[BenchmarkPairList]], repair 01): the explicit, versioned list of
+ *       researcher pairs whose shortest paths an analysis run stores; an input bound by the
+ *       analysis run manifest.
  */
 object SchemaVersions {
   val WorkRecord = "scholarchain.work-record.v3"
@@ -61,6 +83,18 @@ object SchemaVersions {
   val WorkAssignment = "scholarchain.work-assignment.v1"
   val AuthorshipRecordV2 = "scholarchain.authorship-record.v2"
   val PartManifest = "scholarchain.part-manifest.v1"
+  val ResearcherMetricsV2 = "scholarchain.researcher-metrics.v2"
+  val CoauthorEdgeV2 = "scholarchain.coauthor-edge.v2"
+  val ComponentMembership = "scholarchain.component-membership.v1"
+  val CommunityMembership = "scholarchain.community-membership.v1"
+  val BridgeMeasure = "scholarchain.bridge-measure.v1"
+  val Coreness = "scholarchain.coreness.v1"
+  val EvidencePath = "scholarchain.evidence-path.v1"
+  val AnalysisWindow = "scholarchain.analysis-window.v1"
+  val SemanticSummaryInput = "scholarchain.semantic-summary-input.v1"
+  val PartManifestV2 = "scholarchain.part-manifest.v2"
+  val StoreLoadManifest = "scholarchain.store-load-manifest.v1"
+  val BenchmarkPairList = "scholarchain.benchmark-pairs.v1"
 
   /** Superseded versions that no decoder accepts (kept to make the rejection explicit). */
   val retired: Map[String, Vector[String]] = Map(
@@ -98,7 +132,19 @@ object SchemaVersions {
     "ResearcherAssignment" -> ResearcherAssignment,
     "WorkAssignment" -> WorkAssignment,
     "AuthorshipRecordV2" -> AuthorshipRecordV2,
-    "PartManifest" -> PartManifest
+    "PartManifest" -> PartManifest,
+    "ResearcherMetricsV2" -> ResearcherMetricsV2,
+    "CoauthorEdgeV2" -> CoauthorEdgeV2,
+    "ComponentMembership" -> ComponentMembership,
+    "CommunityMembership" -> CommunityMembership,
+    "BridgeMeasure" -> BridgeMeasure,
+    "Coreness" -> Coreness,
+    "EvidencePath" -> EvidencePath,
+    "AnalysisWindow" -> AnalysisWindow,
+    "SemanticSummaryInput" -> SemanticSummaryInput,
+    "PartManifestV2" -> PartManifestV2,
+    "StoreLoadManifest" -> StoreLoadManifest,
+    "BenchmarkPairList" -> BenchmarkPairList
   )
 }
 

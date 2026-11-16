@@ -116,6 +116,51 @@ object PartManifest {
         )
     }
 
+  /**
+   * The path-set rules shared by every part manifest version (v1 and v2): paths sorted by UTF-8
+   * bytes without duplicates, no two paths that differ only in letter case, and no listed file that
+   * is also a directory of another listed path. `rawPaths` is the `path` of every listed file in
+   * listed order (null for a null file or path).
+   */
+  private[core] def pathSetChecks(p: String, rawPaths: Vector[String]): Vector[ValidationError] = {
+    val paths = rawPaths.filter(_ != null)
+    // Only valid paths (pathProblem empty, so at most MaxPathLength characters) enter the
+    // directory index; an invalid path is already refused by the per-file checks (CR-P6-04 m1).
+    // Every directory prefix of a valid path is itself valid, so no overlap among valid paths is
+    // lost.
+    val validPaths = paths.filter(pathProblem(_).isEmpty)
+    val directoryOwner: Map[String, String] =
+      validPaths.foldLeft(Map.empty[String, String]) { (m, b) =>
+        b.indices.filter(b.charAt(_) == '/').foldLeft(m) { (acc, i) =>
+          val dir = b.substring(0, i)
+          if (acc.contains(dir)) acc else acc.updated(dir, b)
+        }
+      }
+    all(
+      Validated.strictlyAscending(at(p, "files.path"), rawPaths),
+      paths.groupBy(_.toLowerCase(java.util.Locale.ROOT)).toVector.sortBy(_._1).flatMap {
+        case (_, same) =>
+          when(same.distinct.size > 1)(
+            ValidationError.InvalidValue(
+              at(p, "files.path"),
+              s"paths differ only in letter case: ${same.distinct.sorted.mkString(", ")}"
+            )
+          )
+      },
+      // A valid file path that is also a directory prefix of another valid listed path (first
+      // listed path kept per prefix, the one `paths.find` named before). Each valid path adds one
+      // prefix copy per '/', so the index costs O(L * d) characters per path, d <= L / 2.
+      validPaths.flatMap { a =>
+        directoryOwner.get(a).toVector.map { b =>
+          ValidationError.InvalidValue(
+            at(p, "files.path"),
+            s"'$a' is listed as a file but is a directory of '$b'"
+          )
+        }
+      }
+    )
+  }
+
   private def fileChecks(f: PartFile, p: String): Vector[ValidationError] =
     if (f == null) Vector(ValidationError.MissingField(p))
     else
@@ -160,47 +205,12 @@ object PartManifest {
       def provenanceOf(t: PartManifest): Provenance = null
       protected def fields(t: PartManifest, p: String): Vector[ValidationError] = {
         val files = Option(t.files).getOrElse(Vector.empty)
-        val paths = files.filter(_ != null).map(_.path).filter(_ != null)
         val runManifest = files.find(f => f != null && f.path == RunManifestFile)
-        // Only valid paths (pathProblem empty, so at most MaxPathLength characters) enter the
-        // directory index; an invalid path is already refused by fileChecks (CR-P6-04 m1). Every
-        // directory prefix of a valid path is itself valid, so no overlap among valid paths is lost.
-        val validPaths = paths.filter(pathProblem(_).isEmpty)
-        val directoryOwner: Map[String, String] =
-          validPaths.foldLeft(Map.empty[String, String]) { (m, b) =>
-            b.indices.filter(b.charAt(_) == '/').foldLeft(m) { (acc, i) =>
-              val dir = b.substring(0, i)
-              if (acc.contains(dir)) acc else acc.updated(dir, b)
-            }
-          }
         all(
           StableId.check(IdKind.Run, t.runId, at(p, "runId")),
           when(t.files == null || files.isEmpty)(ValidationError.MissingField(at(p, "files"))),
           files.zipWithIndex.flatMap { case (f, i) => fileChecks(f, at(p, s"files[$i]")) },
-          Validated.strictlyAscending(
-            at(p, "files.path"),
-            files.map(f => if (f == null) null else f.path)
-          ),
-          paths.groupBy(_.toLowerCase(java.util.Locale.ROOT)).toVector.sortBy(_._1).flatMap {
-            case (_, same) =>
-              when(same.distinct.size > 1)(
-                ValidationError.InvalidValue(
-                  at(p, "files.path"),
-                  s"paths differ only in letter case: ${same.distinct.sorted.mkString(", ")}"
-                )
-              )
-          },
-          // A valid file path that is also a directory prefix of another valid listed path (first
-          // listed path kept per prefix, the one `paths.find` named before). Each valid path adds
-          // one prefix copy per '/', so the index costs O(L * d) characters per path, d <= L / 2.
-          validPaths.flatMap { a =>
-            directoryOwner.get(a).toVector.map { b =>
-              ValidationError.InvalidValue(
-                at(p, "files.path"),
-                s"'$a' is listed as a file but is a directory of '$b'"
-              )
-            }
-          },
+          pathSetChecks(p, files.map(f => if (f == null) null else f.path)),
           runManifest match {
             case None =>
               Vector(
@@ -308,13 +318,69 @@ object PartManifestVerifier {
       if (manifest == null) Vector(ValidationError.MissingField("partManifest"))
       else PartManifest.contract.validate(manifest)
     if (manifestErrors.nonEmpty) manifestErrors
-    else {
+    else
+      compare(
+        manifest.runId,
+        expectedRunId,
+        manifest.files.map(f => Listed(f.path, f.byteCount, f.rowCount, f.sha256, true)),
+        observed
+      )
+  }
+
+  /**
+   * Every problem, empty when the observed directory is exactly the published run `expectedRunId`
+   * described by a v2 manifest ([[PartManifestV2]], DE-P6-02). File set and markers as in
+   * [[verify]]. Per file: byte count and SHA-256 always; for `jsonl` also the LF row count and the
+   * final LF. For `parquet` and `csv` the row count is the declared value (Parquet footer or
+   * writer) and is not compared with the bytes, and no newline rule applies: a binary file that
+   * does not end in LF is accepted when its byte count and SHA-256 match.
+   */
+  def verifyV2(
+      manifest: PartManifestV2,
+      expectedRunId: String,
+      observed: Vector[ObservedFile]
+  ): Vector[ValidationError] = {
+    val manifestErrors =
+      if (manifest == null) Vector(ValidationError.MissingField("partManifest"))
+      else PartManifestV2.contract.validate(manifest)
+    if (manifestErrors.nonEmpty) manifestErrors
+    else
+      compare(
+        manifest.runId,
+        expectedRunId,
+        manifest.files
+          .map(f => Listed(f.path, f.byteCount, f.rowCount, f.sha256, f.format.lineDelimited)),
+        observed
+      )
+  }
+
+  /**
+   * One listed file as the comparison sees it. `lineDelimited` files (every v1 file, and v2 `jsonl`
+   * files) are also compared by LF row count and must end in LF when non-empty; other files (v2
+   * `parquet` and `csv`) are compared by byte count and SHA-256 only.
+   */
+  private[core] final case class Listed(
+      path: String,
+      byteCount: Long,
+      rowCount: Long,
+      sha256: String,
+      lineDelimited: Boolean
+  )
+
+  /** The comparison shared by every part manifest version; the manifest is already valid. */
+  private[core] def compare(
+      manifestRunId: String,
+      expectedRunId: String,
+      files: Vector[Listed],
+      observed: Vector[ObservedFile]
+  ): Vector[ValidationError] = {
+    locally {
       val obs = Option(observed).getOrElse(Vector.empty)
-      val listed = manifest.files.map(f => f.path -> f).toMap
+      val listed = files.map(f => f.path -> f).toMap
       val byPath = obs.filter(o => o != null && o.path != null).groupBy(_.path)
       def field(path: String) = s"files[$path]"
       all(
-        when(manifest.runId != expectedRunId)(
+        when(manifestRunId != expectedRunId)(
           ValidationError.InvalidValue("runId", s"the directory holds run $expectedRunId")
         ),
         when(observed == null || obs.exists(o => o == null || o.path == null))(
@@ -328,7 +394,7 @@ object PartManifestVerifier {
             ValidationError.InvalidValue(field(m), "marker file missing from the run directory")
           )
         },
-        manifest.files.flatMap { f =>
+        files.flatMap { f =>
           when(!byPath.contains(f.path))(
             ValidationError
               .InvalidValue(field(f.path), "listed file missing from the run directory")
@@ -340,7 +406,7 @@ object PartManifestVerifier {
           .map(path =>
             ValidationError.InvalidValue(field(path), "extra file not listed in the part manifest")
           ),
-        manifest.files.flatMap { f =>
+        files.flatMap { f =>
           byPath.get(f.path).flatMap(_.headOption).toVector.flatMap { o =>
             all(
               when(o.byteCount != f.byteCount)(
@@ -349,7 +415,7 @@ object PartManifestVerifier {
                   s"byteCount: listed ${f.byteCount}, observed ${o.byteCount}"
                 )
               ),
-              when(o.rowCount != f.rowCount)(
+              when(f.lineDelimited && o.rowCount != f.rowCount)(
                 ValidationError.InvalidValue(
                   field(f.path),
                   s"rowCount: listed ${f.rowCount}, observed ${o.rowCount}"
@@ -361,7 +427,7 @@ object PartManifestVerifier {
                   s"sha256: listed ${f.sha256}, observed ${o.sha256}"
                 )
               ),
-              when(o.byteCount > 0 && !o.endsWithLf)(
+              when(f.lineDelimited && o.byteCount > 0 && !o.endsWithLf)(
                 ValidationError.InvalidValue(field(f.path), "a non-empty file must end in LF")
               )
             )

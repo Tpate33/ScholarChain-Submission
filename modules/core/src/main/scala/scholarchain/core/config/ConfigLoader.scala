@@ -63,10 +63,13 @@ enum ConfigError {
 /** Value kinds of configuration keys. */
 enum ValueKind {
   case Token, Text, OptionalText, Bucket, Region, AccountId, PositiveInt, AnyLong, Probability,
-    Window, Windows, IdentityVersion, OptionalToken, OptionalLocation
+    Window, Windows, IdentityVersion, OptionalToken, OptionalLocation, OptionalPositiveInt,
+    OptionalLong
 
   /** Optional kinds may be unset (absent, `null`, or an empty environment value). */
-  def optional: Boolean = this == OptionalText || this == OptionalToken || this == OptionalLocation
+  def optional: Boolean =
+    this == OptionalText || this == OptionalToken || this == OptionalLocation ||
+      this == OptionalPositiveInt || this == OptionalLong
 }
 
 /** One configuration key: dotted path, kind, and its environment variable name. */
@@ -82,7 +85,11 @@ final case class ConfigKey(path: String, kind: ValueKind) {
  * v2: `entityResolution.groupingPolicyVersion`, `entityResolution.decisionRunRoot` and
  * `entityResolution.assignmentRunRoot`. Every existing v2 file loads unchanged and keeps its
  * digest; the features that need the keys refuse a configuration without them
- * ([[GroupingRunSettings.from]]).
+ * ([[GroupingRunSettings.from]]). Phase 6 (DE-P6-02) adds five more OPTIONAL keys to v2, the
+ * analysis scope ([[ScholarChainConfig.AnalysisScopeKeys]]): `community.randomSeed`,
+ * `analysis.maxPathHops`, `analysis.maxPathsPerPair`, `analysis.maxEvidenceWorksPerHop` and
+ * `analysis.exportFormat`. Again every existing v2 file loads unchanged and keeps its digest, and
+ * the analysis feature refuses a configuration without them ([[AnalysisRunSettings.from]]).
  */
 object ConfigKeys {
   val EnvPrefix = "SCHOLARCHAIN_CFG_"
@@ -123,6 +130,7 @@ object ConfigKeys {
     ConfigKey("bridge.maxIterations", PositiveInt),
     ConfigKey("community.algorithm", Token),
     ConfigKey("community.maxIterations", PositiveInt),
+    ConfigKey("community.randomSeed", OptionalLong),
     ConfigKey("entityResolution.policyVersion", Token),
     ConfigKey("entityResolution.acceptThreshold", Probability),
     ConfigKey("entityResolution.rejectThreshold", Probability),
@@ -134,7 +142,11 @@ object ConfigKeys {
     ConfigKey("entityResolution.assignmentRunRoot", OptionalLocation),
     ConfigKey("runtime.maxPathHops", PositiveInt),
     ConfigKey("runtime.retrievalTopK", PositiveInt),
-    ConfigKey("runtime.defaultWindow", Window)
+    ConfigKey("runtime.defaultWindow", Window),
+    ConfigKey("analysis.maxPathHops", OptionalPositiveInt),
+    ConfigKey("analysis.maxPathsPerPair", OptionalPositiveInt),
+    ConfigKey("analysis.maxEvidenceWorksPerHop", OptionalPositiveInt),
+    ConfigKey("analysis.exportFormat", OptionalToken)
   )
   val byPath: Map[String, ConfigKey] = all.map(k => k.path -> k).toMap
   val byEnv: Map[String, ConfigKey] = all.map(k => k.envName -> k).toMap
@@ -446,6 +458,14 @@ object ConfigLoader {
   }
 
   private def envValue(key: ConfigKey, raw: String): Either[String, Raw] = key.kind match {
+    case ValueKind.OptionalPositiveInt if raw.nonEmpty =>
+      raw.toIntOption
+        .map(i => Raw.Num(BigDecimal(i), integral = true))
+        .toRight(s"'$raw' is not an integer")
+    case ValueKind.OptionalLong if raw.nonEmpty =>
+      raw.toLongOption
+        .map(l => Raw.Num(BigDecimal(l), integral = true))
+        .toRight(s"'$raw' is not a 64-bit integer")
     case k if k.optional => Right(if (raw.isEmpty) Raw.NullValue else Raw.Str(raw))
     case _ if raw.isEmpty => Left("empty value")
     case ValueKind.PositiveInt =>
@@ -521,6 +541,22 @@ object ConfigLoader {
         s => if (StableId.isToken(s)) None else Some("is not a token [A-Za-z0-9._-]+")
       )
     def optLocation(path: String): Option[String] = optChecked(path, RunLocation.problem)
+    def optPositiveInt(path: String): Option[Int] =
+      values.get(path) match {
+        case None | Some((Raw.NullValue, _)) => None
+        case Some((Raw.Num(n, integral), src)) =>
+          if (integral && n >= 1 && n <= Int.MaxValue) Some(n.toInt)
+          else { fail(path, src, s"$n is not a whole number in [1, ${Int.MaxValue}]"); None }
+        case Some((_, src)) => fail(path, src, "expected an integer or null"); None
+      }
+    def optLong(path: String): Option[Long] =
+      values.get(path) match {
+        case None | Some((Raw.NullValue, _)) => None
+        case Some((Raw.Num(n, integral), src)) =>
+          if (integral && n.isValidLong) Some(n.toLong)
+          else { fail(path, src, s"$n is not a 64-bit integer literal"); None }
+        case Some((_, src)) => fail(path, src, "expected an integer or null"); None
+      }
     def positiveInt(path: String): Int =
       raw(path) match {
         case Some((Raw.Num(n, _), src)) =>
@@ -604,7 +640,8 @@ object ConfigLoader {
       ),
       community = CommunityConfig(
         algorithm = token("community.algorithm"),
-        maxIterations = positiveInt("community.maxIterations")
+        maxIterations = positiveInt("community.maxIterations"),
+        randomSeed = optLong(AnalysisConfig.CommunityRandomSeedKey)
       ),
       entityResolution = EntityResolutionConfig(
         policyVersion = token("entityResolution.policyVersion"),
@@ -621,12 +658,20 @@ object ConfigLoader {
         maxPathHops = positiveInt("runtime.maxPathHops"),
         retrievalTopK = positiveInt("runtime.retrievalTopK"),
         defaultWindow = window("runtime.defaultWindow")
+      ),
+      analysis = AnalysisConfig(
+        maxPathHops = optPositiveInt(AnalysisConfig.MaxPathHopsKey),
+        maxPathsPerPair = optPositiveInt(AnalysisConfig.MaxPathsPerPairKey),
+        maxEvidenceWorksPerHop = optPositiveInt(AnalysisConfig.MaxEvidenceWorksPerHopKey),
+        exportFormat = optToken(AnalysisConfig.ExportFormatKey)
       )
     )
     // Cross-key rules (reject < llmBandLower < llmBandUpper < accept; grouping policy differs
-    // from the match policy; the two run roots are disjoint) once every key is valid.
+    // from the match policy; the two run roots are disjoint; the analysis export format is a
+    // known format) once every key is valid.
     if (errors.isEmpty)
-      EntityResolutionConfig.problems(config.entityResolution).foreach { case (key, reason) =>
+      (EntityResolutionConfig.problems(config.entityResolution) ++
+        AnalysisConfig.problems(config.analysis)).foreach { case (key, reason) =>
         errors += ConfigError.InvalidValue(key, "resolved configuration", reason)
       }
     if (errors.nonEmpty) Left(errors.toVector) else Right(config)

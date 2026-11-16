@@ -8,8 +8,23 @@ class SchemaVersionSuite extends munit.FunSuite {
     errs.exists(_.isInstanceOf[ValidationError.UnsupportedSchemaVersion])
 
   test("schema version constants are frozen and distinct") {
-    assertEquals(SchemaVersions.all.size, 28)
-    assertEquals(SchemaVersions.all.values.toSet.size, 28)
+    assertEquals(SchemaVersions.all.size, 40)
+    assertEquals(SchemaVersions.all.values.toSet.size, 40)
+    // DE-P6-02 repair 01: the explicit, versioned benchmark pair list for stored paths.
+    assertEquals(SchemaVersions.BenchmarkPairList, "scholarchain.benchmark-pairs.v1")
+    // DE-P6-02: the analysis contracts. The v1 metrics, edge and part-manifest versions stay
+    // current (readable), next to their v2 record types.
+    assertEquals(SchemaVersions.ResearcherMetricsV2, "scholarchain.researcher-metrics.v2")
+    assertEquals(SchemaVersions.CoauthorEdgeV2, "scholarchain.coauthor-edge.v2")
+    assertEquals(SchemaVersions.ComponentMembership, "scholarchain.component-membership.v1")
+    assertEquals(SchemaVersions.CommunityMembership, "scholarchain.community-membership.v1")
+    assertEquals(SchemaVersions.BridgeMeasure, "scholarchain.bridge-measure.v1")
+    assertEquals(SchemaVersions.Coreness, "scholarchain.coreness.v1")
+    assertEquals(SchemaVersions.EvidencePath, "scholarchain.evidence-path.v1")
+    assertEquals(SchemaVersions.AnalysisWindow, "scholarchain.analysis-window.v1")
+    assertEquals(SchemaVersions.SemanticSummaryInput, "scholarchain.semantic-summary-input.v1")
+    assertEquals(SchemaVersions.PartManifestV2, "scholarchain.part-manifest.v2")
+    assertEquals(SchemaVersions.StoreLoadManifest, "scholarchain.store-load-manifest.v1")
     assertEquals(SchemaVersions.ResearcherAssignment, "scholarchain.researcher-assignment.v1")
     assertEquals(SchemaVersions.WorkAssignment, "scholarchain.work-assignment.v1")
     assertEquals(SchemaVersions.AuthorshipRecordV2, "scholarchain.authorship-record.v2")
@@ -61,7 +76,19 @@ class SchemaVersionSuite extends munit.FunSuite {
       ResearcherAssignment.contract,
       WorkAssignment.contract,
       AuthorshipRecordV2.contract,
-      PartManifest.contract
+      PartManifest.contract,
+      ResearcherMetricsV2.contract,
+      CoauthorEdgeV2.contract,
+      ComponentMembership.contract,
+      CommunityMembership.contract,
+      BridgeMeasure.contract,
+      Coreness.contract,
+      EvidencePath.contract,
+      AnalysisWindow.contract,
+      SemanticSummaryInput.contract,
+      PartManifestV2.contract,
+      StoreLoadManifest.contract,
+      BenchmarkPairList.contract
     )
     assertEquals(contracts.map(_.recordType).toSet, SchemaVersions.all.keySet)
     contracts.foreach { c =>
@@ -211,6 +238,30 @@ class SchemaVersionSuite extends munit.FunSuite {
 
   test("a record of another type is rejected by its schema version") {
     assert(Json.decode[CoauthorEdge](Json.write(metrics)).left.exists(unsupported))
+  }
+
+  test(
+    "DE-P6-02: v1 and v2 metrics and edges are distinct record types; each accepts its own version"
+  ) {
+    import AnalysisFixtures.{edgeAB, metricA1}
+    assert(Json.decode[ResearcherMetrics](Json.write(metricA1)).left.exists(unsupported))
+    assert(Json.decode[ResearcherMetricsV2](Json.write(metrics)).left.exists(unsupported))
+    assert(Json.decode[CoauthorEdge](Json.write(edgeAB)).left.exists(unsupported))
+    assert(Json.decode[CoauthorEdgeV2](Json.write(coauthorEdge)).left.exists(unsupported))
+    // The v1 records still decode unchanged.
+    assertEquals(Json.decode[ResearcherMetrics](Json.write(metrics)), Right(metrics))
+    assertEquals(Json.decode[CoauthorEdge](Json.write(coauthorEdge)), Right(coauthorEdge))
+    // v1-shaped JSON relabelled v2 does not decode (graph-structure fields are gone in v2).
+    val relabelled =
+      Json
+        .write(metrics)
+        .replace(SchemaVersions.ResearcherMetrics, SchemaVersions.ResearcherMetricsV2)
+    assert(
+      Json
+        .decode[ResearcherMetricsV2](relabelled)
+        .left
+        .exists(_.exists(_.isInstanceOf[ValidationError.Undecodable]))
+    )
   }
 
   test("in-memory validation rejects unsupported versions, including nested records") {

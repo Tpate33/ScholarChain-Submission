@@ -270,7 +270,20 @@ class WireContractSuite extends munit.FunSuite {
       "ResearcherAssignment",
       "WorkAssignment",
       "AuthorshipRecordV2",
-      "PartManifest"
+      "PartManifest",
+      // Phase 6 (DE-P6-02): frozen in AnalysisWireSuite.
+      "ResearcherMetricsV2",
+      "CoauthorEdgeV2",
+      "ComponentMembership",
+      "CommunityMembership",
+      "BridgeMeasure",
+      "Coreness",
+      "EvidencePath",
+      "AnalysisWindow",
+      "SemanticSummaryInput",
+      "PartManifestV2",
+      "StoreLoadManifest",
+      "BenchmarkPairList"
     )
     assertEquals(frozenTypes, SchemaVersions.all.keySet)
   }

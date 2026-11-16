@@ -1034,6 +1034,205 @@ class ConfigLoaderSuite extends munit.FunSuite {
     )
   }
 
+  // ---------------------------------------------------------------- Phase 6 analysis keys (DE-P6-02)
+
+  private val analysisLines =
+    """community.randomSeed = 11
+      |analysis {
+      |  maxPathHops = 3
+      |  maxPathsPerPair = 2
+      |  maxEvidenceWorksPerHop = 5
+      |  exportFormat = parquet
+      |}
+      |""".stripMargin
+
+  test(
+    "DE-P6-02: existing configs load unchanged; the analysis keys are unset and keep the digest"
+  ) {
+    for (text <- Vector(base, jsonBase, dottedBase)) {
+      val c = loadOk(filesEnv, files("base.conf" -> text))
+      assertEquals(c.analysis, AnalysisConfig())
+      assertEquals(c.community.randomSeed, None)
+      assertEquals(upickle.default.write(c), baseDigestInput)
+    }
+    val nulls = base + "analysis.maxPathHops = null\ncommunity.randomSeed = null\n"
+    assertEquals(
+      ScholarChainConfig.digest(loadOk(filesEnv, files("base.conf" -> nulls))),
+      scholarchain.core.Canonical.sha256HexUtf8(baseDigestInput)
+    )
+  }
+
+  test("DE-P6-02: the analysis keys load from files and the environment, with env names") {
+    val c = loadOk(filesEnv, files("base.conf" -> (base + analysisLines)))
+    assertEquals(c.analysis, AnalysisConfig(Some(3), Some(2), Some(5), Some("parquet")))
+    assertEquals(c.community.randomSeed, Some(11L))
+    assertEquals(
+      ScholarChainConfig.AnalysisScopeKeys.map(ConfigKeys.envNameOf),
+      Vector(
+        "SCHOLARCHAIN_CFG_COMMUNITY__RANDOM_SEED",
+        "SCHOLARCHAIN_CFG_ANALYSIS__MAX_PATH_HOPS",
+        "SCHOLARCHAIN_CFG_ANALYSIS__MAX_PATHS_PER_PAIR",
+        "SCHOLARCHAIN_CFG_ANALYSIS__MAX_EVIDENCE_WORKS_PER_HOP",
+        "SCHOLARCHAIN_CFG_ANALYSIS__EXPORT_FORMAT"
+      )
+    )
+    val viaEnv = loadOk(
+      filesEnv ++ Map(
+        "SCHOLARCHAIN_CFG_ANALYSIS__MAX_PATH_HOPS" -> "4",
+        "SCHOLARCHAIN_CFG_ANALYSIS__EXPORT_FORMAT" -> "jsonl",
+        "SCHOLARCHAIN_CFG_COMMUNITY__RANDOM_SEED" -> "9007199254740993"
+      ),
+      files("base.conf" -> (base + analysisLines))
+    )
+    assertEquals(viaEnv.analysis.maxPathHops, Some(4))
+    assertEquals(viaEnv.analysis.exportFormat, Some("jsonl"))
+    assertEquals(viaEnv.community.randomSeed, Some(9007199254740993L))
+    val unset = loadOk(
+      filesEnv + ("SCHOLARCHAIN_CFG_ANALYSIS__MAX_PATH_HOPS" -> ""),
+      files("base.conf" -> (base + analysisLines))
+    )
+    assertEquals(unset.analysis.maxPathHops, None, "an empty environment value unsets the key")
+  }
+
+  test("DE-P6-02: set analysis values are validated") {
+    def withLine(line: String) = loadBase(base + line + "\n")
+    assertEquals(
+      invalidKeys(withLine("analysis.maxPathHops = 0")),
+      Set(AnalysisConfig.MaxPathHopsKey)
+    )
+    assertEquals(
+      invalidKeys(withLine("analysis.maxPathsPerPair = \"2\"")),
+      Set(AnalysisConfig.MaxPathsPerPairKey),
+      "numbers must not be quoted strings"
+    )
+    assertEquals(
+      invalidKeys(withLine("analysis.maxEvidenceWorksPerHop = 1.5")),
+      Set(AnalysisConfig.MaxEvidenceWorksPerHopKey)
+    )
+    for (bad <- Vector("csv", "orc", "\"has space\""))
+      assertEquals(
+        invalidKeys(withLine(s"analysis.exportFormat = $bad")),
+        Set(AnalysisConfig.ExportFormatKey),
+        bad
+      )
+    assertEquals(
+      invalidKeys(withLine("community.randomSeed = 7.0")),
+      Set(AnalysisConfig.CommunityRandomSeedKey)
+    )
+    assertEquals(
+      invalidKeys(
+        ConfigLoader.load(
+          filesEnv + ("SCHOLARCHAIN_CFG_ANALYSIS__MAX_PATH_HOPS" -> "x"),
+          files("base.conf" -> base)
+        )
+      ),
+      Set(AnalysisConfig.MaxPathHopsKey)
+    )
+    assert(
+      loadBase(base + "analysis.unknownKey = 1\n").left
+        .exists(_.contains(ConfigError.UnknownKey("file base.conf", "analysis.unknownKey")))
+    )
+  }
+
+  test("DE-P6-02: analysis keys never change an upstream digest (decision or grouping run)") {
+    val baseDigest = scholarchain.core.Canonical.sha256HexUtf8(baseDigestInput)
+    val grouped = loadOk(filesEnv, files("base.conf" -> (base + groupingLines)))
+    val both = loadOk(filesEnv, files("base.conf" -> (base + groupingLines + analysisLines)))
+    assertNotEquals(ScholarChainConfig.digest(both), ScholarChainConfig.digest(grouped))
+    assertEquals(ScholarChainConfig.digestWithoutGrouping(both), baseDigest)
+    assertEquals(GroupingRunSettings.configDigest(both), GroupingRunSettings.configDigest(grouped))
+    assertEquals(ScholarChainConfig.withoutAnalysis(both), grouped)
+  }
+
+  test("DE-P6-02: the analysis feature refuses a configuration without its keys") {
+    val plain = loadOk(filesEnv, files("base.conf" -> base))
+    assertEquals(
+      AnalysisRunSettings.from(plain),
+      Left(
+        Vector(
+          ConfigError
+            .MissingKey(AnalysisConfig.MaxPathHopsKey, "SCHOLARCHAIN_CFG_ANALYSIS__MAX_PATH_HOPS"),
+          ConfigError.MissingKey(
+            AnalysisConfig.MaxPathsPerPairKey,
+            "SCHOLARCHAIN_CFG_ANALYSIS__MAX_PATHS_PER_PAIR"
+          ),
+          ConfigError.MissingKey(
+            AnalysisConfig.MaxEvidenceWorksPerHopKey,
+            "SCHOLARCHAIN_CFG_ANALYSIS__MAX_EVIDENCE_WORKS_PER_HOP"
+          ),
+          ConfigError.MissingKey(
+            AnalysisConfig.ExportFormatKey,
+            "SCHOLARCHAIN_CFG_ANALYSIS__EXPORT_FORMAT"
+          )
+        )
+      )
+    )
+    assert(AnalysisRunSettings.configDigest(plain).isLeft)
+  }
+
+  test(
+    "DE-P6-02: analysis settings come from configuration only (windows, algorithms, bounds, format)"
+  ) {
+    val c = loadOk(filesEnv, files("base.conf" -> (base + analysisLines)))
+    val s = AnalysisRunSettings.from(c).fold(e => fail(e.map(_.message).mkString("; ")), identity)
+    assertEquals(s.windows, Vector(TimeWindow(2000, 2005), TimeWindow(2006, 2010)))
+    assertEquals(s.graphPolicyVersion, "graph-policy-1.0.0")
+    assertEquals(s.identityVersion, "v1")
+    assertEquals(s.bridgeAlgorithm, "betweenness-sampled")
+    assertEquals(
+      s.bridgeParameters,
+      scala.collection.immutable
+        .SortedMap("maxIterations" -> "10", "randomSeed" -> "7", "sampleSize" -> "64")
+    )
+    assertEquals(s.communityAlgorithm, "label-propagation")
+    assertEquals(
+      s.communityParameters,
+      scala.collection.immutable.SortedMap("maxIterations" -> "20", "randomSeed" -> "11")
+    )
+    assertEquals(s.pathBounds, scholarchain.core.PathBounds(3, 2, 5))
+    assertEquals(s.exportFormat, scholarchain.core.PartFormat.Parquet)
+    val noSeed = c.copy(community = c.community.copy(randomSeed = None))
+    assertEquals(
+      AnalysisRunSettings.from(noSeed).map(_.communityParameters),
+      Right(scala.collection.immutable.SortedMap("maxIterations" -> "20"))
+    )
+    val dupWindows =
+      c.copy(graph = c.graph.copy(windows = Vector(TimeWindow(2000, 2005), TimeWindow(2000, 2005))))
+    assert(
+      AnalysisRunSettings
+        .from(dupWindows)
+        .left
+        .exists(_.exists {
+          case ConfigError.InvalidValue(k, _, why) =>
+            k == "graph.windows" && why.contains("distinct")
+          case _ => false
+        })
+    )
+  }
+
+  test("DE-P6-02: the analysis run has its own config digest (frozen input)") {
+    val baseDigest = scholarchain.core.Canonical.sha256HexUtf8(baseDigestInput)
+    val c = loadOk(filesEnv, files("base.conf" -> (base + analysisLines)))
+    val frozenInput =
+      s"""{"schema":"scholarchain.analysis-config-digest.v1","baseConfigDigest":"$baseDigest","communityRandomSeed":11,"maxPathHops":3,"maxPathsPerPair":2,"maxEvidenceWorksPerHop":5,"exportFormat":"parquet"}"""
+    assertEquals(
+      AnalysisRunSettings.configDigest(c),
+      Right(scholarchain.core.Canonical.sha256HexUtf8(frozenInput))
+    )
+    def digestOf(x: ScholarChainConfig) = AnalysisRunSettings.configDigest(x)
+    val d = digestOf(c)
+    assertNotEquals(digestOf(c.copy(analysis = c.analysis.copy(maxPathHops = Some(4)))), d)
+    assertNotEquals(digestOf(c.copy(community = c.community.copy(randomSeed = None))), d)
+    assertNotEquals(
+      digestOf(c.copy(graph = c.graph.copy(windows = Vector(TimeWindow(2000, 2010))))),
+      d
+    )
+    assertNotEquals(digestOf(c.copy(bridge = c.bridge.copy(sampleSize = 65))), d)
+    // Grouping-scope keys are not analysis inputs.
+    val grouped = loadOk(filesEnv, files("base.conf" -> (base + analysisLines + groupingLines)))
+    assertEquals(digestOf(grouped), d)
+  }
+
   test("config digest is deterministic and sensitive to every value") {
     val c = loadOk(filesEnv, files("base.conf" -> base))
     val d = ScholarChainConfig.digest(c)

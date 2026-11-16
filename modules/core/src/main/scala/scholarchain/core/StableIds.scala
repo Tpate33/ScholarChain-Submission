@@ -30,6 +30,21 @@ enum IdKind(val prefix: String) {
   case MatchCandidate extends IdKind("mcand")
   case CandidateBlock extends IdKind("block")
   case IdentityLink extends IdKind("idlink")
+
+  /** Phase 6 (DE-P6-02, C3): a connected component of one window's coauthorship graph. */
+  case Component extends IdKind("component")
+
+  /** Phase 6 (DE-P6-02, C3): a community of one window's coauthorship graph. */
+  case Community extends IdKind("community")
+
+  /** Phase 6 (DE-P6-02, C3/C6): a bounded shortest-path evidence record. */
+  case EvidencePath extends IdKind("path")
+
+  /** Phase 6 (DE-P6-02, C6): one semantic-summary input record. */
+  case SummaryInput extends IdKind("suminput")
+
+  /** Phase 6 (DE-P6-02, C7): one downstream store load manifest. */
+  case StoreLoad extends IdKind("load")
 }
 
 /** Parsing and validation of stable IDs of every kind. */
@@ -52,6 +67,11 @@ object StableId {
     val MatchCandidate = "scholarchain.match-candidate.v1"
     val CandidateBlock = "scholarchain.candidate-block.v1"
     val IdentityLink = "scholarchain.identity-link.v1"
+    val Component = "scholarchain.component.v1"
+    val Community = "scholarchain.community.v1"
+    val EvidencePath = "scholarchain.evidence-path.v1"
+    val SummaryInput = "scholarchain.summary-input.v1"
+    val StoreLoad = "scholarchain.store-load.v2"
   }
 
   private val Token = "^[A-Za-z0-9._-]+$".r
@@ -740,5 +760,185 @@ object IdentityLinkId {
       w,
       assertedBy.tag,
       r
+    )
+}
+
+/** Shared input checks of the Phase 6 analysis IDs (DE-P6-02). */
+private[core] object AnalysisIdInputs {
+  def window(w: TimeWindow): Either[ValidationError, TimeWindow] =
+    if (w == null) Left(ValidationError.MissingField("window"))
+    else TimeWindow.of(w.startYear, w.endYear)
+
+  def researchers(field: String, ids: Vector[String]): Either[ValidationError, Vector[String]] =
+    if (ids == null || ids.isEmpty) Left(ValidationError.MissingField(field))
+    else
+      ids.zipWithIndex
+        .map { case (r, i) => StableId.validate(IdKind.Researcher, r, s"$field[$i]") }
+        .collectFirst { case Left(e) => e }
+        .toLeft(ids)
+
+  /** The smallest researcher ID by UTF-8 bytes: the anchor of a component or community. */
+  def anchor(field: String, members: Vector[String]): Either[ValidationError, String] =
+    researchers(field, members).map(
+      _.reduce((a, b) => if (Canonical.compareUtf8(a, b) <= 0) a else b)
+    )
+}
+
+/**
+ * Component ID = `component:` + SHA-256(netstrings("scholarchain.component.v1", startYear, endYear,
+ * graph policyVersion, anchor)), where anchor is the smallest member researcher ID by UTF-8 bytes.
+ * The ID depends only on the window, the policy and the member set (through its anchor), never on
+ * an algorithm's internal labels, so any correct connected-components implementation gives it.
+ */
+object ComponentId {
+  def of(window: TimeWindow, policyVersion: String, members: Vector[String]): Result =
+    for {
+      w <- AnalysisIdInputs.window(window)
+      p <- StableId.tokenOrError("policyVersion", policyVersion)
+      a <- AnalysisIdInputs.anchor("members", members)
+    } yield StableId.hashId(
+      IdKind.Component,
+      StableId.Tags.Component,
+      w.startYear.toString,
+      w.endYear.toString,
+      p,
+      a
+    )
+}
+
+/**
+ * Community ID = `community:` + SHA-256(netstrings("scholarchain.community.v1", startYear, endYear,
+ * graph policyVersion, algorithm, parameter count, (key, value) pairs sorted by key..., anchor)),
+ * anchor as for [[ComponentId]]. The algorithm and its parameters are inputs, so two algorithms or
+ * two parameter settings never share a community ID.
+ */
+object CommunityId {
+  def of(
+      window: TimeWindow,
+      policyVersion: String,
+      algorithm: String,
+      parameters: scala.collection.immutable.SortedMap[String, String],
+      members: Vector[String]
+  ): Result =
+    for {
+      w <- AnalysisIdInputs.window(window)
+      p <- StableId.tokenOrError("policyVersion", policyVersion)
+      alg <- StableId.tokenOrError("algorithm", algorithm)
+      params <- Option(parameters).toRight(ValidationError.MissingField("parameters"))
+      _ <- params.keys
+        .find(k => !StableId.isToken(k))
+        .map(k => ValidationError.InvalidValue(s"parameters.$k", "key not a token"))
+        .toLeft(())
+      a <- AnalysisIdInputs.anchor("members", members)
+    } yield {
+      val fields = Vector(
+        StableId.Tags.Community,
+        w.startYear.toString,
+        w.endYear.toString,
+        p,
+        alg,
+        params.size.toString
+      ) ++ params.toVector.flatMap { case (k, v) => Vector(k, v) } :+ a
+      StableId.hashId(IdKind.Community, fields*)
+    }
+}
+
+/**
+ * Evidence path ID = `path:` + SHA-256(netstrings("scholarchain.evidence-path.v1", startYear,
+ * endYear, graph policyVersion, node count, node researcher IDs in path order...)). The node order
+ * is the stored order (from the canonical source to the canonical target), so one path has one ID.
+ */
+object EvidencePathId {
+  def of(window: TimeWindow, policyVersion: String, nodeIds: Vector[String]): Result =
+    for {
+      w <- AnalysisIdInputs.window(window)
+      p <- StableId.tokenOrError("policyVersion", policyVersion)
+      nodes <- AnalysisIdInputs.researchers("nodeIds", nodeIds)
+      _ <-
+        if (nodes.size >= 2) Right(())
+        else Left(ValidationError.InvalidValue("nodeIds", "a path has at least two nodes"))
+    } yield StableId.hashId(
+      IdKind.EvidencePath,
+      (Vector(
+        StableId.Tags.EvidencePath,
+        w.startYear.toString,
+        w.endYear.toString,
+        p,
+        nodes.size.toString
+      ) ++ nodes)*
+    )
+}
+
+/**
+ * Semantic-summary input ID = `suminput:` + SHA-256(netstrings("scholarchain.summary-input.v1",
+ * documentType tag, subjectId, startYear, endYear, graph policyVersion)).
+ */
+object SummaryInputId {
+  def of(
+      documentType: DocumentType,
+      subjectId: String,
+      window: TimeWindow,
+      policyVersion: String
+  ): Result =
+    for {
+      d <- Option(documentType).toRight(ValidationError.MissingField("documentType"))
+      s <- StableId.validateAny(subjectId, "subjectId").map(_ => subjectId)
+      w <- AnalysisIdInputs.window(window)
+      p <- StableId.tokenOrError("policyVersion", policyVersion)
+    } yield StableId.hashId(
+      IdKind.SummaryInput,
+      StableId.Tags.SummaryInput,
+      d.tag,
+      s,
+      w.startYear.toString,
+      w.endYear.toString,
+      p
+    )
+}
+
+/**
+ * Store load ID = `load:` + SHA-256(netstrings("scholarchain.store-load.v2", targetStore tag,
+ * sourceRunId, partManifestSha256, item count, then for each item in ascending UTF-8 byte order of
+ * its path: path, targetRole)).
+ *
+ * Version 2 (DE-P6-02 repair 01, CR-P6-13 finding 3): the role of every item is an input, so two
+ * loads of the same parts with different role maps never share a load ID (the loader's idempotency
+ * key). The v1 tag (paths only) was never committed or published and no longer exists.
+ *
+ * @param items
+ *   (path, targetRole) of every load item; paths distinct
+ */
+object StoreLoadId {
+  def of(
+      targetStore: TargetStore,
+      sourceRunId: String,
+      partManifestSha256: String,
+      items: Vector[(String, String)]
+  ): Result =
+    for {
+      t <- Option(targetStore).toRight(ValidationError.MissingField("targetStore"))
+      r <- StableId.validate(IdKind.Run, sourceRunId, "sourceRunId")
+      h <-
+        if (partManifestSha256 != null && Canonical.isHex64(partManifestSha256))
+          Right(partManifestSha256)
+        else
+          Left(
+            ValidationError.InvalidValue(
+              "partManifestSha256",
+              "expected 64 lowercase hex characters"
+            )
+          )
+      ps <-
+        if (items == null || items.isEmpty || items.exists(i => i == null || i._1 == null))
+          Left(ValidationError.MissingField("items"))
+        else if (items.exists(i => !StableId.isToken(i._2)))
+          Left(ValidationError.InvalidValue("items.targetRole", "missing or not a token"))
+        else if (items.map(_._1).distinct.size != items.size)
+          Left(ValidationError.InvalidValue("items.path", "contains duplicate values"))
+        else Right(items.sortWith((a, b) => Canonical.compareUtf8(a._1, b._1) < 0))
+    } yield StableId.hashId(
+      IdKind.StoreLoad,
+      (Vector(StableId.Tags.StoreLoad, t.tag, r, h, ps.size.toString) ++
+        ps.flatMap { case (path, role) => Vector(path, role) })*
     )
 }
