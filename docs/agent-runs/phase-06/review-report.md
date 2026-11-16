@@ -1004,3 +1004,74 @@ UNVERIFIED CONCERNS:
 - I did not confirm that the Phase 5 held-out refusal strings are byte-identical, because I could not read HEAD's LocalRuns.scala. The defaults ("the clean-tree check (decision D3(b))") look right, and the authors report verifyHeldoutGuards PASS.
 - Cosmetic: "nothing was deleted" appears twice in stage failure messages (disclosed by build-engineer).
 ```
+
+Orchestrator note: the human carried both CR-P6-10 minor findings forward (2026-11-16, prompt-er-p6-08-manifest-pin.md).
+
+---
+
+## CR-P6-11: code-reviewer re-check of CR-P6-09 MAJ-1 after ER-P6-08 (2026-11-16), verbatim
+
+CR-P6-11 re-check: MAJ-1 is closed and I approve. Both manifests now name X, and nothing in the code scope still points at 426df59. I have no Bash, so I did not observe the author's `sbt check` (1117 passed, 0 failed). The run-ID equality rests on that run passing.
+
+```text
+STATUS: COMPLETE
+OWNER: code-reviewer
+WORK ORDER: CR-P6-11 (Phase 6). Read-only, narrow re-check of CR-P6-09 MAJ-1 after the ER-P6-08 pinning repair (docs/agent-runs/phase-06/repair-06.md).
+FILES CREATED: none
+FILES MODIFIED: none
+COMMANDS RUN: none (Read, Grep and Glob only; no Bash. No Grep under gold/ or target/; no held-out path and no phase-05 human-gate.md read)
+TEST RESULTS: not observed. The author reports sbt check success: 1117 passed, 0 failed, 84 suites, markTestRun git_head=8c1bee04... worktree=dirty. I cannot run sbt.
+VALIDATION RESULTS:
+1. Both manifests are pinned to X and otherwise unchanged.
+   - Files: modules/entity-resolution/local-runs/er-decisions.dev.run-manifest.json:1 and er-grouping.dev.run-manifest.json:1.
+   - Both carry codeVersion 8c1bee042e7dca3119f5116df2150e0bee204598. That is 40 lower-case hex characters and equals X.
+   - Values that match the old ones quoted in repair-06.md and review-report.md:
+     - decision configDigest 61655dc1...e085
+     - grouping configDigest 484845939b9f...6298 (the value CR-P6-10 also grep-checked)
+     - inputRunId run:2881724b...8baa in both
+     - decidedAt 2026-11-15T00:00:00Z (also asserted at DevRunInputsSuite.scala:205)
+     - assignedAt 2026-11-15T12:00:00Z
+     - the policy, feature, blocking, grouping and identity versions
+     - three inputSnapshots, attempt 1
+   - Grouping decisionRunId is now run:736cb1706210a34f0958e658c061054c4e6b27b80847528db8619da84495b76a.
+   - I could not diff against HEAD without git. Unchanged fields are judged against the quoted old values plus the orchestrator's observed diff summary.
+2. The decisionRunId chain is enforced by a test, so a passing sbt check verifies it.
+   - RunId.of (modules/core/src/main/scala/scholarchain/core/StableIds.scala:577-600) hashes codeVersion along with the other manifest fields, so a codeVersion change must change the decision run ID.
+   - DevRunInputsSuite.scala:229 computes RunId.of(decisionManifest).
+   - :241 compares the whole grouping file byte for byte with Json.write(expected), and expected includes that derived decisionRunId.
+   - :245 asserts equality directly. :258 asserts that both manifests carry the same codeVersion.
+   - The author's evidence fits this:
+     - With only the codeVersions edited, the suite failed at :241 and at the end-to-end check (:454), whose message named run:736cb170...b76a as the verified decision run ID.
+     - The decision-manifest test (:188-219, canonical bytes at :200) passed.
+     - After the decisionRunId edit, sbt check passed.
+3. A commit Y holding exactly these two files passes the code-scope check at HEAD=Y. Check: project/LocalRuns.scala:1448-1595.
+   - Clean tree, index-flag, ignored-path and raw-byte checks: satisfied once the two manifests are committed. docs/agent-runs/** is outside ErDevCodeScope (build.sbt, project, modules/core, modules/entity-resolution; :1388-1389), so committing or leaving the evidence files is irrelevant.
+   - Common codeVersion C = X: both match (:1534-1544).
+   - C is a commit (:1545-1548) and HEAD or an ancestor of it (:1551-1565). X is Y's parent.
+   - The diff from X to Y over the scope lists only the two manifests (:1566-1588), and :1580 filters out exactly those (ErDevManifests, :1400).
+   - At the old pin 426df59, the same check would now refuse, because the code added in X sits in its diff to HEAD. So the run-time guard also closes this failure class.
+   - No other file in scope depends on the old or new values:
+     - Grep for 426df59, 76ec32b6, 8c1bee0 and 736cb170 (excluding target/) matches only the two manifests under modules/, nothing under project/, and nothing in build.sbt.
+     - local-runs/ holds only er-dev.conf and the two manifests.
+4. Nothing left open on MAJ-1.
+   - X (8c1bee0, "Phase 6: add reproducible entity-resolution dev pipeline") is HEAD.
+   - The session-start status shows no untracked or modified code in scope other than the two manifests, so the producing code (DecisionRunMain, GroupingRunMain, the decisions/ and grouping/ packages) is in the commit the manifests name.
+ASSUMPTIONS:
+- The session-start git status is current: only the two manifests are modified in scope, and the untracked files are docs/agent-runs/phase-06/prompt-er-p6-08-manifest-pin.md and repair-06.md.
+- HEAD is 8c1bee042e7dca3119f5116df2150e0bee204598, as stated in the work order and observed by the author with git rev-parse.
+RISKS:
+- Two values were never printed: the new decision run ID and the derived grouping run ID. They are verified only by the suite passing, not by an independent printout. The decision run ID was taken from a test failure message.
+- Y must change nothing else in scope. Any extra file in scope would make the dev task refuse, so the risk fails closed.
+- erDecisionGroupingDev has still never run.
+MANUAL ACTION REQUIRED:
+- Human: review the two-file diff and commit exactly the two manifests as Y. Adding the docs/agent-runs evidence files is optional. Record the hash.
+- After Y, the allowlist row for sbt erDecisionGroupingDev can go to factory-engineer and human ratification, per CR-P6-09 check 6.
+BLOCKED-ON OWNER: none
+BLOCKED-ON EVIDENCE: none
+NEXT GATE: human commit Y; then factory-engineer prepares the erDecisionGroupingDev allowlist row and probes for ratification; then the first real dev run.
+VERDICT: APPROVE
+FINDINGS: none (CR-P6-09 MAJ-1 verified closed; the CR-P6-10 minors already carried forward for build-engineer are unaffected)
+UNVERIFIED CONCERNS:
+- The author's sbt check result and the step-4 failure messages were not observed by me.
+- That the unchanged fields are byte-identical to HEAD rests on the orchestrator's observed git diff, not on a diff I could run.
+```
