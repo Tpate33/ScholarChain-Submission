@@ -129,7 +129,7 @@ The **global floor** applies to every identity, including the orchestrator. It c
 
 ### Bash allowlist (machine-checked)
 
-Default deny. A Bash call runs only if it passes the character gate in `guard-dangerous.sh` and matches an ACTIVE row for the acting identity. This table mirrors `.claude/hooks/bash-allowlist.tsv` row for row (119 rows; source sha256 `eb708cd4ea78c8f8da0a68579c1bb0b009840c762f5c0a58c052847f18f7eb73`). Group rows (`@GIT`, `@SBT-ALL`, `@AWS-RO`) are included by identities whose row names the group. `code-reviewer` has no rows. INACTIVE rows never match; each names the decision that activates it. The environment lists (`@env`, `@env-nonprod`) are empty until Phase 12 ratifies them.
+Default deny. A Bash call runs only if it passes the character gate in `guard-dangerous.sh` and matches an ACTIVE row for the acting identity. This table mirrors `.claude/hooks/bash-allowlist.tsv` row for row (120 rows; source sha256 `19fa3b7fd04a8d332fe4a3b47a8c830ba0c3925ea9293fc0d30b00327a6ac9f9`). Group rows (`@GIT`, `@SBT-ALL`, `@AWS-RO`) are included by identities whose row names the group. `code-reviewer` has no rows. INACTIVE rows never match; each names the decision that activates it. The environment lists (`@env`, `@env-nonprod`) are empty until Phase 12 ratifies them.
 
 Directives: `@projects` = core hadoop entityResolution sparkAnalytics storage rag services; `@env` = (empty); `@env-nonprod` = (empty).
 
@@ -198,6 +198,7 @@ Directives: `@projects` = core hadoop entityResolution sparkAnalytics storage ra
 | `entity-resolution-engineer` | active | allow | - | `@SBT-ALL` | sbt check |
 | `entity-resolution-engineer` | active | allow | - | `sbt <SBT:entityResolution> <SBT:entityResolution>? <SBT:entityResolution>? <SBT:entityResolution>?` | own-module tasks (E2) |
 | `entity-resolution-engineer` | active | allow | - | `sbt goldSetEvalDev` | Phase 5 dev-split evaluation diagnostics (amendment G9-b, FE-P5-03; decisions-15 items 1 and 2; BE-P5-02): human-owned gold/entity-resolution/dev-v1/ files, freeze file and --expect-split=dev; never final metrics; writes only target/local-runs/dev/ |
+| `entity-resolution-engineer` | active | allow | - | `sbt erDecisionGroupingDev` | Phase 6 dev-only ER decision then grouping run (amendment FE-P6-01; BE-P6-01, BE-P6-02; reviewed CR-P6-09 check 6, CR-P6-10, CR-P6-11 APPROVE at commit 7b72681): root task forking DecisionRunMain then GroupingRunMain on the committed modules/entity-resolution/local-runs/ inputs and the one complete localPipelineDev attempt; 45 s per stage; refuses SCHOLARCHAIN_CFG_*, held-out spellings, gold/ and target/streams/ paths, a code scope (build.sbt project modules/core modules/entity-resolution) not clean against HEAD, and a manifest codeVersion other than HEAD or an ancestor with only the two manifests changed since; create-once, never overwrites a run; writes only target/local-runs/dev/ |
 | `spark-engineer` | active | allow | - | `@GIT` | matrix row |
 | `spark-engineer` | active | allow | - | `@SBT-ALL` | sbt check |
 | `spark-engineer` | active | allow | - | `sbt <SBT:sparkAnalytics> <SBT:sparkAnalytics>? <SBT:sparkAnalytics>? <SBT:sparkAnalytics>?` | own-module tasks (E2) |

@@ -1075,3 +1075,92 @@ UNVERIFIED CONCERNS:
 - The author's sbt check result and the step-4 failure messages were not observed by me.
 - That the unchanged fields are byte-identical to HEAD rests on the orchestrator's observed git diff, not on a diff I could run.
 ```
+
+---
+
+## CR-P6-12: code-reviewer review of FE-P6-01 (inactive allowlist row) (2026-11-16), verbatim
+
+```text
+STATUS: COMPLETE
+OWNER: code-reviewer
+WORK ORDER: CR-P6-12 (Phase 6). Read-only review of the FE-P6-01 constitutional change before human ratification: the inactive `sbt erDecisionGroupingDev` row for entity-resolution-engineer, its 35 probes, and the docs/agents.md mirror.
+FILES CREATED: none
+FILES MODIFIED: none
+COMMANDS RUN: none. Read, Grep and Glob only, on: docs/agent-runs/phase-06/fe-p6-01-report.md, prompt-fe-p6-01-allowlist.md, review-report.md (CR-P6-09 check 6); .claude/hooks/bash-allowlist.tsv; .claude/hooks/probes.tsv:670-729; .claude/hooks/guard-dangerous.sh:40-660; .claude/hooks/validate-agent-files.sh:200-334; .claude/settings.json; docs/agents.md; build.sbt:1-80 and 395-416; project/LocalRuns.scala:995-1074, 1380-1489 and 1600-1829.
+TEST RESULTS: not run. I have no Bash. I did not observe the author's `--probes` run (696 table probes PASS) or the orchestrator's validator run (PASS, 120 rows, sha256 6d1a92c6694f).
+VALIDATION RESULTS:
+1. The row is scoped exactly (bash-allowlist.tsv:101).
+   - Identity: entity-resolution-engineer only.
+   - Status: `inactive:FE-P6-01-ratification-pending`. This matches the loader regex `active|inactive:[A-Za-z0-9+_-]+` (guard:252).
+   - Mode allow, provenance `-`.
+   - Spec: two literal tokens `sbt erDecisionGroupingDev`. `match()` requires `i == n`, so no extra token can match.
+   - Inactive rows never reach `hits` (guard:508). No identity can run the command now.
+   - The justification matches the code:
+     - Root `Def.taskDyn` with `erDevBeforeCompile` runs before the classpath is compiled (build.sbt:398-412).
+     - Refusals: `configOverrideProblem` (SCHOLARCHAIN_CFG_*); `devPathProblems` (held-out spellings, gold/, target/streams/ and the held-out roots); `erDevCodeScopeCheck` over `build.sbt project modules/core modules/entity-resolution`, including the rule that codeVersion is HEAD or an ancestor and only the two manifests changed since.
+     - Create-once on both output roots; the overlay is never overwritten.
+     - DecisionRunMain then GroupingRunMain, 45 s each (LocalRuns.scala:1002-1003).
+     - Outputs under target/local-runs/dev/ (LocalRuns.scala:1016-1019).
+2. Guard verdicts, read from bash_check (guard:478-545).
+   - Inactive state, every probe is correct:
+     - The 4 [FE-P6-01 T] rows: no active row matches. `@SBT-ALL` rows need exact token counts, and `<SBT:entityResolution>` accepts only `entityResolution/{compile,...}` (guard:165). The dormant check then finds row 101: both leading literals equal `toks[:2]`, so the rule is entry-inactive. `-Dscholarchain.x=y` passes the character gate (no leading `=`, no `==`).
+     - `sbt clean ...`, `sbt check ...`, `entityResolution/...`, the upper-case name, `erDecisionGrouping`, `/usr/local/bin/sbt`, `runMain` and `erDecisionGroupingHeldout`: none shares both leading literal tokens, so all give no-allowlist-entry.
+     - `;` is outside GATE_CH, so that probe gives shell-syntax-gate.
+     - `heldout_human_only_bash` runs before allowlist matching (guard:505-507), so the held-out probes give the eval or pipeline rule. The eval rule is checked first, which matches the hadoop-engineer probe.
+     - heldout-run-protected is evaluated only after a hit, so `sbt clean erDecisionGroupingDev` gives no-allowlist-entry whether or not the held-out directory exists.
+     - Other identities: `rows_for` restricts the dormant check to the caller's own rows, so they get no-allowlist-entry. code-reviewer gets reviewer-read-only first. The ORCHESTRATOR's `sbt --version` row is active, so it is never dormant.
+   - Active state after edits (a)-(e), every probe is correct:
+     - The bare command hits row 101. Tripwire, label fence, gitignore and clean checks do not fire (`sbt` is not in DANGER, no secret pattern, no clean token). `decide` returns no decision, so the result is ALLOW, the same path as the existing goldSetEvalDev ALLOW.
+     - The trailing-token forms no longer have a dormant row and give no-allowlist-entry.
+     - `--validate-allowlist` tripwire on `['sbt','erDecisionGroupingDev']` is clean.
+   - No other path admits the command:
+     - `@SBT-ALL` is five exact shapes, `<SBTTEST>` is `<project>/test` only, and no other identity has a row naming it.
+     - settings.json has no allow, ask or deny rule naming it, and no broad `Bash(sbt *)` allow.
+     - The guard never emits allow.
+3. Agreed probes are present (all from CR-P6-09 check 6):
+   - test-engineer no-allowlist-entry (probes.tsv:720) and service-engineer (719).
+   - `sbt clean erDecisionGroupingDev` (696).
+   - `sbt erDecisionGroupingDev check` (692): BLOCK now, BLOCK with no-allowlist-entry after activation.
+   - No required probe is missing. Optional extras are in the nits.
+4. Trailing TAB (probes.tsv:683):
+   - The validator reads rows with `IFS="$TAB" read -r exp hook label json want` (validate-agent-files.sh:319). TAB is an IFS whitespace character, so a trailing TAB is stripped and `want` is empty in both forms. `probe()` skips the substring check when `want` is empty (line 309). The verdict and check are unchanged.
+   - The line count is consistent with the diff stat: 46 insertions = 35 probes + 10 comment lines + 1 re-added line 683.
+   - Acceptable as is. Restoring it is optional (cosmetic byte identity only). It does not have to be restored before commit.
+5. Mode recommendation: keep allow.
+   - It matches the sibling dev tasks (localPipelineDev, goldSetEvalDev).
+   - It adds no capability beyond `sbt check`, which already compiles and runs this module's code.
+   - With no settings.json allow rule, default mode still prompts the human on every call, which suits the first observed runs.
+   - Choose ask only if the human wants a forced prompt even after a later settings or "always allow" rule. In that case activation edit (d) must expect ASK, not ALLOW.
+6. Nothing else changed, based on the session-start git status and the orchestrator's diff stat:
+   - Only bash-allowlist.tsv, probes.tsv and docs/agents.md are modified, plus two untracked phase-06 docs.
+   - No hook script, settings.json, .mcp.json, agent file or ownership row changed.
+   - The held-out fences are intact: heldout_human_only_bash, the R6 regexes, the settings.json denies (155-158) and the clean rule are all as read.
+ASSUMPTIONS:
+- The orchestrator's observed git status and diff stat are accurate. I could not run git diff.
+- The pre-change byte content of probes.tsv:683 differed only by the trailing TAB, per the author's report and the 1-deletion diff stat.
+RISKS:
+- The active-state verdicts are inferred from reading the code. They are first observed at the post-activation `--probes` run.
+- Inherited, already-accepted residual: sbt writes to gitignored target/ paths, which audit-bash-writes.sh does not see.
+- The 45+45 s stages plus compile and sbt start-up must fit inside the agent tool limit. Not observed.
+MANUAL ACTION REQUIRED:
+- Human: choose the mode (recommended: allow).
+- Human: optionally restore the TAB on probes.tsv:683.
+- Human: ratify and commit, then issue the activation work order, edits (a)-(e) with (d) adjusted if ask is chosen, and start a fresh session.
+BLOCKED-ON OWNER: none
+BLOCKED-ON EVIDENCE: none
+NEXT GATE: human ratification and commit of FE-P6-01, then a factory-engineer activation work order, then a fresh session and a `--probes` run that observes the active verdicts, before entity-resolution-engineer runs `sbt erDecisionGroupingDev`.
+VERDICT: APPROVE
+FINDINGS (all owned by factory-engineer; no critical or major findings):
+- nit, docs/agent-runs/phase-06/fe-p6-01-report.md:30 and :142. The report says "7 comment lines". The actual count is 10: probes.tsv:684-689 plus the section headers at 690, 695, 705 and 710. Failure input: anyone reconciling the report with `git diff --stat` (46 insertions). Impact: only the evidence record is inaccurate; behaviour is unaffected.
+- nit, .claude/hooks/bash-allowlist.tsv:101 (justification). "writes only target/local-runs/dev/" leaves out two other writes: sbt compile output in modules/core/target and modules/entity-resolution/target, and the task's streams log under target/streams/_global/erDecisionGroupingDev/, which receives the forked child output through ToLog (LocalRuns.scala:1794). Failure input: a reader relying on the justification as a complete write list. Impact: none on enforcement. The goldSetEvalDev row (line 100) has the same convention, and the output is dev-only.
+- nit, .claude/hooks/probes.tsv:683. Trailing TAB removed from a Phase 5 probe. Verdict unchanged (check 4). Impact: cosmetic byte difference on a ratified line. Restoring it is optional.
+- nit, missing optional probes. Two extra refusal probes would harden the record, each giving no-allowlist-entry in both states:
+  - a leading option, `sbt -Dx=y erDecisionGroupingDev`
+  - an upper-case program token, `SBT erDecisionGroupingDev`
+  Both are refused today; there is simply no probe for them.
+UNVERIFIED CONCERNS:
+- I did not see the pre-change bytes of probes.tsv:683 or the full working-tree diff myself.
+- Pre-existing and not specific to this row: rows with provenance `-` have no cwd-at-root requirement. An `sbt` call started from a subdirectory would make sbt treat that directory as a new build. Not examined further.
+```
+
+Orchestrator note: the harness flagged both FE-P6-01 and CR-P6-12 hand-backs as matching an instruction-shaped pattern (settings-json). Both only discuss whether a `settings.json` allow rule exists; no settings change is proposed or made in this work order.
