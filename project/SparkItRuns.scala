@@ -614,9 +614,12 @@ object SparkItRuns {
    *      stats; join: joined, rejects; pairs: pairs, rejects, stats; final: researcher, work,
    *      rejects, stats). R: that `_counters.json` is valid JSON naming the stage and the ten
    *      required counters.
-   *   5. S: blocking holds round-0 .. round-(k-1), contiguous, 1 <= k <= [[MaxBlockingRounds]].
-   *   6. S: candidates/join is present; candidates/pairs only if join/joined holds a part file;
-   *      candidates/final only if pairs/pairs holds a part file.
+   *   5. S: blocking holds round-0 .. round-(k-1), contiguous, 1 <= k <= [[MaxBlockingRounds]]; for
+   *      r + 1 < [[MaxBlockingRounds]], round-(r+1) is present if and only if round-r/spill holds a
+   *      part file (BE-P6-07, CR-P6-21 m1; Pipeline.scala runBlocking :516-521).
+   *   6. S: candidates/join is present; candidates/pairs is present if and only if join/joined
+   *      holds a part file; candidates/final is present if and only if pairs/pairs holds a part
+   *      file (BE-P6-07, CR-P6-21 m1; Pipeline.scala runCandidates :646-666).
    *   7. S: leaves hold only non-empty regular `part-[mr]-[0-9]{5,}.gz` files, `part-m` only in a
    *      `rejects` leaf. R: that each part decompresses and decodes, and any checksum verification.
    *   8. S: the only hidden entry is `.<X>.crc` (a regular file) for a regular, non-hidden sibling
@@ -863,6 +866,18 @@ object SparkItRuns {
           p += s"${show(d :+ s"round-$i")} is beyond the last blocking level (round-0 to " +
             s"round-${MaxBlockingRounds - 1}; HD-P6-01 rule 5)"
         )
+      // BE-P6-07 (CR-P6-21 m1): the producer runs round r + 1 if and only if round r's spill holds
+      // a non-empty part file and r + 1 is below the last level (Pipeline.scala :516-521).
+      val present = idx.toSet
+      def spillHasPart(i: Int): Boolean = hasPart(d ++ Vector(s"round-$i", "spill"))
+      idx.foreach { i =>
+        if (i > 0 && present(i - 1) && !spillHasPart(i - 1))
+          p += s"${show(d :+ s"round-$i")} exists although round-${i - 1}/spill holds no part " +
+            "file (the producer never runs that round; HD-P6-01 rule 5)"
+        if (i + 1 < MaxBlockingRounds && spillHasPart(i) && !present(i + 1))
+          p += s"${show(d :+ s"round-$i")}/spill holds a part file but round-${i + 1} is " +
+            "missing (the producer always runs the next round; truncated layout, HD-P6-01 rule 5)"
+      }
       stageDir(rounds.map { case (n, _) => n -> roundDir }.toMap)(d)
     }
 
@@ -871,10 +886,21 @@ object SparkItRuns {
       val ch = at(d)
       if (!ch.contains("join"))
         p += s"${show(d)} lacks join/ (the join job always runs; HD-P6-01 rule 6)"
-      if (ch.contains("pairs") && !hasPart(d ++ Vector("join", "joined")))
+      // BE-P6-07 (CR-P6-21 m1): both directions, as the producer runs the pairs job if and only
+      // if join/joined holds a non-empty part file, and the final job if and only if pairs/pairs
+      // does (Pipeline.scala runCandidates :646-666).
+      val joinedParts = hasPart(d ++ Vector("join", "joined"))
+      val pairsParts = hasPart(d ++ Vector("pairs", "pairs"))
+      if (ch.contains("pairs") && !joinedParts)
         p += s"${show(d)}/pairs exists although join/joined holds no part file (HD-P6-01 rule 6)"
-      if (ch.contains("final") && !hasPart(d ++ Vector("pairs", "pairs")))
+      if (!ch.contains("pairs") && joinedParts)
+        p += s"${show(d)}/join/joined holds a part file but pairs/ is missing (the producer " +
+          "always runs the pairs job then; truncated layout, HD-P6-01 rule 6)"
+      if (ch.contains("final") && !pairsParts)
         p += s"${show(d)}/final exists although pairs/pairs holds no part file (HD-P6-01 rule 6)"
+      if (!ch.contains("final") && pairsParts)
+        p += s"${show(d)}/pairs/pairs holds a part file but final/ is missing (the producer " +
+          "always runs the final job then; truncated layout, HD-P6-01 rule 6)"
       stageDir(
         Map(
           "join" -> jobOut(leaves("joined", NamedRejects)) _,
@@ -2342,7 +2368,16 @@ object SparkItRuns {
       }
       def part(d: Path, name: String = "part-r-00000.gz"): Unit = withCrc(d.resolve(name), "gz")
       val FullCandidates = Seq("joined", "pairs", "final")
-      def hadoopRun(r: Path, rounds: Int = 2, cands: Seq[String] = FullCandidates): Unit = {
+      // cands: "joined" = join/joined parts; "pairs" = the pairs job ran (pairs/stats parts) with
+      // pairs/pairs parts; "pairs-empty" = the pairs job ran with no pairs/pairs part; "final" =
+      // the final job ran. lastSpill: the last round also holds spill parts (the producer stops at
+      // the last level, round-3, even when its spill is non-empty).
+      def hadoopRun(
+          r: Path,
+          rounds: Int = 2,
+          cands: Seq[String] = FullCandidates,
+          lastSpill: Boolean = false
+      ): Unit = {
         Files.createDirectories(r)
         withCrc(r.resolve(ManifestFile), "{}")
         CuratedStages.foreach { s =>
@@ -2362,16 +2397,14 @@ object SparkItRuns {
           Seq("blocks", "members").foreach(k =>
             Seq("researcher", "work").foreach(e => part(rd.resolve(s"$k/$e")))
           )
-          if (i + 1 < rounds) part(rd.resolve("spill"))
+          if (i + 1 < rounds || lastSpill) part(rd.resolve("spill"))
           part(rd.resolve("stats"))
         }
         val c = r.resolve("candidates")
         Files.createDirectories(c.resolve("join"))
         if (cands.contains("joined")) part(c.resolve("join/joined"))
-        if (cands.contains("pairs")) {
-          part(c.resolve("pairs/pairs"))
-          part(c.resolve("pairs/stats"))
-        }
+        if (cands.contains("pairs")) part(c.resolve("pairs/pairs"))
+        if (cands.contains("pairs") || cands.contains("pairs-empty")) part(c.resolve("pairs/stats"))
         if (cands.contains("final"))
           Seq("researcher", "work", "stats").foreach(x => part(c.resolve(s"final/$x")))
       }
@@ -2598,9 +2631,19 @@ object SparkItRuns {
         "valid Hadoop layout (5 stages, round-0 and round-1, entity parts at depth 5, crc " +
           "sidecars, candidates join+pairs+final)"
       )(())
-      curAllowed("valid Hadoop layout with candidates join only") {
+      curAllowed(
+        "valid Hadoop layout with join and pairs jobs only (pairs/pairs holds no part, so the " +
+          "producer runs no final job)"
+      ) {
         deleteTree(cur)
-        hadoopRun(cur, cands = Seq("joined"))
+        hadoopRun(cur, cands = Seq("joined", "pairs-empty"))
+      }
+      curAllowed(
+        "valid Hadoop layout with four rounds whose last round (round-3, the last level) holds " +
+          "spill parts"
+      ) {
+        deleteTree(cur)
+        hadoopRun(cur, rounds = 4, lastSpill = true)
       }
       curAllowed("valid Hadoop layout with an empty join job output directory, one round") {
         deleteTree(cur)
@@ -2668,6 +2711,16 @@ object SparkItRuns {
         s"$curated/teams/pairs/.part-r-00001.gz.crc is a checksum sidecar without a regular " +
           "sibling part-r-00001.gz"
       )(put(cur.resolve("teams/pairs/.part-r-00001.gz.crc"), "crc"))
+      // BE-P6-07 (CR-P6-21 n2): a .<X>.crc entry that is a directory, beside a regular X.
+      curCase(
+        ".<X>.crc is a directory",
+        s"$curated/exact-ids/links/.part-r-00000.gz.crc is a checksum sidecar that is not a " +
+          "regular file"
+      ) {
+        val sidecar = crcOf(cur.resolve("exact-ids/links/part-r-00000.gz"))
+        Files.delete(sidecar)
+        Files.createDirectory(sidecar)
+      }
       val deep = cur.resolve("blocking/round-0/blocks/work/deep")
       build()
       part(deep)
@@ -2733,6 +2786,36 @@ object SparkItRuns {
         "candidates/final without pairs/pairs parts",
         s"$curated/candidates/final exists although pairs/pairs holds no part file"
       )(deleteTree(cur.resolve("candidates/pairs/pairs")))
+      // BE-P6-07 (CR-P6-21 m1): truncated layouts the producer cannot make.
+      curCase(
+        "truncated: join/joined holds parts but candidates/pairs is missing",
+        s"$curated/candidates/join/joined holds a part file but pairs/ is missing"
+      ) {
+        deleteTree(cur)
+        hadoopRun(cur, cands = Seq("joined"))
+      }
+      curCase(
+        "truncated: pairs/pairs holds parts but candidates/final is missing",
+        s"$curated/candidates/pairs/pairs holds a part file but final/ is missing"
+      )(deleteTree(cur.resolve("candidates/final")))
+      curCase(
+        "truncated: round-0/spill holds parts but round-1 is missing",
+        s"$curated/blocking/round-0/spill holds a part file but round-1 is missing"
+      ) {
+        deleteTree(cur)
+        hadoopRun(cur, rounds = 1, lastSpill = true)
+      }
+      curCase(
+        "truncated: round-2/spill holds parts but round-3 is missing",
+        s"$curated/blocking/round-2/spill holds a part file but round-3 is missing"
+      ) {
+        deleteTree(cur)
+        hadoopRun(cur, rounds = 3, lastSpill = true)
+      }
+      curCase(
+        "round-1 without round-0/spill parts",
+        s"$curated/blocking/round-1 exists although round-0/spill holds no part file"
+      )(deleteTree(cur.resolve("blocking/round-0/spill")))
       curCase(
         "symbolic link in the curated run (a part file at depth 5)",
         s"$curated/blocking/round-0/members/researcher/part-r-00001.gz is a symbolic link " +

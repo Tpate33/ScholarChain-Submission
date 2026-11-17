@@ -110,13 +110,6 @@ class VerifiedArchiveReaderSuite extends munit.FunSuite {
     assertEquals(v.grouping.manifest.parameters.get("inputRunId"), Some(v.curated.runId))
   }
 
-  tmp.test("curated contract: the valid Hadoop layout with candidates join only is accepted") {
-    root =>
-      val w = RunFixtures.write(root, Spec(curatedCandidates = Vector("joined")))
-      assert(!Files.exists(w.runs.curatedRun.resolve("candidates/pairs")))
-      accepted(w)
-  }
-
   tmp.test(
     "curated contract: one round and an empty join job output directory (rule 11) are accepted"
   ) { root =>
@@ -856,18 +849,365 @@ class VerifiedArchiveReaderSuite extends munit.FunSuite {
       assert(rs.head.message.contains("declared bytes"), rs.mkString("\n"))
   }
 
-  test("ArchiveRuns refuses relative, unnormalized and outside paths and a malformed pin") {
+  test("ArchiveRuns refuses relative, unnormalized and outside paths; the seam a malformed pin") {
     val pin = "run:" + "a" * 64
-    assert(ArchiveRuns.of("/a", "b", "/a/c", "/a/d", pin).isLeft)
-    assert(ArchiveRuns.of("/a", "/a/../a/b", "/a/c", "/a/d", pin).isLeft)
-    assert(ArchiveRuns.of("/a", "/x/b", "/a/c", "/a/d", pin).isLeft)
-    assert(ArchiveRuns.of("/a", "/a/b", "/a/b", "/a/d", pin).isLeft)
-    assert(ArchiveRuns.of("/a", "/a/b", "/a/c", "/a/d", "a" * 64).isLeft)
-    assert(ArchiveRuns.of("/a", "/a/b", "/a/c", "/a/d", "run:" + "A" * 64).isLeft)
-    assert(ArchiveRuns.of("/a", "/a/b", "/a/c", "/a/d", null).isLeft)
+    assert(ArchiveRuns.of("/a", "b", "/a/c", "/a/d").isLeft)
+    assert(ArchiveRuns.of("/a", "/a/../a/b", "/a/c", "/a/d").isLeft)
+    assert(ArchiveRuns.of("/a", "/x/b", "/a/c", "/a/d").isLeft)
+    assert(ArchiveRuns.of("/a", "/a/b", "/a/b", "/a/d").isLeft)
+    def seam(p: String) = SyntheticCuratedPin.archiveRuns("/a", "/a/b", "/a/c", "/a/d", p)
+    assert(seam("a" * 64).isLeft)
+    assert(seam("run:" + "A" * 64).isLeft)
+    assert(seam(null).isLeft)
+    assertEquals(seam(pin).map(_.pinnedCuratedRunId), Right(pin))
+  }
+
+  // ---------------------------------------------------------------- CR-P6-21 n1: committed pin
+
+  /**
+   * The committed dev curated manifest (modules/hadoop/local-runs/er-candidates.dev.run-
+   * manifest.json at HEAD), restated field by field by hand (sparkAnalytics never reads another
+   * module's files). Its run ID is the pin, so the pin is the committed run, not an arbitrary hex.
+   */
+  private val committedDevCuratedManifest = RunManifest(
+    SchemaVersions.RunManifest,
+    "hadoop.pipeline",
+    "a961035e8863a1c4b3337557bb17fbab05a1182a",
+    "179e02020754eb95b9abc855d55d8209c3e8baa2b46d4696a0b9a857a204ca40",
+    Vector(
+      SnapshotRef(SourceType.Dblp, "dblp-2026-10-03"),
+      SnapshotRef(SourceType.OpenAlex, "openalex-api-2026-11-05"),
+      SnapshotRef(SourceType.Crossref, "crossref-api-2026-11-05")
+    ),
+    scala.collection.immutable.SortedMap(
+      "scholarchain.blocking.keySource" -> "scholarchain.hadoop.jobs.EntityResolutionKeySource",
+      "scholarchain.blocking.keySourceVersion" -> "er-blocking.v2",
+      "scholarchain.blocking.maxBlockSize" -> "8",
+      "scholarchain.blocking.oversizePolicy" -> "drop",
+      "scholarchain.candidates.featureVersion" -> "er-features.v2",
+      "scholarchain.codec.intermediate" -> "org.apache.hadoop.io.compress.DefaultCodec",
+      "scholarchain.codec.output" -> "org.apache.hadoop.io.compress.GzipCodec",
+      "scholarchain.dblp.encoding" -> "ISO-8859-1",
+      "scholarchain.dblp.maxRecordBytes" -> "1048576",
+      "scholarchain.dblp.recordTypes" ->
+        "article,inproceedings,proceedings,book,incollection,phdthesis,mastersthesis",
+      "scholarchain.dblp.venues" -> "*",
+      "scholarchain.dblp.yearRange" -> "*",
+      "scholarchain.input.digest" ->
+        "97897d97c73fcdbb2e749e1d665247a97f58632d840766c00ff52e450f04ad7d",
+      "scholarchain.input.split" -> "dev",
+      "scholarchain.orcid.maxRecordBytes" -> "1048576",
+      "scholarchain.reducers.blocking" -> "1",
+      "scholarchain.reducers.candidates" -> "1",
+      "scholarchain.reducers.exactIds" -> "1",
+      "scholarchain.reducers.normalize" -> "1",
+      "scholarchain.reducers.teams" -> "1",
+      "scholarchain.reject.maxExcerptChars" -> "256",
+      "scholarchain.team.maxSize" -> "100",
+      "scholarchain.team.sources" -> "dblp"
+    ),
+    1
+  )
+
+  test("n1: the committed pin is the literal dev run and RunId of the committed dev manifest") {
     assertEquals(
-      ArchiveRuns.of("/a", "/a/b", "/a/c", "/a/d", pin).map(_.pinnedCuratedRunId),
-      Right(pin)
+      HadoopCuratedRun.PinnedRunId,
+      "run:2881724b5c86b561a235836d51946fbd884beed36a14f929b27c278cb5de8baa"
     )
+    assertEquals(RunId.of(committedDevCuratedManifest), Right(HadoopCuratedRun.PinnedRunId))
+    assertEquals(
+      ArchiveRuns.of("/a", "/a/b", "/a/c", "/a/d").map(_.pinnedCuratedRunId),
+      Right(HadoopCuratedRun.PinnedRunId)
+    )
+  }
+
+  tmp.test(
+    "n1: the public ArchiveRuns.of refuses a synthetic curated run (its own hex is no pin)"
+  ) { root =>
+    val w = RunFixtures.write(root)
+    val pub = ArchiveRuns
+      .of(
+        w.runs.archiveRoot.toString,
+        w.runs.curatedRun.toString,
+        w.runs.decisionRun.toString,
+        w.runs.groupingRun.toString
+      )
+      .fold(e => fail(e.mkString), identity)
+    val rs = VerifiedArchiveReader.read(pub, limits).swap.getOrElse(fail("accepted"))
+    assertEquals(rs.map(r => (r.step, r.run)).toSet, Set((CheckStep.CuratedRun, "curated")))
+    assert(
+      rs.exists(
+        _.message.contains("is not the pinned curated run " + HadoopCuratedRun.PinnedRunId)
+      ),
+      rs.mkString("\n")
+    )
+  }
+
+  // ---------------------------------------------------------------- CR-P6-21 m1: rules 5, 6 iff
+
+  curatedRefused(
+    "m1 7 hadoop-layout: join/joined parts without candidates/pairs are refused (rule 6 iff)",
+    CheckStep.HadoopLayout,
+    "'candidates/join/joined' holds a part file but pairs/ is missing",
+    Spec(curatedCandidates = Vector("joined"))
+  )(_ => ())
+
+  curatedRefused(
+    "m1 7 hadoop-layout: pairs/pairs parts without candidates/final are refused (rule 6 iff)",
+    CheckStep.HadoopLayout,
+    "'candidates/pairs/pairs' holds a part file but final/ is missing",
+    Spec(curatedCandidates = Vector("joined", "pairs"))
+  )(_ => ())
+
+  curatedRefused(
+    "m1 7 hadoop-layout: round-0/spill parts without round-1 are refused (rule 5 iff)",
+    CheckStep.HadoopLayout,
+    "'blocking/round-0/spill' holds a part file but round-1 is missing",
+    Spec(curatedRounds = 1, curatedSpillInLast = true)
+  )(_ => ())
+
+  curatedRefused(
+    "m1 7 hadoop-layout: round-2/spill parts without round-3 are refused (rule 5 iff)",
+    CheckStep.HadoopLayout,
+    "'blocking/round-2/spill' holds a part file but round-3 is missing",
+    Spec(curatedRounds = 3, curatedSpillInLast = true)
+  )(_ => ())
+
+  curatedRefused(
+    "m1 7 hadoop-layout: round-1 without round-0/spill parts is refused (rule 5 iff)",
+    CheckStep.HadoopLayout,
+    "'blocking/round-1' exists although round-0/spill holds no part file"
+  )(c => LocalSpark.deleteTree(c.resolve("blocking/round-0/spill")))
+
+  tmp.test("m1: join and an empty pairs/ job directory (pairs/pairs without parts) are accepted") {
+    root =>
+      val w = RunFixtures.write(root, Spec(curatedCandidates = Vector("joined", "pairs-empty")))
+      assert(Files.isDirectory(w.runs.curatedRun.resolve("candidates/pairs")))
+      assert(!Files.exists(w.runs.curatedRun.resolve("candidates/pairs/pairs")))
+      assert(!Files.exists(w.runs.curatedRun.resolve("candidates/final")))
+      accepted(w)
+  }
+
+  tmp.test("m1: four rounds with a spill part in round-3 (the last level) are accepted") { root =>
+    val w = RunFixtures.write(root, Spec(curatedRounds = 4, curatedSpillInLast = true))
+    assert(Files.exists(w.runs.curatedRun.resolve("blocking/round-3/spill/part-r-00000.gz")))
+    accepted(w)
+  }
+
+  // ---------------------------------------------------------------- CR-P6-21 n2: branches
+
+  curatedRefused(
+    "n2 9 run-manifest: a curated manifest without a DBLP snapshot is refused (rule 2)",
+    CheckStep.RunManifest,
+    "the run manifest has 0 DBLP snapshots; exactly one is required",
+    Spec(curatedSnapshots = Vector(SnapshotRef(SourceType.OpenAlex, "openalex-2026-11-05")))
+  )(_ => ())
+
+  curatedRefused(
+    "n2 9 run-manifest: a curated manifest with two DBLP snapshots is refused (rule 2)",
+    CheckStep.RunManifest,
+    "the run manifest has 2 DBLP snapshots; exactly one is required",
+    Spec(curatedSnapshots = RunFixtures.snapshots ++ RunFixtures.otherSnapshots)
+  )(_ => ())
+
+  private def countersWith(stage: String, k: String, raw: String): String =
+    RunFixtures
+      .countersJson(stage)
+      .replace(s"\"$k\": 0", s"\"$k\": $raw")
+
+  curatedRefused(
+    "n2 10 stage-counters: a fractional counter is refused (rule 4)",
+    CheckStep.StageCounters,
+    "'teams/_counters.json' counter INPUT is not a non-negative integer below 2^53: 1.5"
+  )(c =>
+    Files.write(c.resolve("teams/_counters.json"), utf8(countersWith("teams", "INPUT", "1.5")))
+  )
+
+  curatedRefused(
+    "n2 10 stage-counters: a counter above 2^53 is refused (rule 4)",
+    CheckStep.StageCounters,
+    "'teams/_counters.json' counter EMITTED_PAIR is not a non-negative integer below 2^53"
+  )(c =>
+    Files.write(
+      c.resolve("teams/_counters.json"),
+      utf8(countersWith("teams", "EMITTED_PAIR", "9007199254740994"))
+    )
+  )
+
+  curatedRefused(
+    "n2 10 stage-counters: 2^53 + 1 (which a double rounds to 2^53) is refused (rule 4)",
+    CheckStep.StageCounters,
+    "'exact-ids/_counters.json' counter ACCEPTED is not a non-negative integer below 2^53"
+  )(c =>
+    Files.write(
+      c.resolve("exact-ids/_counters.json"),
+      utf8(countersWith("exact-ids", "ACCEPTED", "9007199254740993"))
+    )
+  )
+
+  tmp.test("n2 10 stage-counters: 2^53 - 1 is accepted (the largest exact counter)") { root =>
+    val w = RunFixtures.write(root)
+    Files.write(
+      w.runs.curatedRun.resolve("teams/_counters.json"),
+      utf8(countersWith("teams", "INPUT", "9007199254740991"))
+    )
+    accepted(w)
+  }
+
+  curatedRefused(
+    "n2 7 hadoop-layout: a .<X>.crc sidecar that is a directory is refused (rule 8)",
+    CheckStep.HadoopLayout,
+    "'exact-ids/links/.part-r-00000.gz.crc' is a checksum sidecar that is not a regular file"
+  ) { c =>
+    val sidecar = RunFixtures.crcOf(c.resolve("exact-ids/links/part-r-00000.gz"))
+    Files.delete(sidecar)
+    Files.createDirectory(sidecar)
+    ()
+  }
+
+  // ---------------------------------------------------------------- step 2B: curated parts
+
+  tmp.test("16 curated-parts: the consumed leaves decode and match their EMITTED counters") {
+    root =>
+      val v = accepted(RunFixtures.write(root))
+      // Hand counts: 6 work assignments (w1..w5, x1), 11 mention assignments, no venue,
+      // institution or topic record; 10 identified mentions, all on representatives.
+      assertEquals(v.curatedSources.works.size, 6)
+      assertEquals(v.curatedSources.mentions.size, 11)
+      assertEquals(
+        (v.curatedSources.venues, v.curatedSources.institutions, v.curatedSources.topics),
+        (Vector.empty, Vector.empty, Vector.empty)
+      )
+      assertEquals(v.authorships.size, 10)
+      assertEquals(
+        HadoopCuratedRun.ConsumedLeaves.map(v.curatedRowsOf),
+        Vector(6L, 11L, 0L, 0L, 0L)
+      )
+      assertEquals(v.curatedPartsOf("venues"), Vector.empty)
+      assertEquals(
+        v.canonicalInput.sourceWorks.map(_.workId).toSet,
+        v.graphInput.works.map(_.workId).toSet
+      )
+  }
+
+  private def rewriteGz(p: Path, text: String): Unit =
+    RunFixtures.withCrc(p, RunFixtures.gzip(text))
+
+  tmp.test("16 curated-parts: a changed byte in a consumed part fails its Hadoop crc") { root =>
+    val w = RunFixtures.write(root)
+    tamper(w.runs.curatedRun.resolve("normalize/works/part-r-00000.gz"))
+    refusedExactly(w, CheckStep.CuratedParts, "curated", "crc sidecar chunk 0")
+  }
+
+  tmp.test("16 curated-parts: decoded rows that differ from EMITTED.<leaf> are refused") { root =>
+    val w = RunFixtures.write(root)
+    val c = w.runs.curatedRun
+    val text = Files.readString(c.resolve("normalize/_counters.json"))
+    Files.write(
+      c.resolve("normalize/_counters.json"),
+      utf8(text.replace("\"EMITTED.works\": 6", "\"EMITTED.works\": 7"))
+    )
+    refusedExactly(
+      w,
+      CheckStep.CuratedParts,
+      "curated",
+      "normalize/works: decoded 6 rows, normalize/_counters.json declares EMITTED.works = 7"
+    )
+  }
+
+  tmp.test("10 stage-counters: a consumed leaf with parts but without EMITTED.<leaf> is refused") {
+    root =>
+      val w = RunFixtures.write(root)
+      val c = w.runs.curatedRun
+      val text = Files.readString(c.resolve("normalize/_counters.json"))
+      Files.write(
+        c.resolve("normalize/_counters.json"),
+        utf8(text.replace("\"EMITTED.mentions\": 11,", ""))
+      )
+      refusedExactly(
+        w,
+        CheckStep.StageCounters,
+        "curated",
+        "lacks EMITTED.mentions although normalize/mentions holds part files"
+      )
+  }
+
+  tmp.test("10 stage-counters: a positive EMITTED.<leaf> without the leaf is refused") { root =>
+    val w = RunFixtures.write(root)
+    val c = w.runs.curatedRun
+    val text = Files.readString(c.resolve("normalize/_counters.json"))
+    Files.write(
+      c.resolve("normalize/_counters.json"),
+      utf8(
+        text.replace("\"EMITTED.works\": 6,", "\"EMITTED.topics\": 2,\n    \"EMITTED.works\": 6,")
+      )
+    )
+    refusedExactly(
+      w,
+      CheckStep.StageCounters,
+      "curated",
+      "declares EMITTED.topics = 2 but normalize/topics holds no part file"
+    )
+  }
+
+  tmp.test("16 curated-parts: a consumed row that breaks its record contract is refused") { root =>
+    val w = RunFixtures.write(root)
+    val p = w.runs.curatedRun.resolve("normalize/works/part-r-00000.gz")
+    val good = new String(
+      new java.util.zip.GZIPInputStream(Files.newInputStream(p)).readAllBytes(),
+      StandardCharsets.UTF_8
+    )
+    rewriteGz(p, good.replaceFirst("\"title\":\"[^\"]*\"", "\"title\":\"\""))
+    refusedExactly(w, CheckStep.CuratedParts, "curated", "normalize/works/part-r-00000.gz row 1")
+  }
+
+  tmp.test("16 curated-parts: decompressed bytes beyond the remaining driver budget are refused") {
+    root =>
+      val w = RunFixtures.write(root)
+      // The budget left after the declared grouping and decision bytes equals the compressed
+      // curated bytes (so the driver bound passes); the JSON text of the works is larger.
+      val g = w.runs.groupingRun
+      val declared = Vector(
+        "assignments/researcher/part-00000.jsonl",
+        "assignments/work/part-00000.jsonl",
+        "authorships/part-00000.jsonl",
+        "teams/part-00000.jsonl"
+      ).map(x => size(g.resolve(x))).sum +
+        size(w.runs.decisionRun.resolve("decisions/researcher/part-00000.jsonl"))
+      val compressed = Vector("works", "mentions")
+        .map(l => size(w.runs.curatedRun.resolve(s"normalize/$l/part-r-00000.gz")))
+        .sum
+      refusedExactly(
+        w,
+        CheckStep.CuratedParts,
+        "curated",
+        "decompresses to more than the remaining driver byte budget",
+        limits.copy(maxDriverValidationBytes = declared + compressed)
+      )
+  }
+
+  tmp.test("12 driver-bound: the curated rows count towards maxDriverValidationRows") { root =>
+    val w = RunFixtures.write(root)
+    // Grouping 11 + 6 + 10 + 5, decision 1 = 33 rows; curated 6 + 11 = 17 more.
+    accepted(w, limits.copy(maxDriverValidationRows = 50))
+    refusedExactly(
+      w,
+      CheckStep.DriverBound,
+      "grouping,decision",
+      "50 declared rows exceed",
+      limits.copy(maxDriverValidationRows = 49)
+    )
+  }
+
+  tmp.test("17 canonical-input: a representative without a curated work record is refused") {
+    root =>
+      val w = RunFixtures.write(root, Spec(withoutCuratedWorks = Set(RunFixtures.w4)))
+      // The curated mention of w4 is gone with its work, so only the work rule refuses.
+      refusedExactly(
+        w,
+        CheckStep.CanonicalInput,
+        "curated,grouping",
+        s"representative ${RunFixtures.w4} has no curated work record"
+      )
   }
 }

@@ -558,7 +558,29 @@ class AnalysisValidationSuite extends munit.FunSuite {
       "analysis.maxEvidenceWorksPerHop" -> config.copy(analysis =
         a.copy(maxEvidenceWorksPerHop = Some(3))
       ),
-      "analysis.exportFormat" -> config.copy(analysis = a.copy(exportFormat = Some("jsonl")))
+      "analysis.exportFormat" -> config.copy(analysis = a.copy(exportFormat = Some("jsonl"))),
+      // DE-P6-03: the path-length keys are set together; each variant differs in its own key.
+      "analysis.pathLengthSampleSize" -> config.copy(analysis =
+        a.copy(
+          pathLengthSampleSize = Some(4),
+          pathLengthSeed = Some(7L),
+          pathLengthMinComponentSize = Some(2)
+        )
+      ),
+      "analysis.pathLengthSeed" -> config.copy(analysis =
+        a.copy(
+          pathLengthSampleSize = Some(4),
+          pathLengthSeed = Some(8L),
+          pathLengthMinComponentSize = Some(2)
+        )
+      ),
+      "analysis.pathLengthMinComponentSize" -> config.copy(analysis =
+        a.copy(
+          pathLengthSampleSize = Some(4),
+          pathLengthSeed = Some(7L),
+          pathLengthMinComponentSize = Some(3)
+        )
+      )
     )
   }
 

@@ -18,7 +18,12 @@ final case class GraphInput(
     researchers: Vector[ResearcherAssignment]
 )
 
-/** The datasets of one analysis run (validator input for the cross-dataset checks). */
+/**
+ * The datasets of one analysis run (validator input for the cross-dataset checks). The DE-P6-03
+ * datasets (canonical tables, window structures, path-length estimates, temporal comparisons,
+ * entity summary inputs) default to empty, so callers of the DE-P6-02 shape keep compiling; every
+ * record present is covered by [[AnalysisValidation.checkRunChain]].
+ */
 final case class AnalysisOutputs(
     metrics: Vector[ResearcherMetricsV2],
     edges: Vector[CoauthorEdgeV2],
@@ -28,7 +33,14 @@ final case class AnalysisOutputs(
     coreness: Vector[Coreness],
     paths: Vector[EvidencePath],
     windows: Vector[AnalysisWindow],
-    summaryInputs: Vector[SemanticSummaryInput]
+    summaryInputs: Vector[SemanticSummaryInput],
+    nodes: Vector[GraphNodeV2] = Vector.empty,
+    graphEdges: Vector[GraphEdgeV2] = Vector.empty,
+    windowStructures: Vector[WindowStructure] = Vector.empty,
+    pathLengthEstimates: Vector[PathLengthEstimate] = Vector.empty,
+    windowComparisons: Vector[WindowComparison] = Vector.empty,
+    temporalChanges: Vector[ResearcherTemporalChange] = Vector.empty,
+    entitySummaryInputs: Vector[EntitySummaryInput] = Vector.empty
 ) {
 
   /** (lineage, provenance) of every record, for [[AnalysisValidation.checkRunChain]]. */
@@ -43,7 +55,14 @@ final case class AnalysisOutputs(
       of("coreness", coreness)(_.lineage, _.provenance) ++
       of("paths", paths)(_.lineage, _.provenance) ++
       of("windows", windows)(_.lineage, _.provenance) ++
-      of("summaryInputs", summaryInputs)(_.lineage, _.provenance)
+      of("summaryInputs", summaryInputs)(_.lineage, _.provenance) ++
+      of("nodes", nodes)(_.lineage, _.provenance) ++
+      of("graphEdges", graphEdges)(_.lineage, _.provenance) ++
+      of("windowStructures", windowStructures)(_.lineage, _.provenance) ++
+      of("pathLengthEstimates", pathLengthEstimates)(_.lineage, _.provenance) ++
+      of("windowComparisons", windowComparisons)(_.lineage, _.provenance) ++
+      of("temporalChanges", temporalChanges)(_.lineage, _.provenance) ++
+      of("entitySummaryInputs", entitySummaryInputs)(_.lineage, _.provenance)
   }
 }
 
@@ -242,15 +261,15 @@ object AnalysisValidation {
 
   // ---------------------------------------------------------------- window model
 
-  private final case class PairKey(a: String, b: String)
+  private[core] final case class PairKey(a: String, b: String)
 
-  private final class EdgeAcc {
+  private[core] final class EdgeAcc {
     val works = mutable.ArrayBuffer.empty[String]
     val byYear = mutable.TreeMap.empty[Int, Long]
   }
 
   /** The recomputed graph of one window from the counted teams. */
-  private final class WindowModel(val window: TimeWindow, counted: Vector[PublicationTeam]) {
+  private[core] final class WindowModel(val window: TimeWindow, counted: Vector[PublicationTeam]) {
     val teams: Vector[PublicationTeam] = counted.filter(_.year.exists(window.contains))
     val edges: Map[PairKey, EdgeAcc] = {
       val m = mutable.HashMap.empty[PairKey, EdgeAcc]
@@ -343,7 +362,7 @@ object AnalysisValidation {
       }
   }
 
-  private def models(
+  private[core] def models(
       input: GraphInput,
       settings: AnalysisRunSettings
   ): Map[TimeWindow, WindowModel] = {
@@ -1116,6 +1135,7 @@ object AnalysisValidation {
           .filter(_ != null)
           .map(m => (m.window, m.researcherId) -> m.identity)
           .toMap
+      val values = new FactValues(outputs, ms)
       all(
         duplicates("summaryInputs.inputId", inputs.map(_.inputId)),
         inputs.flatMap { s =>
@@ -1143,11 +1163,120 @@ object AnalysisValidation {
                     s"${r.kind.tag} ${r.id} resolves to no stored record of the window"
                   )
                 )
-              }
+              } ++ (SummaryFactVocabulary.get(fact.name) match {
+                case None =>
+                  Vector(
+                    invalid(
+                      s"$f.facts[${fact.name}]",
+                      s"'${fact.name}' is not a computed fact of the frozen vocabulary (SummaryFactVocabulary)"
+                    )
+                  )
+                case Some(k) =>
+                  fact.evidence.find(_.kind == k) match {
+                    case None =>
+                      Vector(
+                        invalid(
+                          s"$f.facts[${fact.name}]",
+                          s"a ${fact.name} fact cites a ${k.tag} record"
+                        )
+                      )
+                    case Some(r) =>
+                      values.valueOf(fact.name, s.window, r.id).toVector.flatMap { v =>
+                        when(v != fact.value)(
+                          invalid(
+                            s"$f.facts[${fact.name}].value",
+                            s"expected $v, the ${fact.name} of ${k.tag} ${r.id}"
+                          )
+                        )
+                      }
+                  }
+              })
             }
           )
         }
       )
+    }
+  }
+
+  /**
+   * The frozen fact vocabulary of semantic-summary inputs (DE-P6-03, course item 10: summaries come
+   * from computed data, never invented metrics): each fact name states one field of one kind of
+   * stored record, and the fact's value must equal that field of the first cited record of the kind
+   * (`String.valueOf` of the number; `community` is the community ID itself). A fact with any other
+   * name is refused.
+   */
+  val SummaryFactVocabulary: Map[String, SummaryEvidenceKind] = {
+    import SummaryEvidenceKind.*
+    Map(
+      "publicationCount" -> ResearcherMetrics,
+      "distinctCoauthorCount" -> ResearcherMetrics,
+      "totalCoauthorOccurrences" -> ResearcherMetrics,
+      "unresolvedCoauthorOccurrences" -> ResearcherMetrics,
+      "averageCoauthorsPerPaper" -> ResearcherMetrics,
+      "maximumCoauthorsOnOnePaper" -> ResearcherMetrics,
+      "weightedDegree" -> ResearcherMetrics,
+      "jointPublicationCount" -> CoauthorEdge,
+      "firstCollaborationYear" -> CoauthorEdge,
+      "lastCollaborationYear" -> CoauthorEdge,
+      "hopCount" -> EvidencePath,
+      "componentSize" -> Component,
+      "community" -> Community,
+      "communitySize" -> Community,
+      "crossCommunityDegree" -> BridgeMeasure,
+      "communitiesReached" -> BridgeMeasure,
+      "participationCoefficient" -> BridgeMeasure,
+      "coreness" -> Coreness,
+      "teamSize" -> CountedWork,
+      "workYear" -> CountedWork
+    )
+  }
+
+  /** Field values of the stored records by (window, ID), for [[SummaryFactVocabulary]]. */
+  private final class FactValues(outputs: AnalysisOutputs, ms: Map[TimeWindow, WindowModel]) {
+    private def by[A](
+        xs: Vector[A]
+    )(w: A => TimeWindow, id: A => String): Map[(TimeWindow, String), A] =
+      Option(xs).getOrElse(Vector.empty).filter(_ != null).map(x => (w(x), id(x)) -> x).toMap
+    private val metrics = by(outputs.metrics)(_.window, _.researcherId)
+    private val edges = by(outputs.edges)(_.window, _.edgeId)
+    private val paths = by(outputs.paths)(_.window, _.pathId)
+    private val components = by(outputs.components)(_.window, _.componentId)
+    private val communities = by(outputs.communities)(_.window, _.communityId)
+    private val bridges = by(outputs.bridges)(_.window, _.researcherId)
+    private val coreness = by(outputs.coreness)(_.window, _.researcherId)
+    private val teams = ms.toVector.flatMap { case (w, m) =>
+      m.teams.map(t => (w, t.workId) -> t)
+    }.toMap
+
+    def valueOf(name: String, w: TimeWindow, id: String): Option[String] = {
+      val k = (w, id)
+      name match {
+        case "publicationCount" => metrics.get(k).map(_.publicationCount.toString)
+        case "distinctCoauthorCount" => metrics.get(k).map(_.distinctCoauthorCount.toString)
+        case "totalCoauthorOccurrences" => metrics.get(k).map(_.totalCoauthorOccurrences.toString)
+        case "unresolvedCoauthorOccurrences" =>
+          metrics.get(k).map(_.unresolvedCoauthorOccurrences.toString)
+        case "averageCoauthorsPerPaper" =>
+          metrics.get(k).map(m => String.valueOf(m.averageCoauthorsPerPaper))
+        case "maximumCoauthorsOnOnePaper" =>
+          metrics.get(k).map(_.maximumCoauthorsOnOnePaper.toString)
+        case "weightedDegree" => metrics.get(k).map(_.weightedDegree.toString)
+        case "jointPublicationCount" => edges.get(k).map(_.jointPublicationCount.toString)
+        case "firstCollaborationYear" => edges.get(k).map(_.firstCollaborationYear.toString)
+        case "lastCollaborationYear" => edges.get(k).map(_.lastCollaborationYear.toString)
+        case "hopCount" => paths.get(k).map(_.hopCount.toString)
+        case "componentSize" => components.get(k).map(_.componentSize.toString)
+        case "community" => communities.get(k).map(_.communityId)
+        case "communitySize" => communities.get(k).map(_.communitySize.toString)
+        case "crossCommunityDegree" => bridges.get(k).map(_.crossCommunityDegree.toString)
+        case "communitiesReached" => bridges.get(k).map(_.communitiesReached.toString)
+        case "participationCoefficient" =>
+          bridges.get(k).map(b => String.valueOf(b.participationCoefficient))
+        case "coreness" => coreness.get(k).map(_.coreness.toString)
+        case "teamSize" => teams.get(k).map(_.teamSize.toString)
+        case "workYear" => teams.get(k).flatMap(_.year).map(_.toString)
+        case _ => None
+      }
     }
   }
 
@@ -1170,6 +1299,17 @@ object AnalysisValidation {
 
     /** [[BenchmarkPairList.digest]] of the run's benchmark pair list (repair 01, finding 4). */
     val BenchmarkPairsDigest = "benchmarkPairsDigest"
+
+    /**
+     * DE-P6-03: the label-propagation outcome of every window, recorded by the analysis run as
+     * computed manifest parameters `community.converged.<start>-<end>` (`true` or `false`) and
+     * `community.iterations.<start>-<end>` (decimal), so another outcome is another run ID. Checked
+     * against [[WindowStructure]] by [[StructureValidation.checkWindowStructures]].
+     */
+    def communityConverged(w: TimeWindow): String =
+      s"community.converged.${w.startYear}-${w.endYear}"
+    def communityIterations(w: TimeWindow): String =
+      s"community.iterations.${w.startYear}-${w.endYear}"
   }
 
   /**
@@ -1285,8 +1425,15 @@ object AnalysisValidation {
                 "groupingManifest.parameters.identityVersion",
                 s"the configured graph.identityVersion is ${settings.identityVersion}"
               )
-            ),
-            outputs.lineageAndProvenance.zipWithIndex.flatMap { case ((name, l, pr), i) =>
+            ), {
+              // DE-P6-03: the index is the record's position within its own dataset.
+              val seen = mutable.HashMap.empty[String, Int]
+              outputs.lineageAndProvenance.map { case (name, l, pr) =>
+                val i = seen.getOrElse(name, 0)
+                seen(name) = i + 1
+                (name, l, pr, i)
+              }
+            }.flatMap { case (name, l, pr, i) =>
               val f = s"$name[$i]"
               all(
                 when(l != expected)(invalid(s"$f.lineage", s"must equal the run chain $expected")),

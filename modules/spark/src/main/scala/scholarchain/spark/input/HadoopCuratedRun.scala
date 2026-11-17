@@ -18,9 +18,11 @@ import scholarchain.core.*
  * restated here, each with its source.
  *
  * Rules (S = structural, no content read; C = content, bounded by `maxMetadataBytes`):
- *   1. S: the run directory is `run=<64 hex>` (CheckStep.RunName), its run ID equals the pinned run
- *      ID the caller supplies (never inferred from the input), and it lies in `snapshot=<token>/`
- *      under `hadoop/` (CheckStep.CuratedRun); not a symbolic link (CheckStep.Tree).
+ *   1. S: the run directory is `run=<64 hex>` (CheckStep.RunName), its run ID equals the committed
+ *      pin [[PinnedRunId]] (CR-P6-21 n1: the pin is a main-code constant, never supplied by a
+ *      production caller and never inferred from the input; [[ArchiveRuns.of]] always uses it), and
+ *      it lies in `snapshot=<token>/` under `hadoop/` (CheckStep.CuratedRun); not a symbolic link
+ *      (CheckStep.Tree).
  *   2. S: `_run-manifest.json` is a non-empty regular file with its crc (CheckStep.HadoopLayout).
  *      C: it decodes strictly through the core RunManifest contract (`Json.decode`: schema version,
  *      structural decode, field validation), `stage == "hadoop.pipeline"`, `RunId.of(manifest)`
@@ -31,17 +33,26 @@ import scholarchain.core.*
  *   4. S: each stage holds a regular `_SUCCESS` of size 0 and a non-empty regular `_counters.json`,
  *      their crcs, and only its listed subdirectories. C: `_counters.json` is a JSON object whose
  *      `stage` is the stage's name and whose `counters` object holds each of the ten required
- *      counters as a non-negative integer (CheckStep.StageCounters).
- *   5. S: blocking holds round-0 .. round-(k-1), contiguous, 1 <= k <= [[MaxBlockingRounds]].
- *   6. S: candidates/join is present; candidates/pairs only if join/joined holds a part file;
- *      candidates/final only if pairs/pairs holds a part file ("only if", as in the preflight).
+ *      counters as a non-negative integer below 2^53 (CheckStep.StageCounters). For the consumed
+ *      normalize leaves ([[ConsumedLeaves]]) the normalize counters must also declare the rows:
+ *      `EMITTED.<leaf>` present (same integer rule) exactly when the leaf holds a part file, and
+ *      absent or 0 when the leaf directory is absent ([[emittedRows]]).
+ *   5. S: blocking holds round-0 .. round-(k-1), contiguous, 1 <= k <= [[MaxBlockingRounds]]; for r
+ *      + 1 < [[MaxBlockingRounds]], round-(r+1) is present if and only if round-r/spill holds a
+ *      part file (CR-P6-21 m1; the same rule as the preflight, project/SparkItRuns.scala:869-880).
+ *   6. S: candidates/join is present; candidates/pairs is present if and only if join/joined holds
+ *      a part file; candidates/final is present if and only if pairs/pairs holds a part file
+ *      (CR-P6-21 m1; preflight project/SparkItRuns.scala:889-903).
  *   7. S: leaves hold only non-empty regular `part-[mr]-[0-9]{5,}.gz` files, `part-m` only in a
- *      `rejects` leaf. C: NOT enforced. Spark step 1A consumes no curated data part, so no part is
- *      opened, decompressed or decoded.
+ *      `rejects` leaf. C (SP-P6-03 step 2B): enforced for the consumed leaves only
+ *      ([[ConsumedLeaves]], [[CuratedParts]]): each part decompresses (gzip) within the driver byte
+ *      budget, is strict UTF-8 JSON lines, every row decodes through its core contract, and the
+ *      decoded rows equal `EMITTED.<leaf>`. Parts of other leaves are never opened.
  *   8. S: the only hidden entry is `.<X>.crc` (a regular file) for a regular, non-hidden sibling X,
  *      and every regular non-hidden file has one; `.DS_Store`, `._*` and every other hidden entry
- *      are refused. C: NOT enforced. No crc sidecar is compared with its file (not consumed, not
- *      decoded).
+ *      are refused. C (step 2B): the crc sidecar of every consumed part is verified against the
+ *      part's bytes ([[HadoopChecksum]], the Hadoop ChecksumFileSystem CRC32 layout); other crc
+ *      sidecars are not compared.
  *   9. S: files at most [[MaxFileDepth]] and directories at most [[MaxDirDepth]] levels below the
  *      run directory, at most `maxTreeEntries` entries (the bounded NOFOLLOW walk, CheckStep.Tree).
  *   10. S: `_temporary`, `_IN_PROGRESS`, `_FAILED` and `.staging*` are refused at any level, and
@@ -92,6 +103,32 @@ object HadoopCuratedRun {
   /** HD-P6-01 rule 5: round-0 .. round-3 (entity-resolution BlockingKeys.Levels = 4). */
   val MaxBlockingRounds: Int = 4
 
+  /**
+   * The one pinned Hadoop curated dev run (human decision Option A,
+   * docs/agent-runs/phase-06/prompt-curated-compat-option-a.md; the same run as build-engineer's
+   * `SparkItRuns.PinnedCuratedRunHex`, BE-P6-04). Committed main-code constant (CR-P6-21 n1): the
+   * HD-P6-01 contract applies to this run only, and [[ArchiveRuns.of]] gives no caller a way to
+   * pass another run ID (the synthetic-fixture seam is `private[input]`). It equals `RunId.of` of
+   * the committed dev manifest `modules/hadoop/local-runs/er-candidates.dev.run-manifest.json`
+   * (checked by a test that restates that manifest by hand).
+   */
+  val PinnedRunId: String =
+    "run:2881724b5c86b561a235836d51946fbd884beed36a14f929b27c278cb5de8baa"
+
+  /**
+   * The normalize leaves an analysis consumes (SP-P6-03 step 2B, the curated records of
+   * `CanonicalGraphInput`), in this order: works (`work-record.v3`), mentions
+   * (`author-mention.v1`), venues, institutions, topics. Restated from modules/hadoop
+   * NormalizeJob.scala (`kind.output` of the canonical record reducer and `NamedOutputs.Mentions`).
+   */
+  val ConsumedLeaves: Vector[String] =
+    Vector("works", "mentions", "venues", "institutions", "topics")
+
+  /**
+   * The normalize counter declaring a leaf's rows (modules/hadoop `Counters.inc2(Emitted, out)`).
+   */
+  def emittedCounter(leaf: String): String = s"EMITTED.$leaf"
+
   /** The parent of the snapshot directory (modules/hadoop Pipeline.scala `RunLayout.of`). */
   val HadoopDir = "hadoop"
   val SnapshotDirName = "^snapshot=([A-Za-z0-9._-]+)$".r
@@ -101,7 +138,7 @@ object HadoopCuratedRun {
   private val ManifestFile = PartManifest.RunManifestFile
   private val Rejects = "rejects"
   private val DsStore = ".DS_Store"
-  private val PartName = "^part-([mr])-[0-9]{5,}\\.gz$".r
+  private[input] val PartName = "^part-([mr])-[0-9]{5,}\\.gz$".r
   private val CrcName = "^\\.(.+)\\.crc$".r
   private val RoundName = "^round-(0|[1-9][0-9]*)$".r
   private val IncompleteMarkers: Set[String] = Set("_temporary", "_IN_PROGRESS", "_FAILED")
@@ -313,7 +350,7 @@ object HadoopCuratedRun {
       dirsOnly(d, o - SuccessMarker - CountersFile, allowed)
     }
 
-    // Rule 5: contiguous blocking rounds.
+    // Rule 5: contiguous blocking rounds, round r + 1 present if and only if round r spills.
     def blocking(d: Vector[String]): Unit = {
       val rounds = at(d).keys.toVector.collect { case n @ RoundName(i) =>
         (n, i.toIntOption.getOrElse(Int.MaxValue))
@@ -329,20 +366,46 @@ object HadoopCuratedRun {
           p += s"${show(d :+ s"round-$i")} is beyond the last blocking level (round-0 to " +
             s"round-${MaxBlockingRounds - 1}; HD-P6-01 rule 5)"
         )
+      // CR-P6-21 m1, as build-engineer's preflight (project/SparkItRuns.scala:869-880): the
+      // producer runs round r + 1 if and only if round r's spill holds a non-empty part file and
+      // r + 1 is below the last level (modules/hadoop Pipeline.scala runBlocking :516-521,
+      // nonEmptyDirs :417-423).
+      val present = idx.toSet
+      def spillHasPart(i: Int): Boolean = hasPart(d ++ Vector(s"round-$i", "spill"))
+      idx.foreach { i =>
+        if (i > 0 && present(i - 1) && !spillHasPart(i - 1))
+          p += s"${show(d :+ s"round-$i")} exists although round-${i - 1}/spill holds no part " +
+            "file (the producer never runs that round; HD-P6-01 rule 5)"
+        if (i + 1 < MaxBlockingRounds && spillHasPart(i) && !present(i + 1))
+          p += s"${show(d ++ Vector(s"round-$i", "spill"))} holds a part file but round-${i + 1} " +
+            "is missing (the producer always runs the next round; truncated layout, HD-P6-01 " +
+            "rule 5)"
+      }
       stageDir(rounds.map { case (n, _) => n -> roundDir }.toMap)(d)
     }
 
-    // Rule 6: the candidate jobs.
+    // Rule 6: the candidate jobs, each present if and only if its input holds a part file.
     def candidates(d: Vector[String]): Unit = {
       val ch = at(d)
       if (!ch.contains("join"))
         p += s"${show(d)} lacks join/ (the join job always runs; HD-P6-01 rule 6)"
-      if (ch.contains("pairs") && !hasPart(d ++ Vector("join", "joined")))
+      // CR-P6-21 m1, as the preflight (project/SparkItRuns.scala:889-903): the producer runs the
+      // pairs job if and only if join/joined holds a non-empty part file, and the final job if and
+      // only if pairs/pairs does (modules/hadoop Pipeline.scala runCandidates :646-666).
+      val joinedParts = hasPart(d ++ Vector("join", "joined"))
+      val pairsParts = hasPart(d ++ Vector("pairs", "pairs"))
+      if (ch.contains("pairs") && !joinedParts)
         p += s"${show(d :+ "pairs")} exists although join/joined holds no part file " +
           "(HD-P6-01 rule 6)"
-      if (ch.contains("final") && !hasPart(d ++ Vector("pairs", "pairs")))
+      if (!ch.contains("pairs") && joinedParts)
+        p += s"${show(d ++ Vector("join", "joined"))} holds a part file but pairs/ is missing " +
+          "(the producer always runs the pairs job then; truncated layout, HD-P6-01 rule 6)"
+      if (ch.contains("final") && !pairsParts)
         p += s"${show(d :+ "final")} exists although pairs/pairs holds no part file " +
           "(HD-P6-01 rule 6)"
+      if (!ch.contains("final") && pairsParts)
+        p += s"${show(d ++ Vector("pairs", "pairs"))} holds a part file but final/ is missing " +
+          "(the producer always runs the final job then; truncated layout, HD-P6-01 rule 6)"
       stageDir(
         Map[String, Handler](
           "join" -> jobOut(leaves("joined", Rejects)),
@@ -422,9 +485,8 @@ object HadoopCuratedRun {
           case Some(c: ujson.Obj) =>
             RequiredCounters.flatMap { k =>
               c.value.get(k) match {
-                case Some(ujson.Num(n)) if n >= 0 && n.isWhole && n <= MaxExactDouble =>
-                  Vector.empty
-                case Some(v) => Vector(s"$at counter $k is not a non-negative integer: $v")
+                case Some(v) =>
+                  counterValue(v).left.toOption.map(w => s"$at counter $k $w").toVector
                 case None => Vector(s"$at lacks the required counter $k")
               }
             }
@@ -435,6 +497,60 @@ object HadoopCuratedRun {
     }
   }
 
-  /** Largest integer a JSON number (an IEEE double) holds exactly: 2^53. */
-  private val MaxExactDouble: Double = 9007199254740992.0
+  /**
+   * Exclusive bound of a counter value: 2^53. Every integer below it is an exact IEEE double, and
+   * any JSON integer text of at least 2^53 parses to a double of at least 2^53 (rounding is
+   * monotonic), so refusing values >= 2^53 refuses every counter that a double cannot hold exactly
+   * (for example 2^53 + 1, which parses to 2^53). Limitation: a whole-valued fraction text such as
+   * `5.0` parses to the integer 5 and is accepted (the parsed value is exact).
+   */
+  val CounterBound: Double = 9007199254740992.0
+
+  /** A counter as a non-negative integer below [[CounterBound]], or why it is not one. */
+  def counterValue(v: ujson.Value): Either[String, Long] = v match {
+    case ujson.Num(n) if n >= 0 && n.isWhole && n < CounterBound => Right(n.toLong)
+    case other => Left(s"is not a non-negative integer below 2^53: $other")
+  }
+
+  /**
+   * The rows the normalize counters declare for each consumed leaf ([[ConsumedLeaves]]), given
+   * whether the leaf holds a part file (`hasParts`). Refuses (rule 4 content) a leaf with parts but
+   * without `EMITTED.<leaf>`, a declared count that is not a counter value, and a positive count
+   * for a leaf without parts; a leaf without parts and without a counter declares 0 rows. `text` is
+   * `normalize/_counters.json`, already accepted by [[countersProblems]].
+   */
+  def emittedRows(
+      text: String,
+      hasParts: String => Boolean
+  ): Either[Vector[String], Map[String, Long]] = {
+    val at = s"'normalize/$CountersFile'"
+    val counters: Map[String, ujson.Value] =
+      try
+        ujson.read(text) match {
+          case o: ujson.Obj =>
+            o.value.get("counters") match {
+              case Some(c: ujson.Obj) => c.value.toMap
+              case _ => Map.empty
+            }
+          case _ => Map.empty
+        }
+      catch { case NonFatal(_) => Map.empty }
+    val results = ConsumedLeaves.map { leaf =>
+      val k = emittedCounter(leaf)
+      (counters.get(k), hasParts(leaf)) match {
+        case (None, false) => Right(leaf -> 0L)
+        case (None, true) =>
+          Left(s"$at lacks $k although normalize/$leaf holds part files (rows undeclared)")
+        case (Some(v), parts) =>
+          counterValue(v) match {
+            case Left(w) => Left(s"$at counter $k $w")
+            case Right(n) if n > 0 && !parts =>
+              Left(s"$at declares $k = $n but normalize/$leaf holds no part file")
+            case Right(n) => Right(leaf -> n)
+          }
+      }
+    }
+    val bad = results.collect { case Left(w) => w }
+    if (bad.nonEmpty) Left(bad) else Right(results.collect { case Right(kv) => kv }.toMap)
+  }
 }

@@ -169,7 +169,22 @@ object RecordSchemas {
   val parquet: Map[String, StructType] =
     Map(
       SchemaVersions.CoauthorEdgeV2 -> CoauthorEdgeRows.schema,
-      SchemaVersions.ResearcherMetricsV2 -> ResearcherMetricsRows.schema
+      SchemaVersions.ResearcherMetricsV2 -> ResearcherMetricsRows.schema,
+      SchemaVersions.ComponentMembership -> ComponentMembershipRows.schema,
+      SchemaVersions.CommunityMembership -> CommunityMembershipRows.schema,
+      SchemaVersions.BridgeMeasure -> BridgeMeasureRows.schema,
+      SchemaVersions.Coreness -> CorenessRows.schema,
+      SchemaVersions.GraphNodeV2 -> GraphNodeRows.schema,
+      SchemaVersions.GraphEdgeV2 -> GraphEdgeRows.schema,
+      SchemaVersions.WindowStructure -> WindowStructureRows.schema,
+      // SP-P6-03 step 2C
+      SchemaVersions.EvidencePath -> EvidencePathRows.schema,
+      SchemaVersions.AnalysisWindow -> AnalysisWindowRows.schema,
+      SchemaVersions.PathLengthEstimate -> PathLengthEstimateRows.schema,
+      SchemaVersions.WindowComparison -> WindowComparisonRows.schema,
+      SchemaVersions.ResearcherTemporalChange -> TemporalChangeRows.schema,
+      SchemaVersions.SemanticSummaryInput -> SummaryInputRows.schema,
+      SchemaVersions.EntitySummaryInput -> EntitySummaryInputRows.schema
     )
 
   /**

@@ -8,8 +8,22 @@ class SchemaVersionSuite extends munit.FunSuite {
     errs.exists(_.isInstanceOf[ValidationError.UnsupportedSchemaVersion])
 
   test("schema version constants are frozen and distinct") {
-    assertEquals(SchemaVersions.all.size, 40)
-    assertEquals(SchemaVersions.all.values.toSet.size, 40)
+    assertEquals(SchemaVersions.all.size, 47)
+    assertEquals(SchemaVersions.all.values.toSet.size, 47)
+    // DE-P6-03: canonical graph tables, window structure, path-length estimate, temporal
+    // comparison and entity summary inputs. graph-node.v1 and graph-edge.v1 stay current.
+    assertEquals(SchemaVersions.GraphNodeV2, "scholarchain.graph-node.v2")
+    assertEquals(SchemaVersions.GraphEdgeV2, "scholarchain.graph-edge.v2")
+    assertEquals(SchemaVersions.GraphNode, "scholarchain.graph-node.v1")
+    assertEquals(SchemaVersions.GraphEdge, "scholarchain.graph-edge.v1")
+    assertEquals(SchemaVersions.WindowStructure, "scholarchain.window-structure.v1")
+    assertEquals(SchemaVersions.PathLengthEstimate, "scholarchain.path-length-estimate.v1")
+    assertEquals(SchemaVersions.WindowComparison, "scholarchain.window-comparison.v1")
+    assertEquals(
+      SchemaVersions.ResearcherTemporalChange,
+      "scholarchain.researcher-temporal-change.v1"
+    )
+    assertEquals(SchemaVersions.EntitySummaryInput, "scholarchain.entity-summary-input.v1")
     // DE-P6-02 repair 01: the explicit, versioned benchmark pair list for stored paths.
     assertEquals(SchemaVersions.BenchmarkPairList, "scholarchain.benchmark-pairs.v1")
     // DE-P6-02: the analysis contracts. The v1 metrics, edge and part-manifest versions stay
@@ -88,7 +102,14 @@ class SchemaVersionSuite extends munit.FunSuite {
       SemanticSummaryInput.contract,
       PartManifestV2.contract,
       StoreLoadManifest.contract,
-      BenchmarkPairList.contract
+      BenchmarkPairList.contract,
+      GraphNodeV2.contract,
+      GraphEdgeV2.contract,
+      WindowStructure.contract,
+      PathLengthEstimate.contract,
+      WindowComparison.contract,
+      ResearcherTemporalChange.contract,
+      EntitySummaryInput.contract
     )
     assertEquals(contracts.map(_.recordType).toSet, SchemaVersions.all.keySet)
     contracts.foreach { c =>

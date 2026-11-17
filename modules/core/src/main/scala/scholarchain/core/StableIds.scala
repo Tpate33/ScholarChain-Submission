@@ -72,6 +72,12 @@ object StableId {
     val EvidencePath = "scholarchain.evidence-path.v1"
     val SummaryInput = "scholarchain.summary-input.v1"
     val StoreLoad = "scholarchain.store-load.v2"
+
+    /** DE-P6-03: the deterministic BFS source sample of a path-length estimate (not an ID). */
+    val PathSample = "scholarchain.path-sample.v1"
+
+    /** DE-P6-03: work and topic summary inputs (prefix `suminput`, separate tag). */
+    val EntitySummaryInput = "scholarchain.entity-summary-input.v1"
   }
 
   private val Token = "^[A-Za-z0-9._-]+$".r
@@ -894,6 +900,73 @@ object SummaryInputId {
       w.endYear.toString,
       p
     )
+}
+
+/**
+ * Entity summary input ID (DE-P6-03) = `suminput:` + SHA-256(netstrings(
+ * "scholarchain.entity-summary-input.v1", documentType tag, subjectId, graph policyVersion)). Work
+ * and topic summaries are not windowed; the separate tag keeps them apart from [[SummaryInputId]].
+ */
+object EntitySummaryInputId {
+  def of(documentType: DocumentType, subjectId: String, policyVersion: String): Result =
+    for {
+      d <- Option(documentType).toRight(ValidationError.MissingField("documentType"))
+      s <- StableId.validateAny(subjectId, "subjectId").map(_ => subjectId)
+      p <- StableId.tokenOrError("policyVersion", policyVersion)
+    } yield StableId.hashId(
+      IdKind.SummaryInput,
+      StableId.Tags.EntitySummaryInput,
+      d.tag,
+      s,
+      p
+    )
+}
+
+/**
+ * Sample key of one researcher for the path-length estimate of its component (DE-P6-03): 64
+ * lowercase hex = SHA-256(netstrings("scholarchain.path-sample.v1", seed in decimal, startYear,
+ * endYear, researcherId)). The BFS sources of a component are its `min(sampleSize, size)` members
+ * with the smallest keys (ascending as strings, which equals ascending bytes for lowercase hex).
+ * The key depends only on the seed, the window and the researcher, never on partitioning or
+ * iteration order, so every implementation selects the same sources.
+ */
+object PathSampleKey {
+  def of(seed: Long, window: TimeWindow, researcherId: String): Result =
+    for {
+      w <- AnalysisIdInputs.window(window)
+      r <- StableId.validate(IdKind.Researcher, researcherId, "researcherId")
+    } yield Canonical.hashFields(
+      StableId.Tags.PathSample,
+      seed.toString,
+      w.startYear.toString,
+      w.endYear.toString,
+      r
+    )
+
+  /** The sample of a component: the `k` members with the smallest keys, sorted by UTF-8 bytes. */
+  def sample(
+      seed: Long,
+      window: TimeWindow,
+      members: Vector[String],
+      k: Int
+  ): Either[ValidationError, Vector[String]] = {
+    val keyed = Option(members).getOrElse(Vector.empty).map(m => of(seed, window, m).map(_ -> m))
+    keyed.collectFirst { case Left(e) => e } match {
+      case Some(e) => Left(e)
+      case None =>
+        Right(
+          keyed
+            .collect { case Right(x) => x }
+            .distinct
+            .sortWith((a, b) =>
+              if (a._1 != b._1) a._1 < b._1 else Canonical.compareUtf8(a._2, b._2) < 0
+            )
+            .take(math.max(k, 0))
+            .map(_._2)
+            .sortWith((a, b) => Canonical.compareUtf8(a, b) < 0)
+        )
+    }
+  }
 }
 
 /**

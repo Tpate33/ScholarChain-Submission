@@ -1073,7 +1073,11 @@ class ConfigLoaderSuite extends munit.FunSuite {
         "SCHOLARCHAIN_CFG_ANALYSIS__MAX_PATH_HOPS",
         "SCHOLARCHAIN_CFG_ANALYSIS__MAX_PATHS_PER_PAIR",
         "SCHOLARCHAIN_CFG_ANALYSIS__MAX_EVIDENCE_WORKS_PER_HOP",
-        "SCHOLARCHAIN_CFG_ANALYSIS__EXPORT_FORMAT"
+        "SCHOLARCHAIN_CFG_ANALYSIS__EXPORT_FORMAT",
+        // DE-P6-03: the optional path-length estimate keys.
+        "SCHOLARCHAIN_CFG_ANALYSIS__PATH_LENGTH_SAMPLE_SIZE",
+        "SCHOLARCHAIN_CFG_ANALYSIS__PATH_LENGTH_SEED",
+        "SCHOLARCHAIN_CFG_ANALYSIS__PATH_LENGTH_MIN_COMPONENT_SIZE"
       )
     )
     val viaEnv = loadOk(
@@ -1231,6 +1235,93 @@ class ConfigLoaderSuite extends munit.FunSuite {
     // Grouping-scope keys are not analysis inputs.
     val grouped = loadOk(filesEnv, files("base.conf" -> (base + analysisLines + groupingLines)))
     assertEquals(digestOf(grouped), d)
+  }
+
+  private val pathLengthLines =
+    """analysis.pathLengthSampleSize = 4
+      |analysis.pathLengthSeed = 9007199254740993
+      |analysis.pathLengthMinComponentSize = 3
+      |""".stripMargin
+
+  test("DE-P6-03: unset path-length keys keep the analysis digest; set, they change it and load") {
+    val baseDigest = scholarchain.core.Canonical.sha256HexUtf8(baseDigestInput)
+    val plain = loadOk(filesEnv, files("base.conf" -> (base + analysisLines)))
+    val frozenInput =
+      s"""{"schema":"scholarchain.analysis-config-digest.v1","baseConfigDigest":"$baseDigest","communityRandomSeed":11,"maxPathHops":3,"maxPathsPerPair":2,"maxEvidenceWorksPerHop":5,"exportFormat":"parquet"}"""
+    assertEquals(
+      AnalysisRunSettings.configDigest(plain),
+      Right(scholarchain.core.Canonical.sha256HexUtf8(frozenInput)),
+      "unset path-length keys are omitted from the digest input"
+    )
+    assertEquals(AnalysisRunSettings.from(plain).map(_.pathLengthSampling), Right(None))
+    val c = loadOk(filesEnv, files("base.conf" -> (base + analysisLines + pathLengthLines)))
+    assertEquals(
+      c.analysis,
+      AnalysisConfig(
+        Some(3),
+        Some(2),
+        Some(5),
+        Some("parquet"),
+        Some(4),
+        Some(9007199254740993L),
+        Some(3)
+      )
+    )
+    val withInput =
+      s"""{"schema":"scholarchain.analysis-config-digest.v1","baseConfigDigest":"$baseDigest","communityRandomSeed":11,"maxPathHops":3,"maxPathsPerPair":2,"maxEvidenceWorksPerHop":5,"exportFormat":"parquet","pathLengthSampleSize":4,"pathLengthSeed":"9007199254740993","pathLengthMinComponentSize":3}"""
+    // A seed beyond 2^53 is written as a JSON string by the codec (exact, never rounded).
+    assertEquals(
+      AnalysisRunSettings.configDigest(c),
+      Right(scholarchain.core.Canonical.sha256HexUtf8(withInput)),
+      "frozen digest input with the path-length keys"
+    )
+    assertEquals(
+      AnalysisRunSettings.from(c).map(_.pathLengthSampling),
+      Right(Some(PathLengthSampling(4, 9007199254740993L, 3)))
+    )
+    // The path-length keys are analysis scope: no upstream digest changes.
+    assertEquals(ScholarChainConfig.digestWithoutGrouping(c), baseDigest)
+    val viaEnv = loadOk(
+      filesEnv ++ Map(
+        "SCHOLARCHAIN_CFG_ANALYSIS__PATH_LENGTH_SAMPLE_SIZE" -> "8",
+        "SCHOLARCHAIN_CFG_ANALYSIS__PATH_LENGTH_SEED" -> "-1",
+        "SCHOLARCHAIN_CFG_ANALYSIS__PATH_LENGTH_MIN_COMPONENT_SIZE" -> "2"
+      ),
+      files("base.conf" -> (base + analysisLines))
+    )
+    assertEquals(
+      AnalysisRunSettings.from(viaEnv).map(_.pathLengthSampling),
+      Right(Some(PathLengthSampling(8, -1L, 2)))
+    )
+  }
+
+  test("DE-P6-03: path-length keys are validated and set together or not at all") {
+    def withLines(lines: String) = loadBase(base + analysisLines + lines)
+    assertEquals(
+      invalidKeys(withLines("analysis.pathLengthSampleSize = 4\n")),
+      Set(AnalysisConfig.PathLengthSampleSizeKey),
+      "one key alone is refused"
+    )
+    assertEquals(
+      invalidKeys(
+        withLines(
+          pathLengthLines
+            .replace("pathLengthMinComponentSize = 3", "pathLengthMinComponentSize = 1")
+        )
+      ),
+      Set(AnalysisConfig.PathLengthMinComponentSizeKey)
+    )
+    assertEquals(
+      invalidKeys(
+        withLines(pathLengthLines.replace("pathLengthSampleSize = 4", "pathLengthSampleSize = 0"))
+      ),
+      Set(AnalysisConfig.PathLengthSampleSizeKey)
+    )
+    assertEquals(
+      invalidKeys(withLines(pathLengthLines.replace("9007199254740993", "1.5"))),
+      Set(AnalysisConfig.PathLengthSeedKey)
+    )
+    assert(withLines(pathLengthLines).isRight)
   }
 
   test("config digest is deterministic and sensitive to every value") {

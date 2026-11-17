@@ -89,12 +89,29 @@ final case class CommunityConfig(
  *   `analysis.maxEvidenceWorksPerHop`: most evidence works shown per path hop, >= 1
  * @param exportFormat
  *   `analysis.exportFormat`: part format of the analysis exports, `parquet` or `jsonl`
+ * @param pathLengthSampleSize
+ *   `analysis.pathLengthSampleSize` (DE-P6-03, optional): number of BFS source researchers sampled
+ *   per component for the component-level path-length estimate
+ *   ([[scholarchain.core.PathLengthEstimate]]), >= 1
+ * @param pathLengthSeed
+ *   `analysis.pathLengthSeed` (DE-P6-03, optional): seed of the deterministic source sample
+ *   ([[scholarchain.core.PathSampleKey]]), any 64-bit integer
+ * @param pathLengthMinComponentSize
+ *   `analysis.pathLengthMinComponentSize` (DE-P6-03, optional): smallest component (researchers)
+ *   that gets an estimate, >= 2
+ *
+ * The three path-length keys are set together or not at all; when none is set the run stores no
+ * path-length estimate, and its config digest is unchanged (unset keys are omitted from every
+ * digest input).
  */
 final case class AnalysisConfig(
     maxPathHops: Option[Int] = None,
     maxPathsPerPair: Option[Int] = None,
     maxEvidenceWorksPerHop: Option[Int] = None,
-    exportFormat: Option[String] = None
+    exportFormat: Option[String] = None,
+    pathLengthSampleSize: Option[Int] = None,
+    pathLengthSeed: Option[Long] = None,
+    pathLengthMinComponentSize: Option[Int] = None
 ) derives ReadWriter
 
 object AnalysisConfig {
@@ -103,6 +120,13 @@ object AnalysisConfig {
   val MaxEvidenceWorksPerHopKey = "analysis.maxEvidenceWorksPerHop"
   val ExportFormatKey = "analysis.exportFormat"
   val CommunityRandomSeedKey = "community.randomSeed"
+  val PathLengthSampleSizeKey = "analysis.pathLengthSampleSize"
+  val PathLengthSeedKey = "analysis.pathLengthSeed"
+  val PathLengthMinComponentSizeKey = "analysis.pathLengthMinComponentSize"
+
+  /** The three path-length keys, set together or not at all. */
+  val PathLengthKeys: Vector[String] =
+    Vector(PathLengthSampleSizeKey, PathLengthSeedKey, PathLengthMinComponentSizeKey)
 
   /** Every problem of the set analysis keys as (configuration key, reason), empty when valid. */
   def problems(c: AnalysisConfig): Vector[(String, String)] =
@@ -112,9 +136,25 @@ object AnalysisConfig {
         Option(v).flatten.toVector.flatMap(n =>
           if (n >= 1) Vector.empty else Vector(key -> s"$n is below 1")
         )
+      val pathLengthSet = Vector(
+        Option(c.pathLengthSampleSize).flatten.isDefined,
+        Option(c.pathLengthSeed).flatten.isDefined,
+        Option(c.pathLengthMinComponentSize).flatten.isDefined
+      )
       positive(MaxPathHopsKey, c.maxPathHops) ++
         positive(MaxPathsPerPairKey, c.maxPathsPerPair) ++
         positive(MaxEvidenceWorksPerHopKey, c.maxEvidenceWorksPerHop) ++
+        positive(PathLengthSampleSizeKey, c.pathLengthSampleSize) ++
+        Option(c.pathLengthMinComponentSize).flatten.toVector.flatMap(n =>
+          if (n >= 2) Vector.empty
+          else
+            Vector(PathLengthMinComponentSizeKey -> s"$n is below 2 (a path needs two researchers)")
+        ) ++
+        (if (pathLengthSet.distinct.size > 1)
+           Vector(
+             PathLengthSampleSizeKey -> s"${PathLengthKeys.mkString(", ")} are set together or not at all"
+           )
+         else Vector.empty) ++
         Option(c.exportFormat).flatten.toVector.flatMap { f =>
           if (scholarchain.core.PartFormat.AnalysisExportFormats.exists(_.tag == f)) Vector.empty
           else
@@ -143,6 +183,10 @@ object AnalysisConfig {
  *   (DE-P6-02 repair 01, CR-P6-13 finding 1). The analysis run manifest and every record lineage
  *   must record exactly this value ([[scholarchain.core.AnalysisValidation.checkRunChain]]).
  *
+ * @param pathLengthSampling
+ *   (DE-P6-03) the component-level path-length estimate settings, present exactly when the three
+ *   `analysis.pathLength*` keys are set; absent: the run stores no path-length estimate
+ *
  * The constructor is private: settings exist only through [[AnalysisRunSettings.from]], so the
  * digest always describes the analysis settings it travels with (a changed setting is a changed
  * configuration, hence a changed digest and a changed analysis run ID).
@@ -157,15 +201,34 @@ final case class AnalysisRunSettings private (
     communityParameters: SortedMap[String, String],
     pathBounds: PathBounds,
     exportFormat: PartFormat,
-    configDigest: String
+    configDigest: String,
+    pathLengthSampling: Option[PathLengthSampling] = None
 )
+
+/**
+ * Settings of the component-level path-length estimate (DE-P6-03, course item 5 "where feasible";
+ * [[scholarchain.core.PathLengthEstimate]]).
+ *
+ * @param sampleSize
+ *   `analysis.pathLengthSampleSize`: BFS sources per component (all members when the component is
+ *   not larger, which makes the estimate exact)
+ * @param seed
+ *   `analysis.pathLengthSeed`: seed of [[scholarchain.core.PathSampleKey]]
+ * @param minComponentSize
+ *   `analysis.pathLengthMinComponentSize`: smallest component that gets an estimate (>= 2)
+ */
+final case class PathLengthSampling(sampleSize: Int, seed: Long, minComponentSize: Int)
 
 object AnalysisRunSettings {
 
   /** Schema tag of the analysis config digest input; part of the digested JSON. */
   val DigestSchema = "scholarchain.analysis-config-digest.v1"
 
-  /** The analysis digest input. Frozen field order. */
+  /**
+   * The analysis digest input. Frozen field order. The three path-length fields (DE-P6-03) have the
+   * default None and are omitted from the JSON when unset, so every configuration without them
+   * keeps its exact digest.
+   */
   private final case class DigestInput(
       schema: String,
       baseConfigDigest: String,
@@ -173,7 +236,10 @@ object AnalysisRunSettings {
       maxPathHops: Int,
       maxPathsPerPair: Int,
       maxEvidenceWorksPerHop: Int,
-      exportFormat: String
+      exportFormat: String,
+      pathLengthSampleSize: Option[Int] = None,
+      pathLengthSeed: Option[Long] = None,
+      pathLengthMinComponentSize: Option[Int] = None
   ) derives ReadWriter
 
   /**
@@ -206,7 +272,10 @@ object AnalysisRunSettings {
           bounds.maxHops,
           bounds.maxPathsPerPair,
           bounds.maxEvidenceWorksPerHop,
-          format.tag
+          format.tag,
+          c.analysis.pathLengthSampleSize,
+          c.analysis.pathLengthSeed,
+          c.analysis.pathLengthMinComponentSize
         )
       )
     )
@@ -274,7 +343,12 @@ object AnalysisRunSettings {
             ) ++ c.community.randomSeed.map(s => "randomSeed" -> s.toString),
             pathBounds = bounds,
             exportFormat = exportFormat,
-            configDigest = digestOf(c, bounds, exportFormat)
+            configDigest = digestOf(c, bounds, exportFormat),
+            pathLengthSampling = for {
+              k <- a.pathLengthSampleSize
+              s <- a.pathLengthSeed
+              m <- a.pathLengthMinComponentSize
+            } yield PathLengthSampling(k, s, m)
           )
         )
       }
@@ -598,7 +672,10 @@ object ScholarChainConfig {
     AnalysisConfig.MaxPathHopsKey,
     AnalysisConfig.MaxPathsPerPairKey,
     AnalysisConfig.MaxEvidenceWorksPerHopKey,
-    AnalysisConfig.ExportFormatKey
+    AnalysisConfig.ExportFormatKey,
+    AnalysisConfig.PathLengthSampleSizeKey,
+    AnalysisConfig.PathLengthSeedKey,
+    AnalysisConfig.PathLengthMinComponentSizeKey
   )
 
   /** `c` with every analysis-scope key unset. */

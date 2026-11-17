@@ -70,13 +70,41 @@ object LogicalReproducibility {
     (a.count(), b.count(), show(ma.except(mb)), show(mb.except(ma)))
   }
 
-  /** Compares the Parquet parts `a` and `b` (each read back with the schema of its files). */
-  def compare(spark: SparkSession, a: Vector[Path], b: Vector[Path], limit: Int = 20): Report = {
-    val fa = spark.read.parquet(a.map(_.toUri.toString)*)
-    val fb = spark.read.parquet(b.map(_.toUri.toString)*)
+  private def report(a: Vector[Path], b: Vector[Path], fa: DataFrame, fb: DataFrame, limit: Int) = {
     val (na, nb, onlyA, onlyB) =
       if (fa.schema == fb.schema) compareFrames(fa, fb, limit)
       else (fa.count(), fb.count(), Vector.empty, Vector.empty)
     Report(fa.schema, fb.schema, na, nb, onlyA, onlyB, bytesOf(a) == bytesOf(b))
   }
+
+  /** Compares the Parquet parts `a` and `b` (each read back with the schema of its files). */
+  def compare(spark: SparkSession, a: Vector[Path], b: Vector[Path], limit: Int = 20): Report =
+    report(
+      a,
+      b,
+      spark.read.parquet(a.map(_.toUri.toString)*),
+      spark.read.parquet(b.map(_.toUri.toString)*),
+      limit
+    )
+
+  /**
+   * The rows of CSV parts (SP-P6-03 step 2B, the Neptune bulk-load files): every part's first line
+   * is its header (the column names; all columns read as strings, no inference), quoted fields may
+   * hold LF, and a doubled double quote is a quote (the `NeptuneCsv` quoting rule).
+   */
+  def readCsv(spark: SparkSession, parts: Vector[Path]): DataFrame =
+    spark.read
+      .option("header", "true")
+      .option("multiLine", "true")
+      .option("quote", "\"")
+      .option("escape", "\"")
+      .option("inferSchema", "false")
+      .csv(parts.map(_.toUri.toString)*)
+
+  /**
+   * Compares the CSV parts `a` and `b` as row multisets (header columns equal, every row with its
+   * multiplicity), as [[compare]] does for Parquet; bytes again a diagnosis only.
+   */
+  def compareCsv(spark: SparkSession, a: Vector[Path], b: Vector[Path], limit: Int = 20): Report =
+    report(a, b, readCsv(spark, a), readCsv(spark, b), limit)
 }

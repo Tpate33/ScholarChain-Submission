@@ -283,7 +283,15 @@ class WireContractSuite extends munit.FunSuite {
       "SemanticSummaryInput",
       "PartManifestV2",
       "StoreLoadManifest",
-      "BenchmarkPairList"
+      "BenchmarkPairList",
+      // Phase 6 (DE-P6-03): frozen in StructureWireSuite.
+      "GraphNodeV2",
+      "GraphEdgeV2",
+      "WindowStructure",
+      "PathLengthEstimate",
+      "WindowComparison",
+      "ResearcherTemporalChange",
+      "EntitySummaryInput"
     )
     assertEquals(frozenTypes, SchemaVersions.all.keySet)
   }

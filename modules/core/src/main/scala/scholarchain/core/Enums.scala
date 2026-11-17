@@ -231,13 +231,21 @@ object EdgeLabel {
   given ReadWriter[EdgeLabel] = EnumCodec.tagged("EdgeLabel", values.toSeq, _.tag)
 }
 
-/** Document type of a text chunk or generated profile (an input of the chunk ID). */
+/**
+ * Document type of a text chunk or generated profile (an input of the chunk ID).
+ *
+ * DE-P6-03 appends `work-summary` and `topic-summary` (the selected paper and topic summaries,
+ * [[EntitySummaryInput]]). Appending changes no existing tag and no frozen example; the
+ * `semantic-summary-input.v1` contract still refuses both (they are not analysis-window subjects).
+ */
 enum DocumentType(val tag: String) {
   case ResearcherProfile extends DocumentType("researcher-profile")
   case WorkAbstract extends DocumentType("work-abstract")
   case CommunitySummary extends DocumentType("community-summary")
   case PathSummary extends DocumentType("path-summary")
   case CollaborationSummary extends DocumentType("collaboration-summary")
+  case WorkSummary extends DocumentType("work-summary")
+  case TopicSummary extends DocumentType("topic-summary")
 }
 object DocumentType {
   def fromTag(tag: String): Option[DocumentType] = values.find(_.tag == tag)

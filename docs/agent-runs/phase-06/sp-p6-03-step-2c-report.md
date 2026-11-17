@@ -1,0 +1,23 @@
+# Phase 06 SP-P6-03 step 2C: spark-engineer report, paths, temporal, summaries, exports and load manifests (2026-11-17)
+
+- Work orders: prompt-sp-p6-03-consolidated.md, prompt-sp-p6-03-audit-review.md. Last implementation step. HEAD c2d9a82 (uncommitted).
+- STATUS: COMPLETE. Focused checks only. No core contract change.
+
+## Agent report (key fields)
+
+1. Paths (graph/PathJob.scala): distributed BFS from each benchmark pair's target in every window, stopping at the source level, empty frontier or maxHops (as `selectShortestPaths`); exact top-k walk by node-sequence prefixes; hop evidence = first maxEvidenceWorksPerHop sorted supporting works. Shuffles per BFS level 3, per walk step 2 joins + bounded aggregateByKey; arcs keep the structure HashPartitioner(P); levels persisted, checkpointed every interval. No graph collect, no all-pairs. Path-length estimate `sampled-bfs` only with the three keys (IT/dev: sample 8, seed 20261117, min size 3).
+2. Temporal (graph/TemporalJob.scala): co-partitioned joins of the five per-researcher datasets; coauthor turnover from per-pair window bitmasks; community overlap by reduceByKey; window-comparison.v1 and researcher-temporal-change.v1 with limitations as `checkTemporal` recomputes; also analysis-window.v1 (C4).
+3. Summaries (graph/SummaryJob.scala): researcher profiles (P, C, T, U, A, M, W as separate facts), community summaries, path summaries; entity summaries for the distinct evidence works of stored paths and their HAS_TOPIC topics. Fact names from the frozen vocabularies only; values copied from cited records; no text generation, no model.
+4. Exports and load manifests (output/LoadManifests.scala, output/AnalysisRows.scala): one store-load-manifest.v1 per store (neptune-bulk-load, dynamodb, s3-vectors, s3) at `<outputRoot>/load=<run hex>/<store>.json`, create-once, atomic rename, re-verified with `checkLoadManifests` (outside the run directory because they name the hash of its `_parts.json`). All seven required families exported as Parquet. "Partitioned Parquet" = directory of part files per dataset (one per Spark partition, key-sorted, listed in part manifest v2); no Hive-style partition columns (window kept inside records).
+5. `outputs` = 16 names (or the variant with path-length); run ID changes. Pre-publication invariants listed in the agent report. checkRunChain and LogicalReproducibility cover 16 Parquet + 12 CSV datasets.
+6. Dev config digest changes to `e37c32b115c82cbedc56e2407b8a322b52505eabbd800dfb5dade372b47800df` (path-length keys added to analysis-dev.conf; was `c2f9c941…`).
+
+Hand tables (PathJobSuite, PathFixtures, MetricsFixtures temporal) and counter-tests: as reported by the agent (2-hop three-way tie cut to k=2; maxHops cut-off; separate components, absent vertex, source=target give no path; equality with core `selectShortestPaths` on a 40-vertex random graph; exact and sampled path-length cases; comparison counts and coauthor turnover per researcher; work and topic summaries; detected counter-tests for paths, estimates, temporal, summaries and load manifests).
+
+Files created: main graph/PathJob.scala, graph/TemporalJob.scala, graph/SummaryJob.scala, output/AnalysisRows.scala, output/LoadManifests.scala; test testkit/PathFixtures.scala, graph/PathJobSuite.scala, analysis/PathSummaryRunSuite.scala, analysis/TemporalRunSuite.scala, resources/log4j2-test.properties (Spark test logging to WARN). Modified: AnalysisRun.scala, CoauthorEdgeRows.scala, test resources dev-run-01/analysis-dev.conf, DevInputsSuite.scala, LogicalReproducibilitySuite.scala, ResearcherMetricsJobSuite.scala, DevArchiveGraphFoundationChecks.scala, it DevArchiveGraphFoundationSuite.scala (doc comment).
+
+TEST RESULTS: `[info] Passed: Total 202, Failed 0, Errors 0, Passed 202` (sparkAnalytics; was 182). Guard refused `sbt sparkAnalytics/testQuick` and `sbt sparkAnalytics/SparkIT/compile` (nothing executed).
+
+IT expectations (next sparkIT): 14 tests; new run ID; analysis windows 41/0/112/163/0 and 24/0/64/96/0; comparison researchers 64/48/0, edges 96/67/0, overlap 5 years, limitations grouping-unevaluated, overlapping-windows, unequal-window-lengths; 112 temporal changes, none with a gained coauthor; 176 researcher profiles; 4 load manifests; validators empty; logical reproducibility for 16 Parquet + 12 CSV datasets; estimated 45-60 s.
+
+RISKS (as reported): archive behaviour and 120 s bound unobserved; sparkIT reaction to the sibling `load=<hex>/` under out/ unverified; load manifests written after publication (failure leaves a published run without manifests, reported as refusal); validators on the driver; entity-summary selection depends on tied paths stored; label propagation quality (carried).

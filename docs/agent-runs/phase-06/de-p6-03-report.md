@@ -1,0 +1,33 @@
+# Phase 06 DE-P6-03: domain-engineer report, core contracts for the remaining analytics (2026-11-17)
+
+- Work order: routed from sp-p6-03-step-2a-report.md under prompt-sp-p6-03-consolidated.md ("Route ownership blockers through the assigned owners"). Scope modules/core/** only.
+- STATUS returned: BLOCKED-ON human, for the audit event below only. All five items done; sbt check exit 0.
+
+## Orchestrator observations
+
+- `git status --porcelain`: 11 modified modules/core files (main AnalysisValidation.scala, Contract.scala, Enums.scala, StableIds.scala, config/ConfigLoader.scala, config/ScholarChainConfig.scala; test AnalysisValidationSuite.scala, EnumCodecSuite.scala, SchemaVersionSuite.scala, WireContractSuite.scala, config/ConfigLoaderSuite.scala) and 7 new (main AnalysisStructure.scala, CanonicalGraph.scala, StructureValidation.scala; test CanonicalGraphSuite.scala, StructureFixtures.scala, StructureValidationSuite.scala, StructureWireSuite.scala). modules/spark unchanged by this step (step 2A files as before).
+- **Audit event (second occurrence).** domain-engineer started `sbt check` in the foreground with a 600 s timeout; the harness moved the call to the background at 180 s, so markTestRun wrote the marker after the Bash call ended and its next call was refused as UNATTRIBUTED (`.claude/.last-test-run`). Orchestrator Read of the marker: `written_by=sbt markTestRun`, `written_at_utc=2026-11-17T19:21:11.956068Z`, `git_head=c2d9a82…`, `git_worktree=dirty`, `suites=101`, `tests_passed=1457`, `tests_failed=0`, `tests_errored=0`, `tests_skipped=0`; it agrees with the reported markTestRun line and `completed … 1:21:11 PM`. The step 2A instruction "run sbt check in the foreground" cannot hold: a full `sbt check` (~165 s inside sbt, plus launch) crosses the 180 s backgrounding point. Every full sbt check in this session will therefore be recorded as reported, not audit-attributed, unless the human decides otherwise (raised to the human; see the orchestrator summary).
+
+## Agent report (key fields)
+
+1. Canonical tables (CanonicalGraph.scala): generic shape kept, versioned to graph-node.v2 / graph-edge.v2 (GraphNodeV2, GraphEdgeV2) with lineage; frozen per-label property profiles (Researcher, AuthorMention, Work, Venue, Institution, Topic; AUTHORED, RESOLVES_TO, COAUTHORED_WITH, PUBLISHED_IN, HAS_TOPIC, AFFILIATED_WITH); TextChunk, DatasetSnapshot, DERIVED_FROM, SUPPORTED_BY refused. `CanonicalGraph.expected(input, coauthorEdges)` is the executable definition (unresolved mention: one AUTHORED to its work, never RESOLVES_TO; identified mention: RESOLVES_TO, researcher AUTHORED from authorship-record.v2; PUBLISHED_IN/HAS_TOPIC union over member works; unmatched references counted). `CanonicalGraphValidation.checkStructure` refuses dangling endpoints, wrong endpoint labels and mention-rule violations; `checkTables` compares exactly with expected(). AnalysisOutputs gains nodes and graphEdges (and five more fields, all defaulting to empty). Neptune CSV layout via `NeptuneCsv.vertexFile` / `edgeFile`.
+2. Window summaries: new window-structure.v1 (WindowStructure; AnalysisWindow v1 unchanged) with researcher/edge/component counts, largest component size and fraction, singletons, community count and largest size, cross-community edge count, algorithm, iterations, converged, max coreness; `StructureValidation.checkWindowStructures` recomputes everything and ties the outcome to manifest parameters `community.converged.<start>-<end>` / `community.iterations.<start>-<end>` (now core constants).
+3a. Paths: stored path record stays evidence-path.v1 with selectShortestPaths/checkPaths. New path-length-estimate.v1, method sampled-bfs: sources = smallest PathSampleKey (SHA-256 over seed, window, researcher), unbounded BFS per source, average distance, max observed distance, effective diameter 90; stored only when optional config keys analysis.pathLengthSampleSize / pathLengthSeed / pathLengthMinComponentSize are set together; checkPathLengthEstimates recomputes.
+3b. Temporal: window-comparison.v1 per consecutive window pair (inclusionRuleCompatible must be true; overlap years; recomputed limitations including overlapping-windows, unequal-window-lengths, works-without-year-excluded, community-not-converged, grouping-unevaluated); researcher-temporal-change.v1 per pair and researcher (presence, from/to states, coauthors retained/gained/lost, community overlap); checkTemporal recomputes.
+3c. Summaries: semantic-summary-input.v1 now enforces a 20-name fact vocabulary (each fact cites a record whose field equals it); new entity-summary-input.v1 (work-summary, topic-summary) with EntityFactVocabulary and checkEntitySummaries.
+3d. Load manifests: store-load-manifest.v1 gets a frozen LoadRoles vocabulary (neptune-bulk-load CSV vertex/edge roles; 12 dynamodb roles; s3-vectors summary inputs; s3 every dataset); `StructureValidation.checkLoadManifests` requires one manifest per store, checkAgainst, role/schema/format match, every accepted part listed. Serialization only, no loaders.
+
+Config: three optional analysis keys; with them unset the analysis digest input is byte-identical (frozen tests still pass; upstream digests unchanged). Contract.scala: 7 new schema constants (40 to 47). Enums: DocumentType adds work-summary, topic-summary at the end.
+
+TEST RESULTS (sbt check, verbatim as reported): core 621 (was 557), entityResolution 464, hadoop 85, sparkAnalytics 142, tests 145; rag, root, services, storage 0.
+
+```
+[info] markTestRun: wrote /Users/taufeeqpatel/Desktop/ScholarChain/.claude/.last-test-run (git_head=c2d9a8216b945f2dd57eb587099f0b938ed1d670, worktree=dirty, suites=101, passed=1457, skipped=0)
+[success] Total time: 165 s (0:02:45.0), completed Nov 17, 2026, 1:21:11 PM
+```
+
+ASSUMPTIONS (as reported): temporal comparison of consecutive windows only; references without a curated record make no edge (counted); AFFILIATED_WITH from an unresolved mention on a non-representative copy dropped; AuthorMention nodes only on representative works; empty Neptune CSV cell = absent property (not verified against Neptune documentation; storage-engineer to confirm); checkGraphInput before checkTables.
+
+RISKS (as reported): unattributed marker write; `sbt erDecisionGroupingDev` refuses until the ER dev manifests are re-pinned after this core change (no ER rerun is planned in Phase 6 SP-P6-03; recorded, not routed); checkSummaryInputs and checkRunChain message changes; Long above 2^53 written as a JSON string in the digest input (frozen); validators in memory at dev scale.
+
+NEXT GATE (as reported): focused review of the core diff. Orchestrator: covered by the consolidated independent review the human ordered after steps 2B-2D; no separate review now.

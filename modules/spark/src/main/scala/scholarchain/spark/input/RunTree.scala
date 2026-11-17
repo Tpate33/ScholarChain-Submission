@@ -19,8 +19,9 @@ import scholarchain.core.ObservedFile
  * for all three runs before any file content is read (2 and 7 for the curated run only, 5 for the
  * decision and grouping runs only); then, per run, part-manifest (8, decision and grouping),
  * run-manifest (9) and stage-counters (10, curated only) in the order curated 9, 10, decision 8, 9,
- * grouping 8, 9; then orders 11-15 once over the chain. The reader stops at the first stage that
- * refuses, so no check of a later stage runs after a refusal.
+ * grouping 8, 9; then orders 11-17 once over the chain (16 and 17, SP-P6-03 step 2B: the consumed
+ * curated parts and the canonical-table input). The reader stops at the first stage that refuses,
+ * so no check of a later stage runs after a refusal.
  */
 enum CheckStep(val tag: String, val order: Int) {
 
@@ -71,6 +72,17 @@ enum CheckStep(val tag: String, val order: Int) {
 
   /** `AnalysisValidation.checkIdentity` (run-chain binding of assignments and decisions). */
   case Identity extends CheckStep("identity", 15)
+
+  /**
+   * Curated run only (SP-P6-03 step 2B, HD-P6-01 rules 7 and 8 content for the consumed normalize
+   * leaves): every consumed part's crc sidecar verifies, the part decompresses within the driver
+   * byte budget, every row decodes through its core contract, and each leaf's decoded rows equal
+   * its `EMITTED.<leaf>` counter ([[CuratedParts]]).
+   */
+  case CuratedParts extends CheckStep("curated-parts", 16)
+
+  /** `CanonicalGraph.expected` accepts the curated and grouping records (consistent input). */
+  case CanonicalInput extends CheckStep("canonical-input", 17)
 }
 
 /** One refusal: the check that refused, the run it concerns and why. */
@@ -251,6 +263,44 @@ object RunTree {
             case e: IOException => Left(s"cannot read '$file': $e")
           }
       }
+
+  /**
+   * The bytes of a regular file of at most `maxBytes` bytes, bounded twice as [[readUtf8]] (stat
+   * before opening, and the read stops after `maxBytes + 1` bytes).
+   */
+  def readBytes(file: Path, maxBytes: Long): Either[String, Array[Byte]] =
+    if (maxBytes < 0L || maxBytes > MaxArrayBytes)
+      Left(s"read bound $maxBytes is outside 0..$MaxArrayBytes")
+    else
+      attrs(file) match {
+        case None => Left(s"cannot read '$file': no such file, or it cannot be stat'ed")
+        case Some(a) if a.isSymbolicLink || !a.isRegularFile =>
+          Left(s"'$file' is not a regular file")
+        case Some(a) if a.size > maxBytes =>
+          Left(s"'$file' has ${a.size} bytes, more than the read bound $maxBytes")
+        case Some(_) =>
+          try {
+            val bytes = Using.resource(Files.newInputStream(file, LinkOption.NOFOLLOW_LINKS))(
+              _.readNBytes(maxBytes.toInt + 1)
+            )
+            if (bytes.length.toLong > maxBytes)
+              Left(s"'$file' grew beyond the read bound $maxBytes while it was read")
+            else Right(bytes)
+          } catch { case e: IOException => Left(s"cannot read '$file': $e") }
+      }
+
+  /** Strict UTF-8 decoding of `bytes` (malformed input refused, never replaced). */
+  def strictUtf8(bytes: Array[Byte]): Either[String, String] =
+    try
+      Right(
+        StandardCharsets.UTF_8
+          .newDecoder()
+          .onMalformedInput(CodingErrorAction.REPORT)
+          .onUnmappableCharacter(CodingErrorAction.REPORT)
+          .decode(ByteBuffer.wrap(bytes))
+          .toString
+      )
+    catch { case e: CharacterCodingException => Left(s"not valid UTF-8: $e") }
 
   /** The LF-terminated rows of a JSONL text (the empty text has no row). */
   def jsonlRows(text: String): Vector[String] =

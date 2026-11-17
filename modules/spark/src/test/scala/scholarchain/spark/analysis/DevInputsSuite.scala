@@ -55,6 +55,11 @@ class DevInputsSuite extends munit.FunSuite {
     assertEquals(s.identityVersion, "v1")
     assertEquals(s.exportFormat, PartFormat.Parquet)
     assertEquals(s.pathBounds, PathBounds(4, 3, 3))
+    // SP-P6-03 step 2C: the path-length estimate is enabled in the dev configuration.
+    assertEquals(
+      s.pathLengthSampling,
+      Some(scholarchain.core.config.PathLengthSampling(8, 20261117L, 3))
+    )
     println(s"SP-P6-02 dev analysis configDigest=${s.configDigest}")
   }
 

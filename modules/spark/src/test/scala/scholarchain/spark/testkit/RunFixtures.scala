@@ -5,9 +5,12 @@ import java.nio.file.{Files, Path}
 
 import scala.collection.immutable.SortedMap
 
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path => HPath}
+
 import scholarchain.core.*
 import scholarchain.core.config.*
-import scholarchain.spark.input.ArchiveRuns
+import scholarchain.spark.input.{ArchiveRuns, SyntheticCuratedPin}
 
 /**
  * A synthetic, hand-checkable run chain (curated, decision, grouping) in the layout of the archived
@@ -15,6 +18,14 @@ import scholarchain.spark.input.ArchiveRuns
  * `_SUCCESS` and `_counters.json`, crc sidecars, no run-level `_SUCCESS`, no part manifest), the
  * decision and grouping runs as published run directories with part-manifest v1. Every identifier
  * is synthetic; nothing is read from target/, the archive or any gold set.
+ *
+ * SP-P6-03 step 2B: every curated file is written through Hadoop's own `LocalFileSystem` (so every
+ * crc sidecar is a real Hadoop checksum, written by the producer's library, never by the verifier
+ * under test); the consumed normalize leaves hold real records ([[curatedFiles]]: one work record
+ * per work assignment with its author mentions in position order, the spec's venues, institutions
+ * and topics) and `normalize/_counters.json` declares their rows (`EMITTED.<leaf>`); the grouping
+ * run's authorship part holds one `authorship-record.v2` per identified mention on a representative
+ * work ([[authorshipsOf]]).
  *
  * Researchers (dblp-pid anchored sc IDs): A, B, C, D resolved across works, E a singleton; one
  * unresolved mention u1. Counted works and teams:
@@ -372,16 +383,18 @@ object RunFixtures {
   /** The checksum sidecar of `p` (Hadoop LocalFileSystem: `.<name>.crc` beside it). */
   def crcOf(p: Path): Path = p.resolveSibling(s".${p.getFileName}.crc")
 
+  /** Hadoop's local (checksummed) file system: the producer's library writes the crc sidecars. */
+  lazy val hadoopLocal: FileSystem = FileSystem.getLocal(new Configuration())
+
   /**
-   * Writes `bytes` at `p` and a placeholder crc sidecar beside it. The reader checks that the
-   * sidecar exists (HD-P6-01 rule 8) but never compares it with the file (not consumed), so its
-   * bytes are a placeholder, not a Hadoop checksum.
+   * Writes `bytes` at `p` with Hadoop's `LocalFileSystem`, which writes the real crc sidecar
+   * `.<name>.crc` beside it (the layout HD-P6-01 found in the producer's output).
    */
   def withCrc(p: Path, bytes: Array[Byte]): Unit = {
     Files.createDirectories(p.getParent)
-    Files.write(p, bytes)
-    Files.write(crcOf(p), utf8("crc-placeholder"))
-    ()
+    val out = hadoopLocal.create(new HPath(p.toUri), true)
+    try out.write(bytes)
+    finally out.close()
   }
 
   def gzip(text: String): Array[Byte] = {
@@ -396,16 +409,168 @@ object RunFixtures {
   def hadoopPart(dir: Path, name: String = "part-r-00000.gz"): Unit =
     withCrc(dir.resolve(name), gzip("{\"synthetic\":true}\n"))
 
-  /** A `_counters.json` as the producer writes it (Pipeline.scala writeReport, indent 2). */
-  def countersJson(stage: String, counters: Vector[String] = requiredCounters): String =
+  /**
+   * A `_counters.json` as the producer writes it (Pipeline.scala writeReport, indent 2): the named
+   * counters at 0 plus `extra` (for normalize, the `EMITTED.<leaf>` row counts).
+   */
+  def countersJson(
+      stage: String,
+      counters: Vector[String] = requiredCounters,
+      extra: Vector[(String, Long)] = Vector.empty
+  ): String =
     ujson.write(
       ujson.Obj(
         "stage" -> stage,
-        "counters" -> ujson.Obj.from(counters.map(k => k -> ujson.Num(0))),
+        "counters" -> ujson.Obj.from(
+          (counters.map(k => k -> ujson.Num(0)) ++
+            extra.map { case (k, n) => k -> ujson.Num(n.toDouble) }).sortBy(_._1)
+        ),
         "stats" -> ujson.Obj()
       ),
       indent = 2
     )
+
+  // ---------------------------------------------------------------- curated records
+
+  /** Extra source fields of one curated work record (venue and topic assertions). */
+  final case class WorkDecor(
+      venueId: Option[String] = None,
+      topicIds: Vector[String] = Vector.empty
+  )
+
+  /**
+   * The JSON-lines texts of the consumed normalize leaves (leaf -> (rows, text)); a leaf without
+   * records is absent (the producer creates a leaf only when it writes a record).
+   */
+  final case class CuratedFiles(leaves: Map[String, (Long, String)]) {
+    def rows(leaf: String): Long = leaves.get(leaf).map(_._1).getOrElse(0L)
+  }
+
+  private def sourceOf(workId: String): (SourceType, String, String) =
+    if (workId.startsWith("work:dblp:"))
+      (SourceType.Dblp, workId.stripPrefix("work:dblp:"), snapshot)
+    else if (workId.startsWith("work:doi:"))
+      (SourceType.Crossref, workId.stripPrefix("work:doi:"), "crossref-2026-11-05")
+    else (SourceType.OpenAlex, workId.stripPrefix("work:openalex:"), "openalex-2026-11-05")
+
+  def sourceProvenance(source: SourceType, recordId: String, snap: String, c: String): Provenance =
+    Provenance(source, recordId, snap, c, s"${source.tag}-raw/1.0.0", None, None, None)
+
+  /**
+   * One curated work record per work assignment (`work-record.v3`, source by the ID namespace), its
+   * authors the mention assignments of the work in position order (synthetic names, the
+   * `affiliations` of each mention), its year the team year, and its `decor`. Curated run `c`.
+   */
+  def sourceWorks(
+      works: Vector[WorkAssignment],
+      researchers: Vector[ResearcherAssignment],
+      years: Map[String, Int],
+      decor: Map[String, WorkDecor],
+      affiliations: Map[String, Vector[String]],
+      c: String
+  ): Vector[WorkRecord] =
+    works.map { w =>
+      val (source, recordId, snap) = sourceOf(w.workId)
+      val prov = sourceProvenance(source, recordId, snap, c)
+      val authors = researchers
+        .filter(r => r.workId.contains(w.workId))
+        .sortBy(_.position.getOrElse(0))
+        .map { r =>
+          val pos = r.position.getOrElse(0)
+          AuthorMention(
+            SchemaVersions.AuthorMention,
+            r.memberId,
+            w.workId,
+            pos,
+            s"Synthetic Author $pos",
+            s"synthetic author $pos",
+            None,
+            None,
+            affiliations.getOrElse(r.memberId, Vector.empty),
+            Vector.empty,
+            prov
+          )
+        }
+      val d = decor.getOrElse(w.workId, WorkDecor())
+      WorkRecord(
+        schemaVersion = SchemaVersions.WorkRecord,
+        workId = w.workId,
+        source = source,
+        sourceRecordId = recordId,
+        title = s"Synthetic Work $recordId",
+        normalizedTitle = s"synthetic work ${recordId.toLowerCase}",
+        year = years.get(w.workId),
+        venueId = d.venueId,
+        doi = None,
+        arxivId = None,
+        authors = authors,
+        abstractTextRef = None,
+        provenance = prov,
+        recordType = Some("article"),
+        topicIds = d.topicIds
+      )
+    }
+
+  /** The consumed normalize leaves of the given curated records (empty leaves left out). */
+  def curatedFiles(
+      works: Vector[WorkRecord],
+      venues: Vector[Venue],
+      institutions: Vector[Institution],
+      topics: Vector[Topic]
+  ): CuratedFiles = {
+    def leaf[T](name: String, xs: Vector[T])(using c: RecordContract[T]) =
+      Option.when(xs.nonEmpty)(name -> (xs.size.toLong, lines(xs)))
+    CuratedFiles(
+      Vector(
+        leaf("works", works),
+        leaf("mentions", works.flatMap(_.authors)),
+        leaf("venues", venues),
+        leaf("institutions", institutions),
+        leaf("topics", topics)
+      ).flatten.toMap
+    )
+  }
+
+  /**
+   * One `authorship-record.v2` per identified mention assignment on a representative work (the
+   * grouping run's authorship rule), with its assignment's supporting decisions and, when resolved,
+   * the lowest of their confidences in `decisions` (0.5 for a decision not listed).
+   */
+  def authorshipsOf(
+      works: Vector[WorkAssignment],
+      researchers: Vector[ResearcherAssignment],
+      decisions: Vector[MatchDecision],
+      years: Map[String, Int],
+      g: String,
+      d: String
+  ): Vector[AuthorshipRecordV2] = {
+    val reps = works.filter(_.isRepresentative).map(_.workId).toSet
+    val confidence = decisions.map(x => x.decisionId -> x.confidence).toMap
+    researchers
+      .filter(r =>
+        ResearcherAssignment.isMention(r) && r.status.identified && r.workId.exists(reps)
+      )
+      .map { r =>
+        val resolved = r.status == AssignmentStatus.Resolved
+        AuthorshipRecordV2(
+          SchemaVersions.AuthorshipRecordV2,
+          r.workId.get,
+          r.memberId,
+          r.researcherId.get,
+          r.position.get,
+          years.get(r.workId.get),
+          r.status,
+          r.supportingDecisionIds,
+          Option.when(resolved)(
+            r.supportingDecisionIds.map(x => confidence.getOrElse(x, 0.5)).minOption.getOrElse(0.5)
+          ),
+          groupingPolicy,
+          matchPolicy,
+          d,
+          gprov(r.memberId, SchemaVersions.ResearcherAssignment, g)
+        )
+      }
+  }
 
   /**
    * Writes a Hadoop curated run directory in the producer's layout (HD-P6-01 rules 2-11; the same
@@ -414,23 +579,34 @@ object RunFixtures {
    * `_SUCCESS` and a `_counters.json`, each with its crc; normalize works, mentions and rejects
    * (part-m and part-r), exact-ids links, teams teams/pairs/stats; `rounds` blocking rounds with
    * blocks and members per entity (part files 5 levels below the run), spill except in the last
-   * round, and stats; candidates join (joined when `cands` names it), pairs (pairs, stats) and
-   * final (researcher, work, stats) when named. No `_parts.json` and no run-level `_SUCCESS`.
+   * round (and in the last round too when `spillInLast`), and stats; candidates join (joined when
+   * `cands` names it), pairs (pairs, stats), an empty pairs/ job directory (`pairs-empty`) and
+   * final (researcher, work, stats) when named. No `_parts.json` and no run-level `_SUCCESS`. The
+   * consumed normalize leaves hold `curated` (one gzip part each) and the normalize counters
+   * declare their rows.
    */
   def writeHadoopRun(
       dir: Path,
       manifest: RunManifest,
       rounds: Int = 2,
-      cands: Vector[String] = allCandidates
+      cands: Vector[String] = allCandidates,
+      spillInLast: Boolean = false,
+      curated: CuratedFiles = CuratedFiles(Map.empty)
   ): Path = {
     Files.createDirectories(dir)
     withCrc(dir.resolve(PartManifest.RunManifestFile), utf8(Json.write(manifest)))
+    val emitted = curated.leaves.toVector.map { case (leaf, (n, _)) => s"EMITTED.$leaf" -> n }
     hadoopStages.foreach { s =>
       withCrc(dir.resolve(s).resolve(PartManifest.SuccessMarker), Array.emptyByteArray)
-      withCrc(dir.resolve(s).resolve("_counters.json"), utf8(countersJson(s)))
+      val extra = if (s == "normalize") emitted else Vector.empty
+      withCrc(
+        dir.resolve(s).resolve("_counters.json"),
+        utf8(countersJson(s, requiredCounters, extra))
+      )
     }
-    hadoopPart(dir.resolve("normalize/works"))
-    hadoopPart(dir.resolve("normalize/mentions"))
+    curated.leaves.foreach { case (leaf, (_, text)) =>
+      withCrc(dir.resolve(s"normalize/$leaf/part-r-00000.gz"), gzip(text))
+    }
     hadoopPart(dir.resolve("normalize/rejects"), "part-m-00000.gz")
     hadoopPart(dir.resolve("normalize/rejects"))
     hadoopPart(dir.resolve("exact-ids/links"))
@@ -442,7 +618,7 @@ object RunFixtures {
       Vector("blocks", "members").foreach(k =>
         Vector("researcher", "work").foreach(e => hadoopPart(rd.resolve(s"$k/$e")))
       )
-      if (i + 1 < rounds) hadoopPart(rd.resolve("spill"))
+      if (i + 1 < rounds || spillInLast) hadoopPart(rd.resolve("spill"))
       hadoopPart(rd.resolve("stats"))
     }
     val c = dir.resolve("candidates")
@@ -452,6 +628,8 @@ object RunFixtures {
       hadoopPart(c.resolve("pairs/pairs"))
       hadoopPart(c.resolve("pairs/stats"))
     }
+    // The pairs job ran but emitted no pair: an empty pairs/ job directory (rule 11 accepts it).
+    if (cands.contains("pairs-empty")) Files.createDirectories(c.resolve("pairs"))
     if (cands.contains("final"))
       Vector("researcher", "work", "stats").foreach(x => hadoopPart(c.resolve(s"final/$x")))
     dir
@@ -496,6 +674,20 @@ object RunFixtures {
    *   researcher assignments of (grouping run, decision run) instead of the default ones
    * @param decisions
    *   the decisions of the decision run (given its run ID) instead of the default single decision
+   * @param curatedSpillInLast
+   *   also write a spill part in the last blocking round (rule 5 cases)
+   * @param venues
+   *   curated venue records (`normalize/venues`; none by default)
+   * @param institutions
+   *   curated institution records
+   * @param topics
+   *   curated topic records
+   * @param decor
+   *   venue and topic assertions of curated work records, by work ID
+   * @param affiliations
+   *   affiliation IDs of curated author mentions, by mention ID
+   * @param withoutCuratedWorks
+   *   work IDs whose curated work record is left out (canonical-input refusals)
    */
   final case class Spec(
       groupingEdit: SortedMap[String, String] => SortedMap[String, String] = identity,
@@ -518,7 +710,14 @@ object RunFixtures {
       decisionPartSchema: String = SchemaVersions.MatchDecision,
       works: Option[(String, String) => Vector[WorkAssignment]] = None,
       researchers: Option[(String, String) => Vector[ResearcherAssignment]] = None,
-      decisions: Option[String => Vector[MatchDecision]] = None
+      decisions: Option[String => Vector[MatchDecision]] = None,
+      curatedSpillInLast: Boolean = false,
+      venues: Vector[Venue] = Vector.empty,
+      institutions: Vector[Institution] = Vector.empty,
+      topics: Vector[Topic] = Vector.empty,
+      decor: Map[String, WorkDecor] = Map.empty,
+      affiliations: Map[String, Vector[String]] = Map.empty,
+      withoutCuratedWorks: Set[String] = Set.empty
   )
 
   final case class Written(
@@ -543,34 +742,51 @@ object RunFixtures {
     val curatedHex = spec.curatedDirHex.getOrElse(hexOf(c))
     val dblp = cm.inputSnapshots.find(_.source == SourceType.Dblp).map(_.snapshot)
     val parent = spec.curatedParentDir.getOrElse(s"snapshot=${dblp.getOrElse(snapshot)}")
+    val decisionRun = spec.decisionRunIdOfDecisions.getOrElse(d)
+    val decisions = spec.decisions.map(_(decisionRun)).getOrElse(Vector(decision(decisionRun)))
+    val teamRecords = spec.teams.map(_(g)).getOrElse(teams(g))
+    val researcherRecords = spec.researchers.map(_(g, d)).getOrElse(researchers(g, d))
+    val workRecords = spec.works.map(_(g, d)).getOrElse(works(g, d))
+    val years = teamRecords.flatMap(t => t.year.map(t.workId -> _)).toMap
+    val curatedWorks = sourceWorks(
+      workRecords.filterNot(w => spec.withoutCuratedWorks.contains(w.workId)),
+      researcherRecords,
+      years,
+      spec.decor,
+      spec.affiliations,
+      c
+    )
     val curated = writeHadoopRun(
       archive.resolve(s"curated/hadoop/$parent/run=$curatedHex"),
       cm,
       spec.curatedRounds,
-      spec.curatedCandidates
+      spec.curatedCandidates,
+      spec.curatedSpillInLast,
+      curatedFiles(curatedWorks, spec.venues, spec.institutions, spec.topics)
     )
-    val decisionRun = spec.decisionRunIdOfDecisions.getOrElse(d)
-    val decisions = spec.decisions.map(_(decisionRun)).getOrElse(Vector(decision(decisionRun)))
     val decisionDir = writeRun(
       archive.resolve(s"er-decisions/run=${hexOf(d)}"),
       dm,
       Vector(("decisions/researcher/part-00000.jsonl", spec.decisionPartSchema, lines(decisions))),
       withParts = true
     )
-    val teamText = lines(spec.teams.map(_(g)).getOrElse(teams(g))) +
-      spec.extraTeamLines.map(_ + "\n").mkString
+    val teamText = lines(teamRecords) + spec.extraTeamLines.map(_ + "\n").mkString
     val groupingFiles = Vector(
       (
         "assignments/researcher/part-00000.jsonl",
         SchemaVersions.ResearcherAssignment,
-        lines(spec.researchers.map(_(g, d)).getOrElse(researchers(g, d)))
+        lines(researcherRecords)
       ),
       (
         "assignments/work/part-00000.jsonl",
         SchemaVersions.WorkAssignment,
-        lines(spec.works.map(_(g, d)).getOrElse(works(g, d)))
+        lines(workRecords)
       ),
-      ("authorships/part-00000.jsonl", SchemaVersions.AuthorshipRecordV2, "")
+      (
+        "authorships/part-00000.jsonl",
+        SchemaVersions.AuthorshipRecordV2,
+        lines(authorshipsOf(workRecords, researcherRecords, decisions, years, g, d))
+      )
     ) ++ (if (spec.withTeamsPart)
             Vector(("teams/part-00000.jsonl", SchemaVersions.PublicationTeam, teamText))
           else Vector.empty)
@@ -586,7 +802,7 @@ object RunFixtures {
     )
     Written(
       ok(
-        ArchiveRuns.of(
+        SyntheticCuratedPin.archiveRuns(
           archive.toString,
           curated.toString,
           decisionDir.toString,

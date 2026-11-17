@@ -89,7 +89,11 @@ final case class ConfigKey(path: String, kind: ValueKind) {
  * analysis scope ([[ScholarChainConfig.AnalysisScopeKeys]]): `community.randomSeed`,
  * `analysis.maxPathHops`, `analysis.maxPathsPerPair`, `analysis.maxEvidenceWorksPerHop` and
  * `analysis.exportFormat`. Again every existing v2 file loads unchanged and keeps its digest, and
- * the analysis feature refuses a configuration without them ([[AnalysisRunSettings.from]]).
+ * the analysis feature refuses a configuration without them ([[AnalysisRunSettings.from]]). Phase 6
+ * (DE-P6-03) adds three more OPTIONAL analysis-scope keys, set together or not at all:
+ * `analysis.pathLengthSampleSize`, `analysis.pathLengthSeed` and
+ * `analysis.pathLengthMinComponentSize` (the component-level path-length estimate); unset, no
+ * digest changes and no estimate is stored.
  */
 object ConfigKeys {
   val EnvPrefix = "SCHOLARCHAIN_CFG_"
@@ -146,7 +150,10 @@ object ConfigKeys {
     ConfigKey("analysis.maxPathHops", OptionalPositiveInt),
     ConfigKey("analysis.maxPathsPerPair", OptionalPositiveInt),
     ConfigKey("analysis.maxEvidenceWorksPerHop", OptionalPositiveInt),
-    ConfigKey("analysis.exportFormat", OptionalToken)
+    ConfigKey("analysis.exportFormat", OptionalToken),
+    ConfigKey("analysis.pathLengthSampleSize", OptionalPositiveInt),
+    ConfigKey("analysis.pathLengthSeed", OptionalLong),
+    ConfigKey("analysis.pathLengthMinComponentSize", OptionalPositiveInt)
   )
   val byPath: Map[String, ConfigKey] = all.map(k => k.path -> k).toMap
   val byEnv: Map[String, ConfigKey] = all.map(k => k.envName -> k).toMap
@@ -663,7 +670,10 @@ object ConfigLoader {
         maxPathHops = optPositiveInt(AnalysisConfig.MaxPathHopsKey),
         maxPathsPerPair = optPositiveInt(AnalysisConfig.MaxPathsPerPairKey),
         maxEvidenceWorksPerHop = optPositiveInt(AnalysisConfig.MaxEvidenceWorksPerHopKey),
-        exportFormat = optToken(AnalysisConfig.ExportFormatKey)
+        exportFormat = optToken(AnalysisConfig.ExportFormatKey),
+        pathLengthSampleSize = optPositiveInt(AnalysisConfig.PathLengthSampleSizeKey),
+        pathLengthSeed = optLong(AnalysisConfig.PathLengthSeedKey),
+        pathLengthMinComponentSize = optPositiveInt(AnalysisConfig.PathLengthMinComponentSizeKey)
       )
     )
     // Cross-key rules (reject < llmBandLower < llmBandUpper < accept; grouping policy differs

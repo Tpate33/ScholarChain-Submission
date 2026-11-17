@@ -11,10 +11,15 @@ import scholarchain.core.*
  *
  * `pinnedCuratedRunId` is the one curated run (`run:<64 hex>`) to which the reader applies the
  * Hadoop curated-run contract ([[HadoopCuratedRun]], HD-P6-01 rules 1-11, human decision Option A).
- * The caller supplies it explicitly from a committed constant; it is never inferred from the input,
- * and a curated run with any other run ID is refused (CheckStep.CuratedRun).
+ * CR-P6-21 n1: [[ArchiveRuns.of]], the only public constructor, always sets it to the committed
+ * main-code constant [[HadoopCuratedRun.PinnedRunId]], so no caller can pass a directory's own run
+ * ID and generalise the exception; a curated run with any other run ID is refused
+ * (CheckStep.CuratedRun). The case class constructor (and so `apply` and `copy`) is private. The
+ * only other way in is the `private[input]` synthetic-fixture seam
+ * [[ArchiveRuns.forSyntheticFixture]], which no main code calls (test sources reach it through
+ * their own `scholarchain.spark.input` helper).
  */
-final case class ArchiveRuns(
+final case class ArchiveRuns private (
     archiveRoot: Path,
     curatedRun: Path,
     decisionRun: Path,
@@ -24,8 +29,32 @@ final case class ArchiveRuns(
 
 object ArchiveRuns {
 
-  /** Builds and checks the locations and the pinned run ID's form; Left with every problem. */
+  /**
+   * Builds and checks the locations; the curated pin is [[HadoopCuratedRun.PinnedRunId]]. Left with
+   * every problem.
+   */
   def of(
+      archiveRoot: String,
+      curatedRun: String,
+      decisionRun: String,
+      groupingRun: String
+  ): Either[Vector[String], ArchiveRuns] =
+    build(archiveRoot, curatedRun, decisionRun, groupingRun, HadoopCuratedRun.PinnedRunId)
+
+  /**
+   * Synthetic-fixture seam only (synthetic curated runs have synthetic run IDs): as [[of]] with an
+   * explicit pin. `private[input]`; never called by main code.
+   */
+  private[input] def forSyntheticFixture(
+      archiveRoot: String,
+      curatedRun: String,
+      decisionRun: String,
+      groupingRun: String,
+      pinnedCuratedRunId: String
+  ): Either[Vector[String], ArchiveRuns] =
+    build(archiveRoot, curatedRun, decisionRun, groupingRun, pinnedCuratedRunId)
+
+  private def build(
       archiveRoot: String,
       curatedRun: String,
       decisionRun: String,
@@ -114,10 +143,32 @@ final case class VerifiedInput(
     grouping: VerifiedRun,
     graphInput: GraphInput,
     decisions: Vector[MatchDecision],
-    limits: ReaderLimits
+    limits: ReaderLimits,
+    authorships: Vector[AuthorshipRecordV2],
+    curatedLeaves: Map[String, CuratedLeaf],
+    curatedSources: CuratedSources
 ) {
   def teamParts: Vector[Path] = grouping.partsOf(SchemaVersions.PublicationTeam)
   def workParts: Vector[Path] = grouping.partsOf(SchemaVersions.WorkAssignment)
+
+  /** The verified part files of one consumed curated leaf (none when the leaf is absent). */
+  def curatedPartsOf(leaf: String): Vector[Path] =
+    curatedLeaves.get(leaf).map(_.parts).getOrElse(Vector.empty)
+
+  /** The declared (and decoded) rows of one consumed curated leaf. */
+  def curatedRowsOf(leaf: String): Long = curatedLeaves.get(leaf).map(_.declaredRows).getOrElse(0L)
+
+  /** The input of `CanonicalGraph.expected` and `CanonicalGraphValidation.checkTables`. */
+  def canonicalInput: CanonicalGraphInput = CanonicalGraphInput(
+    works = graphInput.works,
+    researchers = graphInput.researchers,
+    authorships = authorships,
+    sourceWorks = curatedSources.works,
+    mentions = curatedSources.mentions,
+    venues = curatedSources.venues,
+    institutions = curatedSources.institutions,
+    topics = curatedSources.topics
+  )
 }
 
 /**
@@ -146,9 +197,9 @@ final case class VerifiedInput(
  *        directory's run ID, exactly one DBLP snapshot, equal to the `snapshot=` token; HD-P6-01
  *        rule 2), then [[CheckStep.StageCounters]] (each stage's `_counters.json` at most
  *        `maxMetadataBytes`, a JSON object naming its stage, with the ten required counters as
- *        non-negative integers; rule 4). The curated run publishes no part manifest (one is refused
- *        by rule 3); its data parts are not consumed by this step, so they are neither opened,
- *        decompressed nor compared with their crc sidecars (rules 7 and 8 content: not enforced);
+ *        non-negative integers below 2^53, and the `EMITTED.<leaf>` rows of the consumed normalize
+ *        leaves; rule 4). The curated run publishes no part manifest (one is refused by rule 3);
+ *        only the consumed leaves' parts are opened, at step 7;
  *      - decision, then grouping: [[CheckStep.PartManifest]] (`_parts.json` at most
  *        `maxMetadataBytes`, decoded, and every file verified against it by core
  *        (`PartManifests.verify`; the grouping run through
@@ -160,12 +211,21 @@ final case class VerifiedInput(
  *      input snapshot sets are equal (grouping and decision, decision and curated);
  *   4. [[CheckStep.DriverBound]]: the declared rows and the declared (verified) bytes of the
  *      consumed parts fit `maxDriverValidationRows` and `maxDriverValidationBytes`; checked before
- *      any data row is read;
- *   5. [[CheckStep.Decode]] of teams, work and researcher assignments and decisions through
- *      `Json.decode`, each part read with at most its declared bytes;
+ *      any data row is read. Step 2B adds the authorship parts and the consumed curated leaves (the
+ *      rows their `EMITTED.<leaf>` counters declare, checked at [[CheckStep.StageCounters]], and
+ *      their compressed bytes);
+ *   5. [[CheckStep.Decode]] of teams, work and researcher assignments, authorships (step 2B) and
+ *      decisions through `Json.decode`, each part read with at most its declared bytes;
  *   6. [[CheckStep.GraphInput]] `AnalysisValidation.checkGraphInput`, then [[CheckStep.Identity]]
  *      `AnalysisValidation.checkIdentity` (no metrics yet: it checks the run binding of every
- *      researcher assignment and decision).
+ *      researcher assignment and decision);
+ *   7. [[CheckStep.CuratedParts]] (step 2B): the consumed curated parts ([[CuratedParts]]: crc
+ *      sidecar verified, gzip within the remaining byte budget, rows decoded, rows equal the
+ *      counters);
+ *   8. [[CheckStep.CanonicalInput]] (step 2B): `CanonicalGraph.expected` accepts the curated and
+ *      grouping records (no duplicate key, every representative has a curated work record, every
+ *      authorship on a representative and agreeing with its assignment, every curated mention
+ *      assigned, one name per venue, institution and topic ID).
  *
  * Limitations: the archive is read-only by convention only. A file changed between verification and
  * a later read is detected only where a later bound or count applies: a data part read for decoding
@@ -187,14 +247,35 @@ object VerifiedArchiveReader {
     if (layoutRefusals.nonEmpty) Left(layoutRefusals)
     else
       for {
-        c <- curatedIntegrity(runs.curatedRun, limits)
+        cl <- curatedIntegrity(runs.curatedRun, limits)
         d <- integrity("decision", runs.decisionRun, limits)
         g <- integrity("grouping", runs.groupingRun, limits)
-        _ <- chain(c, d, g)
-        _ <- bound(d, g, limits)
+        _ <- chain(cl._1, d, g)
+        budget <- bound(d, g, cl._2, limits)
         decoded <- decode(d, g)
         _ <- validate(decoded._1, decoded._2, g)
-      } yield VerifiedInput(c, d, g, decoded._1, decoded._2, limits)
+        sources <- CuratedParts
+          .read(cl._2, budget, limits.maxMetadataBytes)
+          .left
+          .map(_.map(w => Refusal(CheckStep.CuratedParts, "curated", w)))
+        v = VerifiedInput(
+          cl._1,
+          d,
+          g,
+          decoded._1,
+          decoded._2,
+          limits,
+          decoded._3,
+          cl._2,
+          sources
+        )
+        _ <- CanonicalGraph
+          .expected(v.canonicalInput, Vector.empty)
+          .left
+          .map(
+            _.take(20).map(e => Refusal(CheckStep.CanonicalInput, "curated,grouping", e.toString))
+          )
+      } yield v
   }
 
   // ---------------------------------------------------------------- 1. layout
@@ -323,7 +404,7 @@ object VerifiedArchiveReader {
   private def curatedIntegrity(
       dir: Path,
       limits: ReaderLimits
-  ): Either[Vector[Refusal], VerifiedRun] = {
+  ): Either[Vector[Refusal], (VerifiedRun, Map[String, CuratedLeaf])] = {
     val label = "curated"
     def refuse(step: CheckStep, why: Vector[String]) =
       Left(why.map(w => Refusal(step, label, w)))
@@ -351,17 +432,31 @@ object VerifiedArchiveReader {
           }
         }
     manifest.flatMap { case (id, m) =>
-      val counters = HadoopCuratedRun.Stages.flatMap { stage =>
-        RunTree.readUtf8(
+      val texts = HadoopCuratedRun.Stages.map { stage =>
+        stage -> RunTree.readUtf8(
           dir.resolve(stage).resolve(HadoopCuratedRun.CountersFile),
           limits.maxMetadataBytes
-        ) match {
-          case Left(w) => Vector(w)
-          case Right(text) => HadoopCuratedRun.countersProblems(stage, text)
-        }
+        )
+      }
+      val counters = texts.flatMap {
+        case (_, Left(w)) => Vector(w)
+        case (stage, Right(text)) => HadoopCuratedRun.countersProblems(stage, text)
       }
       if (counters.nonEmpty) refuse(CheckStep.StageCounters, counters)
-      else Right(VerifiedRun(label, dir, id, m, None))
+      else {
+        // SP-P6-03 step 2B: the rows the normalize counters declare for the consumed leaves.
+        val normalize = texts.collectFirst { case ("normalize", Right(t)) => t }.getOrElse("")
+        val leaves = for {
+          parts <- CuratedParts.listing(dir)
+          rows <- HadoopCuratedRun.emittedRows(normalize, leaf => parts(leaf).nonEmpty)
+        } yield HadoopCuratedRun.ConsumedLeaves.map { leaf =>
+          leaf -> CuratedLeaf(leaf, parts(leaf), rows(leaf))
+        }.toMap
+        leaves match {
+          case Left(w) => refuse(CheckStep.StageCounters, w)
+          case Right(ls) => Right((VerifiedRun(label, dir, id, m, None), ls))
+        }
+      }
     }
   }
 
@@ -492,16 +587,27 @@ object VerifiedArchiveReader {
   private val Consumed: Vector[String] = Vector(
     SchemaVersions.PublicationTeam,
     SchemaVersions.WorkAssignment,
-    SchemaVersions.ResearcherAssignment
+    SchemaVersions.ResearcherAssignment,
+    SchemaVersions.AuthorshipRecordV2
   )
 
+  /**
+   * The driver bound over every consumed dataset, before any data row is read: the declared rows of
+   * the grouping and decision parts plus the rows the curated counters declare for the consumed
+   * leaves, and their declared bytes plus the compressed curated bytes. Returns the decompressed
+   * byte budget left for the curated parts (`maxDriverValidationBytes` minus the declared bytes of
+   * the grouping and decision parts).
+   */
   private def bound(
       d: VerifiedRun,
       g: VerifiedRun,
+      leaves: Map[String, CuratedLeaf],
       limits: ReaderLimits
-  ): Either[Vector[Refusal], Unit] = {
-    val rows = Consumed.map(g.rowsOf).sum + d.rowsOf(SchemaVersions.MatchDecision)
-    val bytes = Consumed.map(g.bytesOf).sum + d.bytesOf(SchemaVersions.MatchDecision)
+  ): Either[Vector[Refusal], Long] = {
+    val declaredBytes = Consumed.map(g.bytesOf).sum + d.bytesOf(SchemaVersions.MatchDecision)
+    val rows = Consumed.map(g.rowsOf).sum + d.rowsOf(SchemaVersions.MatchDecision) +
+      leaves.values.map(_.declaredRows).sum
+    val bytes = declaredBytes + leaves.values.map(_.compressedBytes).sum
     def over(what: String, n: Long, max: Long) =
       if (n <= max) Vector.empty
       else
@@ -514,7 +620,8 @@ object VerifiedArchiveReader {
         )
     val problems = over("rows", rows, limits.maxDriverValidationRows) ++
       over("bytes", bytes, limits.maxDriverValidationBytes)
-    if (problems.isEmpty) Right(()) else Left(problems)
+    if (problems.isEmpty) Right(limits.maxDriverValidationBytes - declaredBytes)
+    else Left(problems)
   }
 
   /**
@@ -549,7 +656,7 @@ object VerifiedArchiveReader {
   private def decode(
       d: VerifiedRun,
       g: VerifiedRun
-  ): Either[Vector[Refusal], (GraphInput, Vector[MatchDecision])] =
+  ): Either[Vector[Refusal], (GraphInput, Vector[MatchDecision], Vector[AuthorshipRecordV2])] =
     for {
       teams <- decodeAll[PublicationTeam]("grouping", g.listedOf(SchemaVersions.PublicationTeam))
       works <- decodeAll[WorkAssignment]("grouping", g.listedOf(SchemaVersions.WorkAssignment))
@@ -557,8 +664,12 @@ object VerifiedArchiveReader {
         "grouping",
         g.listedOf(SchemaVersions.ResearcherAssignment)
       )
+      authorships <- decodeAll[AuthorshipRecordV2](
+        "grouping",
+        g.listedOf(SchemaVersions.AuthorshipRecordV2)
+      )
       decisions <- decodeAll[MatchDecision]("decision", d.listedOf(SchemaVersions.MatchDecision))
-    } yield (GraphInput(teams, works, researchers), decisions)
+    } yield (GraphInput(teams, works, researchers), decisions, authorships)
 
   // ---------------------------------------------------------------- 6. core validators
 

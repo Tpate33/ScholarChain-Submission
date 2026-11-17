@@ -59,3 +59,18 @@ I approve one standalone `sbt sparkIT` run by spark-engineer using the
 reviewed code in the commit containing this entry. Use the existing
 dev archive and record the nine-test result, metric totals, edge counts,
 and output integrity evidence. Phase 6 remains open.
+
+## Local Spark milestone acceptance (2026-11-17)
+
+I accept SP-P6-03 steps 2A–2C, DE-P6-03 and BE-P6-07 following
+CR-P6-25 (APPROVE). Run 07 passed 14 integration tests. My final
+Terminal sbt check completed successfully with 1517 passed and zero
+failures, errors or skips.
+
+CR-P6-25 f1 is a required Phase 9 prerequisite. Carry f2 into the EMR
+work and retain the other documented non-blocking findings.
+Logical reproducibility was demonstrated within one JVM.
+Cross-JVM reproducibility remains untested.
+
+Phase 6 remains open for the bounded EMR run and its required evidence.
+AWS execution requires my approval. Phase 5 remains accepted.

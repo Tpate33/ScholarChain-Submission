@@ -53,6 +53,21 @@ import upickle.default.ReadWriter
  *     - `benchmark-pairs.v1` ([[BenchmarkPairList]], repair 01): the explicit, versioned list of
  *       researcher pairs whose shortest paths an analysis run stores; an input bound by the
  *       analysis run manifest.
+ *   - Phase 6 (DE-P6-03), new record types, none retiring an earlier one:
+ *     - `graph-node.v2` and `graph-edge.v2` ([[GraphNodeV2]], [[GraphEdgeV2]]): the canonical
+ *       Researcher, AuthorMention, Work, Venue, Institution and Topic tables and their AUTHORED,
+ *       RESOLVES_TO, PUBLISHED_IN, AFFILIATED_WITH, HAS_TOPIC and COAUTHORED_WITH edges. The
+ *       generic v1 shape (label plus string properties) is kept, with the analysis lineage added
+ *       and one frozen property profile per label. `graph-node.v1` and `graph-edge.v1` keep their
+ *       contracts, codecs and frozen examples and still decode. The graph edge ID formula
+ *       ([[GraphEdgeId]], tag `scholarchain.graph-edge.v1`) is unchanged.
+ *     - `window-structure.v1` ([[WindowStructure]]): component, community and coreness totals and
+ *       the label-propagation outcome of one window.
+ *     - `path-length-estimate.v1` ([[PathLengthEstimate]]): sampled-BFS path lengths of one
+ *       component.
+ *     - `window-comparison.v1` and `researcher-temporal-change.v1` ([[WindowComparison]],
+ *       [[ResearcherTemporalChange]]): temporal comparison of consecutive configured windows.
+ *     - `entity-summary-input.v1` ([[EntitySummaryInput]]): work and topic summary inputs.
  */
 object SchemaVersions {
   val WorkRecord = "scholarchain.work-record.v3"
@@ -95,6 +110,13 @@ object SchemaVersions {
   val PartManifestV2 = "scholarchain.part-manifest.v2"
   val StoreLoadManifest = "scholarchain.store-load-manifest.v1"
   val BenchmarkPairList = "scholarchain.benchmark-pairs.v1"
+  val GraphNodeV2 = "scholarchain.graph-node.v2"
+  val GraphEdgeV2 = "scholarchain.graph-edge.v2"
+  val WindowStructure = "scholarchain.window-structure.v1"
+  val PathLengthEstimate = "scholarchain.path-length-estimate.v1"
+  val WindowComparison = "scholarchain.window-comparison.v1"
+  val ResearcherTemporalChange = "scholarchain.researcher-temporal-change.v1"
+  val EntitySummaryInput = "scholarchain.entity-summary-input.v1"
 
   /** Superseded versions that no decoder accepts (kept to make the rejection explicit). */
   val retired: Map[String, Vector[String]] = Map(
@@ -144,7 +166,14 @@ object SchemaVersions {
     "SemanticSummaryInput" -> SemanticSummaryInput,
     "PartManifestV2" -> PartManifestV2,
     "StoreLoadManifest" -> StoreLoadManifest,
-    "BenchmarkPairList" -> BenchmarkPairList
+    "BenchmarkPairList" -> BenchmarkPairList,
+    "GraphNodeV2" -> GraphNodeV2,
+    "GraphEdgeV2" -> GraphEdgeV2,
+    "WindowStructure" -> WindowStructure,
+    "PathLengthEstimate" -> PathLengthEstimate,
+    "WindowComparison" -> WindowComparison,
+    "ResearcherTemporalChange" -> ResearcherTemporalChange,
+    "EntitySummaryInput" -> EntitySummaryInput
   )
 }
 

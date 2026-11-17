@@ -31,7 +31,14 @@ class ResearcherMetricsJobSuite extends munit.FunSuite {
   private val limits = ReaderLimits(1000, 6, 10000, 1L << 20, 1L << 16)
   private val settings = RunFixtures.settings
   private val code = "89abcdef0123456789abcdef0123456789abcdef"
-  private def cfg = AnalysisJobConfig(settings, code, 1, SortedMap.empty, 1)
+  private def cfg = AnalysisJobConfig(
+    settings,
+    code,
+    1,
+    SortedMap.empty,
+    1,
+    Checkpointing(tmp.resolve("checkpoints").toString, 2)
+  )
 
   override def beforeAll(): Unit = {
     tmp = Files.createTempDirectory("scholarchain-metrics-")
@@ -246,15 +253,52 @@ class ResearcherMetricsJobSuite extends munit.FunSuite {
     assertEquals(result.summaries.map(_.jointPublications), Vector(2L, 10L))
   }
 
-  test("one run publishes edges and metrics with the outputs parameter, and re-verifies") {
+  test("one run publishes every dataset (Parquet and Neptune CSV) with the outputs parameter") {
     val pm = result.published.partManifest
+    val node = SchemaVersions.GraphNodeV2
+    val edge = SchemaVersions.GraphEdgeV2
+    // SP-P6-03 step 2B adds the canonical tables, their twelve Neptune CSV datasets and the
+    // window structures to the six step-2A datasets; step 2C adds the analysis windows, evidence
+    // paths, window comparisons, temporal changes and both summary-input datasets (no path-length
+    // estimate: the fixture configuration sets no analysis.pathLength* key).
     assertEquals(
-      pm.files.map(f => (f.path.takeWhile(_ != '/'), f.recordSchemaVersion)).distinct.sortBy(_._1),
+      pm.files
+        .map(f => (f.path.takeWhile(_ != '/'), f.recordSchemaVersion, f.format))
+        .distinct
+        .sortBy(_._1),
       Vector(
-        ("_run-manifest.json", SchemaVersions.RunManifest),
-        ("edges", SchemaVersions.CoauthorEdgeV2),
-        ("metrics", SchemaVersions.ResearcherMetricsV2)
+        ("_run-manifest.json", SchemaVersions.RunManifest, PartFormat.Jsonl),
+        ("affiliated-with-edges", edge, PartFormat.Csv),
+        ("analysis-windows", SchemaVersions.AnalysisWindow, PartFormat.Parquet),
+        ("author-mention-vertices", node, PartFormat.Csv),
+        ("authored-edges", edge, PartFormat.Csv),
+        ("bridges", SchemaVersions.BridgeMeasure, PartFormat.Parquet),
+        ("coauthored-with-edges", edge, PartFormat.Csv),
+        ("communities", SchemaVersions.CommunityMembership, PartFormat.Parquet),
+        ("components", SchemaVersions.ComponentMembership, PartFormat.Parquet),
+        ("coreness", SchemaVersions.Coreness, PartFormat.Parquet),
+        ("edges", SchemaVersions.CoauthorEdgeV2, PartFormat.Parquet),
+        ("entity-summary-inputs", SchemaVersions.EntitySummaryInput, PartFormat.Parquet),
+        ("evidence-paths", SchemaVersions.EvidencePath, PartFormat.Parquet),
+        ("graph-edges", edge, PartFormat.Parquet),
+        ("graph-nodes", node, PartFormat.Parquet),
+        ("has-topic-edges", edge, PartFormat.Csv),
+        ("institution-vertices", node, PartFormat.Csv),
+        ("metrics", SchemaVersions.ResearcherMetricsV2, PartFormat.Parquet),
+        ("published-in-edges", edge, PartFormat.Csv),
+        ("researcher-vertices", node, PartFormat.Csv),
+        ("resolves-to-edges", edge, PartFormat.Csv),
+        ("summary-inputs", SchemaVersions.SemanticSummaryInput, PartFormat.Parquet),
+        ("temporal-changes", SchemaVersions.ResearcherTemporalChange, PartFormat.Parquet),
+        ("topic-vertices", node, PartFormat.Csv),
+        ("venue-vertices", node, PartFormat.Csv),
+        ("window-comparisons", SchemaVersions.WindowComparison, PartFormat.Parquet),
+        ("window-structures", SchemaVersions.WindowStructure, PartFormat.Parquet),
+        ("work-vertices", node, PartFormat.Csv)
       )
+    )
+    assert(
+      pm.files.filter(_.format == PartFormat.Csv).forall(_.rowCountSource == RowCountSource.Writer)
     )
     assertEquals(
       pm.files

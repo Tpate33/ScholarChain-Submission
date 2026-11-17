@@ -145,8 +145,29 @@ class EnumCodecSuite extends munit.FunSuite {
         "work-abstract",
         "community-summary",
         "path-summary",
-        "collaboration-summary"
+        "collaboration-summary",
+        // DE-P6-03: appended (no existing tag changes).
+        "work-summary",
+        "topic-summary"
       )
+    )
+    // DE-P6-03 enums.
+    roundTrip(
+      ComparisonLimitation.values.toSeq,
+      _.tag,
+      Seq(
+        "overlapping-windows",
+        "unequal-window-lengths",
+        "works-without-year-excluded",
+        "community-not-converged",
+        "grouping-unevaluated"
+      )
+    )
+    roundTrip(TemporalPresence.values.toSeq, _.tag, Seq("in-both", "only-from", "only-to"))
+    roundTrip(
+      EntityEvidenceKind.values.toSeq,
+      _.tag,
+      Seq("graph-node", "graph-edge", "source-work")
     )
     roundTrip(
       ExternalIdScheme.values.toSeq,

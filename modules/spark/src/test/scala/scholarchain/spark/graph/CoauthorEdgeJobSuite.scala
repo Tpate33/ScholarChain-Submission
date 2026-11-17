@@ -41,7 +41,14 @@ class CoauthorEdgeJobSuite extends munit.FunSuite {
     finally LocalSpark.deleteTree(tmp)
 
   private val code = "89abcdef0123456789abcdef0123456789abcdef"
-  private def cfg = AnalysisJobConfig(settings, code, 1, SortedMap.empty, 1)
+  private def cfg = AnalysisJobConfig(
+    settings,
+    code,
+    1,
+    SortedMap.empty,
+    1,
+    Checkpointing(tmp.resolve("checkpoints").toString, 2)
+  )
 
   private def run(out: String) = {
     val root = Files.createDirectories(tmp.resolve(out))
