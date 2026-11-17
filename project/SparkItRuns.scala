@@ -35,12 +35,17 @@ import sbt.internal.util.MessageOnlyException
  *      outside the repository, not containing it, and outside every sbt target directory, and no
  *      path segment names the held-out split, gold/, target/streams/ or target/local-runs/heldout;
  *   4. refuses unless the archive holds exactly the three pinned run directories along their paths
- *      (no missing or extra entry, no symbolic link; `.DS_Store` files excepted), each with a
- *      regular _SUCCESS and no _UNVERIFIED, the decision and grouping runs also with a regular
- *      _parts.json; and walks each run directory without following links (CR-P6-16 F5; names and
- *      file types only, at most [[MaxRunDepth]] levels and [[MaxRunEntries]] entries), refusing any
- *      symbolic link and any entry that is neither a regular file nor a directory. No file content
- *      is read and no part checksum is verified (the tests do that via core);
+ *      (no missing or extra entry, no symbolic link; `.DS_Store` files in those path directories
+ *      excepted), none with _UNVERIFIED. The decision and grouping runs need a regular _SUCCESS and
+ *      _parts.json and are walked without following links (CR-P6-16 F5; names and file types only,
+ *      at most [[MaxRunDepth]] levels and [[MaxRunEntries]] entries), refusing any symbolic link
+ *      and any entry that is neither a regular file nor a directory. The curated run must be
+ *      exactly [[PinnedCuratedRunName]] (any other curated run is refused) and is checked against
+ *      the Hadoop producer contract HD-P6-01 rules 1-11 by [[curatedRunProblems]] (BE-P6-04, human
+ *      decision Option A: stage `_SUCCESS` and `_counters.json`, checksum sidecars, no run-level
+ *      `_SUCCESS`, no `.DS_Store` or other hidden entry, files at most 5 and directories at most 4
+ *      levels deep, NOFOLLOW, bounded). No file content is read and no part checksum is verified
+ *      (spark-engineer's reader does that via core);
  *   5. compiles the SparkIT configuration (modules/spark/src/it/scala) and refuses when it defines
  *      no test (zero tests is never a pass);
  *   6. repeats steps 1-4, creates a fresh `modules/spark/target/spark-it/attempt-<n>/`
@@ -105,6 +110,30 @@ object SparkItRuns {
   /** Bounds of the NOFOLLOW walk of each pinned run directory (names and file types only). */
   val MaxRunDepth: Int = 4
   val MaxRunEntries: Int = 20000
+
+  /**
+   * BE-P6-04, human decision Option A (docs/agent-runs/phase-06/prompt-curated-compat-option-a.md):
+   * the one Hadoop curated dev run to which the producer contract HD-P6-01 rules 1-11
+   * (docs/agent-runs/phase-06/hd-p6-01-report.md) is applied instead of the top-level _SUCCESS and
+   * depth-4 rules. Any other curated run ID is refused outright: the exception is not generalized.
+   */
+  val PinnedCuratedRunHex: String =
+    "2881724b5c86b561a235836d51946fbd884beed36a14f929b27c278cb5de8baa"
+  val PinnedCuratedRunName: String = s"run=$PinnedCuratedRunHex"
+
+  /** HD-P6-01 rule 9: below the curated run directory, files at most 5, directories at most 4. */
+  val CuratedMaxFileDepth: Int = 5
+  val CuratedMaxDirDepth: Int = 4
+  val CuratedMaxEntries: Int = MaxRunEntries
+
+  val ManifestFile = "_run-manifest.json"
+  val CountersFile = "_counters.json"
+
+  /** HD-P6-01 rule 3: the five stage directories (Pipeline.scala Stage, in order). */
+  val CuratedStages: Seq[String] = Seq("normalize", "exact-ids", "teams", "blocking", "candidates")
+
+  /** HD-P6-01 rule 5: round-0 .. round-(k-1) with 1 <= k <= 4 (BlockingKeys.Levels = 4). */
+  val MaxBlockingRounds: Int = 4
 
   val SparkTargetRel = "modules/spark/target"
   val OutputRootRel = s"$SparkTargetRel/spark-it"
@@ -205,6 +234,11 @@ object SparkItRuns {
   private val ErrorLine = "^error\t([^\t]+)\t([^\t]+)$".r
   private val ClassesLine = "^classes=([0-9]+)$".r
   private val NonceText = "^[0-9a-f]{64}$".r
+  private val PartName = "^part-([mr])-[0-9]{5,}\\.gz$".r
+  private val CrcName = "^\\.(.+)\\.crc$".r
+  private val RoundName = "^round-(0|[1-9][0-9]*)$".r
+  private val IncompleteMarkers: Set[String] = Set("_temporary", "_IN_PROGRESS", "_FAILED")
+  private val StagingPrefix = ".staging"
 
   private def refuse(message: String): Nothing =
     throw new MessageOnlyException(s"$Task: refused: $message")
@@ -270,6 +304,21 @@ object SparkItRuns {
     shape ++ segmentProblems(s"$what '$value'", segs)
   }
 
+  /**
+   * BE-P6-04: the curated run must be exactly [[PinnedCuratedRunName]] (HD-P6-01 rule 1, pinned).
+   * Checked when the configuration is parsed and again in [[layoutProblems]].
+   */
+  def curatedPinProblem(curatedRel: String): Option[String] = {
+    val name = curatedRel.split('/').last
+    if (name == PinnedCuratedRunName) None
+    else
+      Some(
+        s"$KeyCurated '$curatedRel' is not the pinned Hadoop curated dev run $PinnedCuratedRunName; " +
+          "the HD-P6-01 curated-run contract (human decision Option A, BE-P6-04) applies to that " +
+          "one run only and no other curated run is accepted"
+      )
+  }
+
   /** Parses the configuration text: every key exactly once, no other key, every value checked. */
   def parseConfig(text: String): Either[String, ItConfig] = {
     val problems = ListBuffer.empty[String]
@@ -300,6 +349,7 @@ object SparkItRuns {
         val (parent, name) = if (j < 0) ("", v) else (v.take(j), v.drop(j + 1))
         if (!RunName.pattern.matcher(name).matches)
           problems += s"${s.key} '$v' does not end in run=<64 lower-case hex>"
+        else if (s.key == KeyCurated) problems ++= curatedPinProblem(v)
         if (!s.parent.pattern.matcher(parent).matches)
           problems += s"${s.key} '$v' is not under ${s.parentText}/"
         (s, v)
@@ -374,9 +424,13 @@ object SparkItRuns {
 
   /**
    * The exact-layout check: along the three configured paths every directory holds exactly the
-   * expected children (a regular `.DS_Store` file is ignored), each a real directory (no symbolic
-   * link); each run directory has a regular _SUCCESS and no _UNVERIFIED, and the decision and
-   * grouping runs a regular _parts.json. Lists only directories along the paths; reads no content.
+   * expected children (a regular `.DS_Store` file is ignored in these path directories, never
+   * inside the curated run), each a real directory (no symbolic link). The decision and grouping
+   * runs have a regular _SUCCESS, a regular _parts.json and no _UNVERIFIED, and are walked by
+   * [[runTreeProblems]] (depth [[MaxRunDepth]]; unchanged by BE-P6-04). The curated run must be the
+   * pinned run ([[curatedPinProblem]]), holds no _UNVERIFIED, and is checked by
+   * [[curatedRunProblems]] (HD-P6-01 rules 1-11; no top-level _SUCCESS is required, and one is
+   * refused). Reads no file content.
    */
   def layoutProblems(root: Path, cfg: ItConfig): Seq[String] = {
     val children: Map[String, Set[String]] = cfg.runs
@@ -420,13 +474,23 @@ object SparkItRuns {
     cfg.runs.foreach { case (s, r) =>
       if (good(r)) {
         val d = root.resolve(r)
-        if (!Files.isRegularFile(d.resolve(SuccessMarker), LinkOption.NOFOLLOW_LINKS))
-          p += s"$r (${s.label}) has no regular $SuccessMarker"
-        if (Files.exists(d.resolve(UnverifiedMarker), LinkOption.NOFOLLOW_LINKS))
-          p += s"$r (${s.label}) holds $UnverifiedMarker"
-        if (s.needsParts && !Files.isRegularFile(d.resolve(PartsFile), LinkOption.NOFOLLOW_LINKS))
-          p += s"$r (${s.label}) has no regular $PartsFile"
-        p ++= runTreeProblems(d, r, MaxRunDepth, MaxRunEntries)
+        if (s.key == KeyCurated) {
+          curatedPinProblem(r) match {
+            case Some(m) => p += m
+            case None =>
+              if (Files.exists(d.resolve(UnverifiedMarker), LinkOption.NOFOLLOW_LINKS))
+                p += s"$r (${s.label}) holds $UnverifiedMarker"
+              p ++= curatedRunProblems(d, r, CuratedMaxEntries)
+          }
+        } else {
+          if (!Files.isRegularFile(d.resolve(SuccessMarker), LinkOption.NOFOLLOW_LINKS))
+            p += s"$r (${s.label}) has no regular $SuccessMarker"
+          if (Files.exists(d.resolve(UnverifiedMarker), LinkOption.NOFOLLOW_LINKS))
+            p += s"$r (${s.label}) holds $UnverifiedMarker"
+          if (s.needsParts && !Files.isRegularFile(d.resolve(PartsFile), LinkOption.NOFOLLOW_LINKS))
+            p += s"$r (${s.label}) has no regular $PartsFile"
+          p ++= runTreeProblems(d, r, MaxRunDepth, MaxRunEntries)
+        }
       }
     }
     p.toList
@@ -487,6 +551,340 @@ object SparkItRuns {
     }
     if (p.size <= 20) p.toList else p.take(20).toList :+ s"... and ${p.size - 20} more"
   }
+
+  /** One entry of the curated walk: names, file types and sizes only (no content). */
+  private sealed trait CEntry
+  private final case class CFile(size: Long) extends CEntry
+  private case object CDir extends CEntry
+
+  /** A symbolic link, special file or too-deep directory: already refused by the walk. */
+  private case object COther extends CEntry
+
+  /**
+   * BE-P6-04: the Hadoop curated dev run check, applied only to [[PinnedCuratedRunName]] (the pin
+   * itself is [[curatedPinProblem]]). It replaces, for this run only, the top-level _SUCCESS rule
+   * and the depth-4 walk, with the producer contract HD-P6-01 rules 1-11
+   * (docs/agent-runs/phase-06/hd-p6-01-report.md; producer modules/hadoop Pipeline.scala RunLayout
+   * and runStage, RejectRecord.scala NamedOutputs). Names, file types and sizes only: NO file
+   * content is read, so every content rule is left to spark-engineer's reader.
+   *
+   * The walk does not follow symbolic links and refuses every symbolic link and special file, every
+   * file more than [[CuratedMaxFileDepth]] and every directory more than [[CuratedMaxDirDepth]]
+   * levels below the run directory, and more than `maxEntries` entries (the walk stops there and no
+   * layout is judged). Rule-to-check mapping (S = enforced here, structurally; R = left to the
+   * reader):
+   *   1. S: run directory `run=<64 hex>` under `snapshot=<token>/` under `hadoop/`, not a symbolic
+   *      link ([[parseConfig]], [[layoutProblems]]), and equal to the pinned run.
+   *   2. S: `_run-manifest.json` is a non-empty regular file with its crc. R: strict decoding,
+   *      `stage == "hadoop.pipeline"`, `RunId.of(manifest)` equals the directory, and the
+   *      manifest's dblp snapshot equals the `snapshot=` token.
+   *   3. S: the run directory holds exactly `_run-manifest.json`, its crc and the five stage
+   *      directories of [[CuratedStages]]; `_SUCCESS` there is refused.
+   *   4. S: each stage holds a regular `_SUCCESS` of size 0 and a non-empty regular
+   *      `_counters.json`, their crcs, and only its listed subdirectories (normalize: works,
+   *      mentions, profiles, venues, institutions, topics, rejects; exact-ids: links, rejects,
+   *      stats; teams: teams, pairs, rejects, stats; blocking: round-<r>; candidates: join, pairs,
+   *      final; round-<r>: blocks/{researcher,work}, members/{researcher,work}, spill, rejects,
+   *      stats; join: joined, rejects; pairs: pairs, rejects, stats; final: researcher, work,
+   *      rejects, stats). R: that `_counters.json` is valid JSON naming the stage and the ten
+   *      required counters.
+   *   5. S: blocking holds round-0 .. round-(k-1), contiguous, 1 <= k <= [[MaxBlockingRounds]].
+   *   6. S: candidates/join is present; candidates/pairs only if join/joined holds a part file;
+   *      candidates/final only if pairs/pairs holds a part file.
+   *   7. S: leaves hold only non-empty regular `part-[mr]-[0-9]{5,}.gz` files, `part-m` only in a
+   *      `rejects` leaf. R: that each part decompresses and decodes, and any checksum verification.
+   *   8. S: the only hidden entry is `.<X>.crc` (a regular file) for a regular, non-hidden sibling
+   *      X, and every regular non-hidden file has one; `.DS_Store`, `._*` and every other hidden
+   *      entry are refused. R: that a crc matches its file.
+   *   9. S: files at most 5 and directories at most 4 levels below the run directory, at most
+   *      `maxEntries` entries.
+   *   10. S: `_temporary`, `_IN_PROGRESS`, `_FAILED` and `.staging*` are refused at any level, and
+   *       `_SUCCESS` outside a stage directory; symbolic links and special files are refused.
+   *   11. S: an empty leaf (no part file) or an empty blocks/ or members/ directory is refused; an
+   *       empty job output directory (round-<r>, join, pairs, final) is accepted.
+   *   12. Not checked: the archive holds the run directory only, not its attempt directory (the
+   *       attempt-level success is recorded separately in prompt-curated-compat-option-a.md).
+   * Reports at most 20 problems.
+   */
+  def curatedRunProblems(runDir: Path, shown: String, maxEntries: Int): Seq[String] = {
+    val p = ListBuffer.empty[String]
+    val entries = mutable.LinkedHashMap.empty[Vector[String], CEntry]
+    var count = 0
+    var truncated = false
+    def segs(q: Path): Vector[String] =
+      runDir.relativize(q).iterator.asScala.map(_.toString).toVector
+    def rel(q: Path): String = s"$shown/${runDir.relativize(q)}"
+    def withinBound(): Boolean = {
+      count += 1
+      if (count <= maxEntries) true
+      else {
+        truncated = true
+        p += s"$shown holds more than $maxEntries entries (bound); the walk stopped there"
+        false
+      }
+    }
+    def dirTooDeep(q: Path): String =
+      s"${rel(q)} is a directory more than $CuratedMaxDirDepth levels below the run directory " +
+        "(curated bound, HD-P6-01 rule 9)"
+    try {
+      Files.walkFileTree(
+        runDir,
+        java.util.EnumSet.noneOf(classOf[FileVisitOption]),
+        CuratedMaxFileDepth + 1,
+        new SimpleFileVisitor[Path] {
+          override def preVisitDirectory(d: Path, a: BasicFileAttributes): FileVisitResult =
+            if (d == runDir) FileVisitResult.CONTINUE
+            else if (!withinBound()) FileVisitResult.TERMINATE
+            else {
+              val s = segs(d)
+              if (s.size > CuratedMaxDirDepth) {
+                p += dirTooDeep(d)
+                entries(s) = COther
+              } else entries(s) = CDir
+              FileVisitResult.CONTINUE
+            }
+          override def visitFile(f: Path, a: BasicFileAttributes): FileVisitResult =
+            if (!withinBound()) FileVisitResult.TERMINATE
+            else {
+              val s = segs(f)
+              if (a.isSymbolicLink) {
+                p += s"${rel(f)} is a symbolic link (not followed)"
+                entries(s) = COther
+              } else if (a.isDirectory) {
+                p += dirTooDeep(f)
+                entries(s) = COther
+              } else if (!a.isRegularFile) {
+                p += s"${rel(f)} is a special file (neither a regular file nor a directory)"
+                entries(s) = COther
+              } else {
+                if (s.size > CuratedMaxFileDepth)
+                  p += s"${rel(f)} is more than $CuratedMaxFileDepth levels below the run " +
+                    "directory (curated bound, HD-P6-01 rule 9)"
+                entries(s) = CFile(a.size)
+              }
+              FileVisitResult.CONTINUE
+            }
+          override def visitFileFailed(f: Path, e: IOException): FileVisitResult = {
+            p += s"${rel(f)} cannot be examined (${e.getClass.getSimpleName})"
+            entries(segs(f)) = COther
+            FileVisitResult.CONTINUE
+          }
+          override def postVisitDirectory(d: Path, e: IOException): FileVisitResult = {
+            if (e != null) p += s"${rel(d)} cannot be listed (${e.getClass.getSimpleName})"
+            FileVisitResult.CONTINUE
+          }
+        }
+      )
+      ()
+    } catch {
+      case e: IOException =>
+        truncated = true
+        p += s"$shown cannot be walked (${e.getClass.getSimpleName})"
+    }
+    if (!truncated) p ++= curatedLayoutProblems(shown, entries.toMap)
+    if (p.size <= 20) p.toList else p.take(20).toList :+ s"... and ${p.size - 20} more"
+  }
+
+  /** HD-P6-01 rules 2-8, 10 and 11 on the walked entries (see [[curatedRunProblems]]). */
+  private def curatedLayoutProblems(
+      shown: String,
+      entries: Map[Vector[String], CEntry]
+  ): Seq[String] = {
+    val p = ListBuffer.empty[String]
+    val kids: Map[Vector[String], Map[String, CEntry]] =
+      entries.toSeq.groupBy(_._1.init).map { case (k, v) =>
+        k -> v.map { case (s, e) => s.last -> e }.toMap
+      }
+    def at(d: Vector[String]): Map[String, CEntry] = kids.getOrElse(d, Map.empty)
+    def show(s: Vector[String]): String = if (s.isEmpty) shown else s"$shown/${s.mkString("/")}"
+    def isPart(n: String, e: CEntry): Boolean = e match {
+      case CFile(sz) => sz > 0 && PartName.pattern.matcher(n).matches
+      case _ => false
+    }
+    def hasPart(d: Vector[String]): Boolean = at(d).exists { case (n, e) => isPart(n, e) }
+
+    // Rules 8 and 10 on every judged directory; returns the ordinary entries (not hidden, not a
+    // rule-10 marker, not a misplaced _SUCCESS).
+    def screen(d: Vector[String], stage: Boolean): Map[String, CEntry] = {
+      val ch = at(d)
+      val regular: Set[String] =
+        ch.collect { case (n, CFile(_)) if !n.startsWith(".") => n }.toSet
+      ch.toSeq.sortBy(_._1).foreach { case (n, e) =>
+        val q = show(d :+ n)
+        if (IncompleteMarkers(n) || n.startsWith(StagingPrefix))
+          p += s"$q marks incomplete or failed output (HD-P6-01 rule 10)"
+        else if (n == SuccessMarker && !stage) {
+          if (d.isEmpty)
+            p += s"$q: the Hadoop producer never writes a run-level $SuccessMarker; a run " +
+              "directory holding one is refused (HD-P6-01 rules 3, 10)"
+          else p += s"$q is a $SuccessMarker outside a stage directory (HD-P6-01 rule 10)"
+        } else if (n == DsStore)
+          p += s"$q is a $DsStore file (refused in the curated run, HD-P6-01 rule 8)"
+        else if (n.startsWith("."))
+          n match {
+            case CrcName(x) if !x.startsWith(".") && regular(x) =>
+              e match {
+                case CDir => p += s"$q is a checksum sidecar that is not a regular file"
+                case _ => ()
+              }
+            case CrcName(x) =>
+              p += s"$q is a checksum sidecar without a regular sibling $x (HD-P6-01 rule 8)"
+            case _ =>
+              p += s"$q is a hidden entry other than a .<name>.crc checksum sidecar " +
+                "(HD-P6-01 rule 8)"
+          }
+      }
+      regular.toSeq.sorted.foreach { x =>
+        ch.get(s".$x.crc") match {
+          case Some(CFile(_)) | Some(COther) => ()
+          case _ => p += s"${show(d :+ x)} has no checksum sidecar .$x.crc (HD-P6-01 rule 8)"
+        }
+      }
+      ch.filter { case (n, _) =>
+        !n.startsWith(".") && !IncompleteMarkers(n) && !(n == SuccessMarker && !stage)
+      }
+    }
+
+    def dirsOnly(
+        d: Vector[String],
+        o: Map[String, CEntry],
+        allowed: Map[String, Vector[String] => Unit]
+    ): Unit =
+      o.toSeq.sortBy(_._1).foreach { case (n, e) =>
+        val q = show(d :+ n)
+        allowed.get(n) match {
+          case None =>
+            if (e != COther) p += s"$q is an unexpected entry (HD-P6-01 rules 3, 4)"
+          case Some(f) =>
+            e match {
+              case CDir => f(d :+ n)
+              case COther => ()
+              case _ => p += s"$q is not a directory (HD-P6-01 rule 4)"
+            }
+        }
+      }
+
+    def leaf(allowM: Boolean)(d: Vector[String]): Unit = {
+      val o = screen(d, stage = false)
+      if (!hasPart(d))
+        p += s"${show(d)} holds no part file (an empty leaf output directory, HD-P6-01 rule 11)"
+      o.toSeq.sortBy(_._1).foreach { case (n, e) =>
+        val q = show(d :+ n)
+        (n, e) match {
+          case (_, COther) => ()
+          case (_, CDir) =>
+            p += s"$q is a directory inside a leaf output directory (HD-P6-01 rules 4, 7)"
+          case (PartName(kind), CFile(sz)) =>
+            if (kind == "m" && !allowM)
+              p += s"$q is a map-side part-m file outside a rejects directory (HD-P6-01 rule 7)"
+            if (sz <= 0) p += s"$q is an empty part file (HD-P6-01 rule 7)"
+          case _ => p += s"$q is not a part-[mr]-NNNNN.gz file (HD-P6-01 rule 7)"
+        }
+      }
+    }
+    def leaves(names: String*): Map[String, Vector[String] => Unit] =
+      names.map(n => n -> (leaf(n == NamedRejects) _)).toMap
+
+    def entityParent(d: Vector[String]): Unit = {
+      val o = screen(d, stage = false)
+      if (o.isEmpty)
+        p += s"${show(d)} is an empty output directory without researcher/ or work/ " +
+          "(HD-P6-01 rule 11)"
+      dirsOnly(d, o, leaves("researcher", "work"))
+    }
+
+    def jobOut(allowed: Map[String, Vector[String] => Unit])(d: Vector[String]): Unit =
+      dirsOnly(d, screen(d, stage = false), allowed)
+
+    val roundDir = jobOut(
+      Map[String, Vector[String] => Unit](
+        "blocks" -> (entityParent _),
+        "members" -> (entityParent _)
+      ) ++ leaves("spill", NamedRejects, "stats")
+    ) _
+
+    def stageDir(allowed: Map[String, Vector[String] => Unit])(d: Vector[String]): Unit = {
+      val o = screen(d, stage = true)
+      o.get(SuccessMarker) match {
+        case None =>
+          p += s"${show(d)}/$SuccessMarker is missing (the stage is not committed; HD-P6-01 " +
+            "rules 4, 10)"
+        case Some(CFile(0L)) | Some(COther) => ()
+        case Some(CFile(sz)) =>
+          p += s"${show(d)}/$SuccessMarker is not empty ($sz bytes; HD-P6-01 rule 4)"
+        case Some(CDir) => p += s"${show(d)}/$SuccessMarker is not a regular file (HD-P6-01 rule 4)"
+      }
+      o.get(CountersFile) match {
+        case None => p += s"${show(d)}/$CountersFile is missing (HD-P6-01 rule 4)"
+        case Some(CFile(0L)) => p += s"${show(d)}/$CountersFile is empty (HD-P6-01 rule 4)"
+        case Some(CFile(_)) | Some(COther) => ()
+        case Some(CDir) => p += s"${show(d)}/$CountersFile is not a regular file (HD-P6-01 rule 4)"
+      }
+      dirsOnly(d, o - SuccessMarker - CountersFile, allowed)
+    }
+
+    // Rule 5: contiguous blocking rounds.
+    def blocking(d: Vector[String]): Unit = {
+      val rounds = at(d).keys.toSeq.collect { case n @ RoundName(i) => (n, i.toInt) }
+      val idx = rounds.map(_._2).sorted
+      if (idx.isEmpty) p += s"${show(d)} holds no round-0 directory (HD-P6-01 rule 5)"
+      else if (idx != idx.indices)
+        p += s"${show(d)} round directories are not contiguous from round-0 (found " +
+          s"${idx.map(i => s"round-$i").mkString(", ")}; HD-P6-01 rule 5)"
+      idx
+        .filter(_ >= MaxBlockingRounds)
+        .foreach(i =>
+          p += s"${show(d :+ s"round-$i")} is beyond the last blocking level (round-0 to " +
+            s"round-${MaxBlockingRounds - 1}; HD-P6-01 rule 5)"
+        )
+      stageDir(rounds.map { case (n, _) => n -> roundDir }.toMap)(d)
+    }
+
+    // Rule 6: the candidate jobs.
+    def candidates(d: Vector[String]): Unit = {
+      val ch = at(d)
+      if (!ch.contains("join"))
+        p += s"${show(d)} lacks join/ (the join job always runs; HD-P6-01 rule 6)"
+      if (ch.contains("pairs") && !hasPart(d ++ Vector("join", "joined")))
+        p += s"${show(d)}/pairs exists although join/joined holds no part file (HD-P6-01 rule 6)"
+      if (ch.contains("final") && !hasPart(d ++ Vector("pairs", "pairs")))
+        p += s"${show(d)}/final exists although pairs/pairs holds no part file (HD-P6-01 rule 6)"
+      stageDir(
+        Map(
+          "join" -> jobOut(leaves("joined", NamedRejects)) _,
+          "pairs" -> jobOut(leaves("pairs", NamedRejects, "stats")) _,
+          "final" -> jobOut(leaves("researcher", "work", NamedRejects, "stats")) _
+        )
+      )(d)
+    }
+
+    val stages: Map[String, Vector[String] => Unit] = Map(
+      "normalize" -> stageDir(
+        leaves("works", "mentions", "profiles", "venues", "institutions", "topics", NamedRejects)
+      ) _,
+      "exact-ids" -> stageDir(leaves("links", NamedRejects, "stats")) _,
+      "teams" -> stageDir(leaves("teams", "pairs", NamedRejects, "stats")) _,
+      "blocking" -> (blocking _),
+      "candidates" -> (candidates _)
+    )
+
+    // Rules 2 and 3: the run directory itself.
+    val top = screen(Vector.empty, stage = false)
+    top.get(ManifestFile) match {
+      case None => p += s"$shown lacks $ManifestFile (HD-P6-01 rules 2, 3)"
+      case Some(CFile(0L)) => p += s"$shown/$ManifestFile is empty (HD-P6-01 rule 2)"
+      case Some(CFile(_)) | Some(COther) => ()
+      case Some(CDir) => p += s"$shown/$ManifestFile is not a regular file (HD-P6-01 rule 2)"
+    }
+    CuratedStages
+      .filterNot(top.contains)
+      .foreach(s => p += s"$shown lacks the stage directory $s/ (HD-P6-01 rule 3)")
+    dirsOnly(Vector.empty, top - ManifestFile, stages)
+    p.toList
+  }
+
+  /** The `rejects` named output (RejectRecord.scala NamedOutputs.Rejects): part-m is allowed. */
+  private val NamedRejects = "rejects"
 
   /** The Spark build target must be exactly `<build base>/modules/spark/target`. */
   def outputTargetProblem(buildBase: File, sparkTarget: File): Option[String] = {
@@ -788,7 +1186,8 @@ object SparkItRuns {
       s"$Task: archive root $root (<user.home>/${cfg.rootRel}, from $ConfigRel): a real directory " +
         "outside the repository and every sbt target directory, holding exactly the pinned runs " +
         cfg.runs.map { case (s, r) => s"${s.label} ${r.split('/').last}" }.mkString(", ") +
-        s" with $SuccessMarker, without $UnverifiedMarker, and $PartsFile where required " +
+        s" (decision and grouping runs with $SuccessMarker and $PartsFile; the curated run per " +
+        "the HD-P6-01 contract, BE-P6-04; none with " + s"$UnverifiedMarker) " +
         "(layout only; the archive is opened read-only by convention, which the build cannot enforce)"
     )
     Preflight(repo, root, cfg)
@@ -1167,7 +1566,9 @@ object SparkItRuns {
     )
 
     // Configuration text.
-    val hexA = "a" * 64
+    // The fixture curated run carries the pinned run ID (BE-P6-04); hexOther is any other ID.
+    val hexA = PinnedCuratedRunHex
+    val hexOther = "f" * 64
     val hexB = "b" * 64
     val hexC = "c" * 64
     val curated =
@@ -1246,6 +1647,12 @@ object SparkItRuns {
       s"duplicate key '$KeyRoot'"
     )
     refused("line without =", parsed(cfgText(extra = "just words\n")), "is not key=value")
+    val curatedOther = curated.replace(s"run=$hexA", s"run=$hexOther")
+    refused(
+      "configuration naming a curated run other than the pinned run",
+      parsed(cfgText(cur = curatedOther)),
+      s"is not the pinned Hadoop curated dev run $PinnedCuratedRunName"
+    )
     val fixtureCfg = parseConfig(cfgText()) match {
       case Right(c) => c
       case Left(m) => selfFail(s"FAIL: fixture configuration: $m")
@@ -1435,17 +1842,68 @@ object SparkItRuns {
         Files.createDirectories(p.getParent)
         Files.write(p, Array.emptyByteArray)
       }
-      def build(): Unit = {
+      // BE-P6-04: a synthetic Hadoop curated layout per HD-P6-01 (names, types and sizes only;
+      // file bytes are placeholders, since the preflight reads no content).
+      def put(p: Path, text: String): Unit = {
+        Files.createDirectories(p.getParent)
+        Files.write(p, text.getBytes(StandardCharsets.UTF_8))
+      }
+      def crcOf(p: Path): Path = p.resolveSibling(s".${p.getFileName}.crc")
+      def withCrc(p: Path, text: String): Unit = {
+        put(p, text)
+        put(crcOf(p), "crc")
+      }
+      def part(d: Path, name: String = "part-r-00000.gz"): Unit = withCrc(d.resolve(name), "gz")
+      val FullCandidates = Seq("joined", "pairs", "final")
+      def hadoopRun(r: Path, rounds: Int = 2, cands: Seq[String] = FullCandidates): Unit = {
+        Files.createDirectories(r)
+        withCrc(r.resolve(ManifestFile), "{}")
+        CuratedStages.foreach { s =>
+          withCrc(r.resolve(s).resolve(SuccessMarker), "")
+          withCrc(r.resolve(s).resolve(CountersFile), "{}")
+        }
+        part(r.resolve("normalize/works"))
+        part(r.resolve("normalize/mentions"))
+        part(r.resolve("normalize/rejects"), "part-m-00000.gz")
+        part(r.resolve("normalize/rejects"))
+        part(r.resolve("exact-ids/links"))
+        part(r.resolve("teams/teams"))
+        part(r.resolve("teams/pairs"))
+        part(r.resolve("teams/stats"))
+        (0 until rounds).foreach { i =>
+          val rd = r.resolve(s"blocking/round-$i")
+          Seq("blocks", "members").foreach(k =>
+            Seq("researcher", "work").foreach(e => part(rd.resolve(s"$k/$e")))
+          )
+          if (i + 1 < rounds) part(rd.resolve("spill"))
+          part(rd.resolve("stats"))
+        }
+        val c = r.resolve("candidates")
+        Files.createDirectories(c.resolve("join"))
+        if (cands.contains("joined")) part(c.resolve("join/joined"))
+        if (cands.contains("pairs")) {
+          part(c.resolve("pairs/pairs"))
+          part(c.resolve("pairs/stats"))
+        }
+        if (cands.contains("final"))
+          Seq("researcher", "work", "stats").foreach(x => part(c.resolve(s"final/$x")))
+      }
+      def buildFor(cfg: ItConfig): Unit = {
         deleteTree(root)
         deleteTree(elsewhere)
         Files.createDirectories(elsewhere)
-        fixtureCfg.runs.foreach { case (s, r) =>
+        cfg.runs.foreach { case (s, r) =>
           val d = root.resolve(r)
           Files.createDirectories(d)
-          touch(d.resolve(SuccessMarker))
-          if (s.needsParts) Files.write(d.resolve(PartsFile), "[]".getBytes(StandardCharsets.UTF_8))
+          if (s.key == KeyCurated) hadoopRun(d)
+          else {
+            touch(d.resolve(SuccessMarker))
+            if (s.needsParts)
+              Files.write(d.resolve(PartsFile), "[]".getBytes(StandardCharsets.UTF_8))
+          }
         }
       }
+      def build(): Unit = buildFor(fixtureCfg)
       def layout(): Option[String] = problems(layoutProblems(root, fixtureCfg))
       def moveAndLink(rel: String): Unit = {
         val p = root.resolve(rel)
@@ -1514,11 +1972,11 @@ object SparkItRuns {
         s"(Hadoop curated dev input) holds _UNVERIFIED"
       )
       build()
-      Files.delete(root.resolve(curated).resolve(SuccessMarker))
+      withCrc(root.resolve(curated).resolve(SuccessMarker), "")
       refused(
-        "curated run without _SUCCESS",
+        "curated run holds a run-level _SUCCESS (the producer never writes one)",
         layout(),
-        "(Hadoop curated dev input) has no regular _SUCCESS"
+        s"$curated/_SUCCESS: the Hadoop producer never writes a run-level _SUCCESS"
       )
       build()
       Files.delete(root.resolve(assignments).resolve(SuccessMarker))
@@ -1631,6 +2089,192 @@ object SparkItRuns {
       allowed(
         "entry-count bound control (100 entries)",
         problems(runTreeProblems(decDir, decisions, MaxRunDepth, 100))
+      )
+      build()
+      touch(decDir.resolve(DsStore))
+      allowed(".DS_Store inside the decision run stays tolerated (unchanged)", layout())
+      build()
+
+      // BE-P6-04: the Hadoop curated contract (HD-P6-01 rules 1-11) on synthetic fixtures only.
+      val cur = root.resolve(curated)
+      def curCase(name: String, sub: String)(change: => Unit): Unit = {
+        build()
+        change
+        refused(s"curated: $name", layout(), sub)
+      }
+      def curAllowed(name: String)(change: => Unit): Unit = {
+        build()
+        change
+        allowed(s"curated: $name", layout())
+      }
+      curAllowed(
+        "valid Hadoop layout (5 stages, round-0 and round-1, entity parts at depth 5, crc " +
+          "sidecars, candidates join+pairs+final)"
+      )(())
+      curAllowed("valid Hadoop layout with candidates join only") {
+        deleteTree(cur)
+        hadoopRun(cur, cands = Seq("joined"))
+      }
+      curAllowed("valid Hadoop layout with an empty join job output directory, one round") {
+        deleteTree(cur)
+        hadoopRun(cur, rounds = 1, cands = Nil)
+      }
+      curAllowed("valid Hadoop layout with four rounds (round-0 to round-3)") {
+        deleteTree(cur)
+        hadoopRun(cur, rounds = 4)
+      }
+      curCase("missing stage _SUCCESS", s"$curated/teams/_SUCCESS is missing") {
+        Files.delete(cur.resolve("teams/_SUCCESS"))
+        Files.delete(crcOf(cur.resolve("teams/_SUCCESS")))
+      }
+      curCase("stage _SUCCESS not empty", s"$curated/normalize/_SUCCESS is not empty (1 bytes") {
+        withCrc(cur.resolve("normalize/_SUCCESS"), "x")
+      }
+      curCase("missing _counters.json", s"$curated/blocking/_counters.json is missing") {
+        Files.delete(cur.resolve("blocking/_counters.json"))
+        Files.delete(crcOf(cur.resolve("blocking/_counters.json")))
+      }
+      curCase("missing _run-manifest.json", s"$curated lacks _run-manifest.json") {
+        Files.delete(cur.resolve(ManifestFile))
+        Files.delete(crcOf(cur.resolve(ManifestFile)))
+      }
+      curCase("empty _run-manifest.json", s"$curated/_run-manifest.json is empty") {
+        withCrc(cur.resolve(ManifestFile), "")
+      }
+      curCase("missing stage directory", s"$curated lacks the stage directory teams/") {
+        deleteTree(cur.resolve("teams"))
+      }
+      curCase(
+        "_temporary in a job output directory",
+        s"$curated/blocking/round-0/_temporary marks incomplete or failed output"
+      )(Files.createDirectories(cur.resolve("blocking/round-0/_temporary/0")))
+      curCase("_IN_PROGRESS in the run directory", s"$curated/_IN_PROGRESS marks incomplete")(
+        withCrc(cur.resolve("_IN_PROGRESS"), "")
+      )
+      curCase("_FAILED in a stage directory", s"$curated/candidates/_FAILED marks incomplete")(
+        withCrc(cur.resolve("candidates/_FAILED"), "")
+      )
+      curCase(".staging directory", s"$curated/.staging-1 marks incomplete")(
+        Files.createDirectories(cur.resolve(".staging-1"))
+      )
+      curCase(
+        "_SUCCESS outside a stage directory",
+        s"$curated/candidates/join/_SUCCESS is a _SUCCESS outside a stage directory"
+      )(withCrc(cur.resolve("candidates/join/_SUCCESS"), ""))
+      curCase(".DS_Store in the curated run", s"$curated/normalize/.DS_Store is a .DS_Store file")(
+        touch(cur.resolve("normalize/.DS_Store"))
+      )
+      curCase(
+        "stray dotfile",
+        s"$curated/normalize/works/.hidden is a hidden entry other than a .<name>.crc"
+      )(touch(cur.resolve("normalize/works/.hidden")))
+      curCase(
+        "AppleDouble file",
+        s"$curated/normalize/works/._part-r-00000.gz is a hidden entry other than"
+      )(touch(cur.resolve("normalize/works/._part-r-00000.gz")))
+      curCase(
+        "missing .crc sibling",
+        s"$curated/exact-ids/links/part-r-00000.gz has no checksum sidecar .part-r-00000.gz.crc"
+      )(Files.delete(crcOf(cur.resolve("exact-ids/links/part-r-00000.gz"))))
+      curCase(
+        "orphan .crc",
+        s"$curated/teams/pairs/.part-r-00001.gz.crc is a checksum sidecar without a regular " +
+          "sibling part-r-00001.gz"
+      )(put(cur.resolve("teams/pairs/.part-r-00001.gz.crc"), "crc"))
+      val deep = cur.resolve("blocking/round-0/blocks/work/deep")
+      build()
+      part(deep)
+      refused(
+        "curated: file at depth 6",
+        layout(),
+        s"$curated/blocking/round-0/blocks/work/deep/part-r-00000.gz is more than 5 levels below"
+      )
+      refused(
+        "curated: directory at depth 5",
+        layout(),
+        s"$curated/blocking/round-0/blocks/work/deep is a directory more than 4 levels below"
+      )
+      curCase(
+        "round gap (round-0 and round-2)",
+        s"$curated/blocking round directories are not contiguous from round-0 (found round-0, " +
+          "round-2"
+      )(Files.move(cur.resolve("blocking/round-1"), cur.resolve("blocking/round-2")))
+      curCase("round-4", s"$curated/blocking/round-4 is beyond the last blocking level") {
+        deleteTree(cur)
+        hadoopRun(cur, rounds = 5)
+      }
+      curCase("no blocking round", s"$curated/blocking holds no round-0 directory") {
+        deleteTree(cur.resolve("blocking/round-0"))
+        deleteTree(cur.resolve("blocking/round-1"))
+      }
+      curCase(
+        "part-m outside rejects",
+        s"$curated/normalize/works/part-m-00000.gz is a map-side part-m file outside a rejects"
+      )(part(cur.resolve("normalize/works"), "part-m-00000.gz"))
+      curCase("empty part file", s"$curated/teams/teams/part-r-00000.gz is an empty part file")(
+        withCrc(cur.resolve("teams/teams/part-r-00000.gz"), "")
+      )
+      curCase(
+        "non-part file in a leaf",
+        s"$curated/normalize/works/data.json is not a part-[mr]-NNNNN.gz file"
+      )(withCrc(cur.resolve("normalize/works/data.json"), "x"))
+      curCase(
+        "empty leaf output directory",
+        s"$curated/normalize/venues holds no part file (an empty leaf output directory"
+      )(Files.createDirectories(cur.resolve("normalize/venues")))
+      curCase(
+        "empty blocks/ directory",
+        s"$curated/blocking/round-1/blocks is an empty output directory without researcher/"
+      ) {
+        deleteTree(cur.resolve("blocking/round-1/blocks/researcher"))
+        deleteTree(cur.resolve("blocking/round-1/blocks/work"))
+      }
+      curCase("unknown top-level entry", s"$curated/notes.txt is an unexpected entry")(
+        withCrc(cur.resolve("notes.txt"), "x")
+      )
+      curCase("unknown stage subdirectory", s"$curated/normalize/extra is an unexpected entry")(
+        part(cur.resolve("normalize/extra"))
+      )
+      curCase("candidates without join", s"$curated/candidates lacks join/")(
+        deleteTree(cur.resolve("candidates/join"))
+      )
+      curCase(
+        "candidates/pairs without join/joined parts",
+        s"$curated/candidates/pairs exists although join/joined holds no part file"
+      )(deleteTree(cur.resolve("candidates/join/joined")))
+      curCase(
+        "candidates/final without pairs/pairs parts",
+        s"$curated/candidates/final exists although pairs/pairs holds no part file"
+      )(deleteTree(cur.resolve("candidates/pairs/pairs")))
+      curCase(
+        "symbolic link in the curated run (a part file at depth 5)",
+        s"$curated/blocking/round-0/members/researcher/part-r-00001.gz is a symbolic link " +
+          "(not followed)"
+      ) {
+        touch(elsewhere.resolve("outside-part"))
+        Files.createSymbolicLink(
+          cur.resolve("blocking/round-0/members/researcher/part-r-00001.gz"),
+          elsewhere.resolve("outside-part")
+        )
+      }
+      build()
+      refused(
+        "curated: entry-count bound (10 entries)",
+        problems(curatedRunProblems(cur, curated, 10)),
+        s"$curated holds more than 10 entries (bound)"
+      )
+      allowed(
+        s"curated: entry-count bound control ($CuratedMaxEntries entries)",
+        problems(curatedRunProblems(cur, curated, CuratedMaxEntries))
+      )
+      val otherCfg = fixtureCfg.copy(runs = fixtureCfg.runs.map { case (s, r) =>
+        if (s.key == KeyCurated) (s, curatedOther) else (s, r)
+      })
+      buildFor(otherCfg)
+      refused(
+        "curated: a valid Hadoop layout under a different curated run ID",
+        problems(layoutProblems(root, otherCfg)),
+        s"is not the pinned Hadoop curated dev run $PinnedCuratedRunName"
       )
       build()
 

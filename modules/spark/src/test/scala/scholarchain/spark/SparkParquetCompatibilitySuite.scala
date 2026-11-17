@@ -21,7 +21,8 @@ import scholarchain.core.*
  * SP-P6-02 step 0: local Spark and Parquet compatibility of the sparkAnalytics test classpath
  * (Scala 3 calling the Spark `_2.13` artifacts) with the core contracts. Synthetic data only, one
  * local[1] SparkSession bound to the loopback address, every write under one fresh directory in
- * `java.io.tmpdir`, deleted in `afterAll`. No network, no AWS, no graph job.
+ * `java.io.tmpdir`, deleted in `afterAll`. Loopback listeners only; no outbound network. No AWS, no
+ * graph job.
  *
  * Driver-memory note: the `collect` calls below act on at most five synthetic rows; production jobs
  * never collect graph data to the driver.
@@ -217,8 +218,8 @@ class SparkParquetCompatibilitySuite extends munit.FunSuite {
 
     // A published run directory: the Parquet part, the run manifest, the part manifest, _SUCCESS.
     val runDir = tmp.resolve("run")
-    val dataPath = "metrics/part-00000.parquet"
-    Files.createDirectories(runDir.resolve("metrics"))
+    val dataPath = "synthetic/part-00000.parquet"
+    Files.createDirectories(runDir.resolve("synthetic"))
     val partBytes = Files.readAllBytes(part)
     Files.write(runDir.resolve(dataPath), partBytes)
     val rm = runManifest(1)
