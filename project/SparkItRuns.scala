@@ -59,13 +59,18 @@ import sbt.internal.util.MessageOnlyException
  *      system properties only, inherited AWS_*, SCHOLARCHAIN_*, GIT_* and MUNIT_* removed (MUNIT_*
  *      for MUNIT_FLAKY_OK; the runner also refuses any MUNIT_* it still sees) and the AWS isolation
  *      variables added, stdin closed, output through the sbt task log, and a wall-clock bound of
- *      [[TimeoutSeconds]] (destroy, then destroyForcibly);
- *   7. decides only from the runner's result file, the nonce and the exit code ([[verdict]]): PASS
- *      requires exit 0 and a complete result file written by this run's runner (its first and last
- *      lines carry the nonce) in which the classes that ran equal the expected SparkIT test classes
- *      (definedTestNames, n > 0) and every class ran at least one test with zero failures, zero
- *      ignored tests and zero assumption failures. Printed output is never parsed; writes
- *      `result.txt`.
+ *      [[TimeoutSeconds]] (destroy, then destroyForcibly); 6a. (BE-P6-06) before creating the
+ *      attempt, refuses unless the SparkIT classpath holds exactly one JUnit (the junit:junit jar
+ *      at the ledger's `junit` revision, the only provider of org.junit.runner.JUnitCore and
+ *      Result) and at most one hamcrest ([[junitOnClasspath]]); the fork itself is [[runRunner]],
+ *      the code path `verifySparkItRunner` exercises in `check`;
+ *   7. decides only from the runner's result file (format v2: where JUnitCore and Result were
+ *      loaded from, which must be that jar, and the JUnit failures, reported first), the nonce and
+ *      the exit code ([[verdict]]): PASS requires exit 0 and a complete result file written by this
+ *      run's runner (its first and last lines carry the nonce) in which the classes that ran equal
+ *      the expected SparkIT test classes (definedTestNames, n > 0) and every class ran at least one
+ *      test with zero failures, zero ignored tests and zero assumption failures. Printed output is
+ *      never parsed; writes `result.txt`.
  *
  * The archive is opened read-only by convention only: the build cannot stop test code from writing
  * there. `verifySparkItGuards` (part of `check`) tests the refusals on temporary directories and
@@ -78,6 +83,13 @@ object SparkItRuns {
 
   val Task = "sparkIT"
   val SelfTest = "verifySparkItGuards"
+
+  /** BE-P6-06: the archive-independent real-runner check in `check` ([[runnerCheck]]). */
+  val RunnerCheck = "verifySparkItRunner"
+
+  /** Its scratch directory, under the root build target (never under [[OutputRootRel]]). */
+  val RunnerCheckScratchRel = "target/sparkit-runner-check"
+  val RunnerCheckTimeoutSeconds: Long = 60L
 
   /** The committed configuration (owner build-engineer). */
   val ConfigRel = "project/spark-it.properties"
@@ -243,7 +255,9 @@ object SparkItRuns {
   private val AttemptName = "^attempt-([1-9][0-9]*)$".r
   private val ClassLine =
     "^class\t([^\t]+)\trun=([0-9]+)\tfailures=([0-9]+)\tignored=([0-9]+)\tassumptionFailures=([0-9]+)$".r
-  private val ErrorLine = "^error\t([^\t]+)\t([^\t]+)$".r
+  private val ErrorLine = "^error\t([^\t]+)\t(run|failures|counts)\t([^\t]+)$".r
+  private val FailureLine = "^failure\t([^\t]+)\t([^\t]*)\t([^\t]+)\t([^\t]*)$".r
+  private val JUnitLine = "^junit\t(JUnitCore|Result)\t([^\t]+)\t([^\t]+)$".r
   private val ClassesLine = "^classes=([0-9]+)$".r
   private val NonceText = "^[0-9a-f]{64}$".r
   private val PartName = "^part-([mr])-[0-9]{5,}\\.gz$".r
@@ -971,9 +985,7 @@ object SparkItRuns {
 
   /** The forked JVM's options: Java 17 opens, scratch under the attempt, the fixed properties. */
   def jvmOptions(java17: Seq[String], attempt: Path, root: Path, cfg: ItConfig): Seq[String] =
-    java17 ++ Seq(
-      s"-Djava.io.tmpdir=${attempt.resolve("tmp")}",
-      s"-XX:ErrorFile=${attempt.resolve("hs_err_pid%p.log")}",
+    baseJvmOptions(java17, attempt) ++ Seq(
       s"-D${Prop.ArchiveRoot}=$root"
     ) ++ cfg.runs.map { case (s, r) => s"-D${s.prop}=${root.resolve(r)}" } ++ Seq(
       s"-D${Prop.AttemptDir}=$attempt",
@@ -1048,9 +1060,118 @@ object SparkItRuns {
       assumptionFailures: Int
   )
 
-  /** The parsed result file: per class either counts or an error (class name, exception name). */
-  final case class RunnerResult(classes: Seq[ClassResult], errors: Seq[(String, String)]) {
-    def names: Seq[String] = classes.map(_.name) ++ errors.map(_._1)
+  /** One JUnit failure as the runner recorded it (read before the counts, BE-P6-06). */
+  final case class FailureRecord(cls: String, header: String, exception: String, message: String)
+
+  /** One error line: the class, the runner stage that failed and the exception class. */
+  final case class ErrorRecord(cls: String, stage: String, exception: String)
+
+  /**
+   * Where the forked runner loaded a JUnit class from: code source path, Implementation-Version.
+   */
+  final case class LoadedFrom(path: String, implementationVersion: String)
+
+  /**
+   * The parsed result file (format v2, BE-P6-06): where JUnitCore and Result were loaded from, the
+   * failure lines, and per class either counts or an error.
+   */
+  final case class RunnerResult(
+      junitCore: LoadedFrom,
+      junitResult: LoadedFrom,
+      failures: Seq[FailureRecord],
+      classes: Seq[ClassResult],
+      errors: Seq[ErrorRecord]
+  ) {
+    def names: Seq[String] = classes.map(_.name) ++ errors.map(_.cls)
+  }
+
+  /**
+   * BE-P6-06: the one JUnit jar the forked runner must load JUnitCore and Result from, and its
+   * revision (the update report's junit:junit revision, equal to the ledger key `junit`).
+   */
+  final case class JUnitExpectation(jar: Path, revision: String)
+
+  /** One SparkIT classpath entry and its managed module (organization, name, revision), if any. */
+  final case class CpEntry(file: File, module: Option[(String, String, String)])
+
+  def cpEntries(cp: Seq[Attributed[File]]): Seq[CpEntry] =
+    cp.map(a =>
+      CpEntry(a.data, a.get(Keys.moduleID.key).map(m => (m.organization, m.name, m.revision)))
+    )
+
+  val JUnitResources: Seq[String] =
+    Seq("org/junit/runner/JUnitCore.class", "org/junit/runner/Result.class")
+  val HamcrestResource = "org/hamcrest/Matcher.class"
+
+  /**
+   * Whether a classpath entry (directory or jar) holds `resource`; an unreadable jar is an error.
+   */
+  def provides(f: File, resource: String): Either[String, Boolean] = {
+    val p = f.toPath
+    if (Files.isDirectory(p)) Right(Files.isRegularFile(p.resolve(resource)))
+    else if (Files.isRegularFile(p))
+      Try {
+        val z = new java.util.zip.ZipFile(f)
+        try z.getEntry(resource) != null
+        finally z.close()
+      }.toEither.left
+        .map(e => s"cannot read SparkIT classpath entry $f (${e.getClass.getSimpleName})")
+    else Right(false)
+  }
+
+  private def showEntry(e: CpEntry): String =
+    e.module.fold(e.file.toString) { case (o, n, r) => s"$o:$n:$r (${e.file})" }
+
+  /**
+   * BE-P6-06: the JUnit and hamcrest providers on the SparkIT classpath. Right only when exactly
+   * one managed module junit:junit is present at `expectedRevision`, every entry holding
+   * org/junit/runner/JUnitCore.class or Result.class is that one jar, and at most one entry holds
+   * org/hamcrest/Matcher.class. Returns the expectation and a description for the log.
+   */
+  def junitOnClasspath(
+      entries: Seq[CpEntry],
+      expectedRevision: String
+  ): Either[String, (JUnitExpectation, String)] = {
+    val p = ListBuffer.empty[String]
+    def scan(resource: String): Seq[CpEntry] =
+      entries.filter { e =>
+        provides(e.file, resource) match {
+          case Right(b) => b
+          case Left(m) => p += m; false
+        }
+      }
+    val modules = entries.filter(_.module.exists { case (o, n, _) => o == "junit" && n == "junit" })
+    val junitProviders = JUnitResources.flatMap(scan).distinct
+    val hamcrest = scan(HamcrestResource)
+    if (modules.size != 1)
+      p += s"expected exactly one junit:junit module on the SparkIT classpath, found ${modules.size}" +
+        (if (modules.isEmpty) "" else s": ${modules.map(showEntry).mkString(", ")}")
+    modules.headOption.foreach { m =>
+      val rev = m.module.fold("")(_._3)
+      if (rev != expectedRevision)
+        p += s"junit:junit on the SparkIT classpath is $rev, not the ledger's junit=$expectedRevision " +
+          "(the runner's reflective JUnit API names are verified against that revision)"
+      if (junitProviders.map(_.file) != Seq(m.file))
+        p += "JUnit classes (org/junit/runner/JUnitCore.class, Result.class) are provided by " +
+          s"${junitProviders.map(showEntry).mkString(", ")}; expected only ${m.file}"
+    }
+    if (hamcrest.size > 1)
+      p += s"more than one SparkIT classpath entry provides $HamcrestResource: " +
+        hamcrest.map(showEntry).mkString(", ")
+    if (p.nonEmpty) Left(p.distinct.mkString("; "))
+    else {
+      val m = modules.head
+      val note =
+        s"JUnit: exactly one provider of org.junit.runner.{JUnitCore,Result}: ${showEntry(m)}; " +
+          s"hamcrest: ${if (hamcrest.isEmpty) "none" else hamcrest.map(showEntry).mkString(", ")}; " +
+          s"${entries.size} classpath entries scanned"
+      Right((JUnitExpectation(m.file.toPath, m.module.fold("")(_._3)), note))
+    }
+  }
+
+  private def samePath(a: Path, b: Path): Boolean = {
+    def norm(p: Path): Path = Try(p.toRealPath()).getOrElse(p.toAbsolutePath.normalize)
+    norm(a) == norm(b)
   }
 
   /** The result file, when it is a regular, symlink-free file within [[MaxResultBytes]]. */
@@ -1071,13 +1192,16 @@ object SparkItRuns {
   private def nat(s: String): Option[Int] = Try(s.toInt).toOption.filter(_ >= 0)
 
   /**
-   * Strict parse: `format=<FORMAT>`, `nonce=<nonce>`, one `class` or `error` line per class,
-   * `classes=<count of those lines>`, `complete=<nonce>`, and a final LF; nothing else.
+   * Strict parse of format v2 (BE-P6-06): `format=<FORMAT>`, `nonce=<nonce>`, `junit JUnitCore` and
+   * `junit Result` lines (code source path, Implementation-Version), then per class its `failure`
+   * lines followed by one `class` or `error` line, `classes=<count of class and error lines>`,
+   * `complete=<nonce>`, and a final LF; nothing else. Fields are tab-separated. Line numbers in
+   * messages are 1-based.
    */
   def parseResult(text: String, nonce: String): Either[String, RunnerResult] = {
     val lines = text.split("\n", -1).toVector
     val format = s"format=${SparkItJUnitRunner.FORMAT}"
-    if (!text.endsWith("\n") || lines.size < 5)
+    if (!text.endsWith("\n") || lines.size < 7)
       Left(s"$JUnitResultFile is incomplete (no final line); NOT a pass")
     else if (lines(0) != format) Left(s"$JUnitResultFile does not start with $format")
     else if (lines(1) != s"nonce=$nonce" || lines(lines.size - 2) != s"complete=$nonce")
@@ -1086,61 +1210,95 @@ object SparkItRuns {
           "written completely by this run's runner; NOT a pass"
       )
     else {
-      val body = lines.slice(2, lines.size - 3)
-      val classes = ListBuffer.empty[ClassResult]
-      val errors = ListBuffer.empty[(String, String)]
       val bad = ListBuffer.empty[Int]
+      def junitAt(i: Int, kind: String): LoadedFrom = lines(i) match {
+        case JUnitLine(k, path, v) if k == kind => LoadedFrom(path, v)
+        case _ =>
+          bad += i + 1
+          LoadedFrom(SparkItJUnitRunner.UNKNOWN, SparkItJUnitRunner.UNKNOWN)
+      }
+      val core = junitAt(2, "JUnitCore")
+      val res = junitAt(3, "Result")
+      val body = lines.slice(4, lines.size - 3)
+      val classes = ListBuffer.empty[ClassResult]
+      val errors = ListBuffer.empty[ErrorRecord]
+      val failures = ListBuffer.empty[FailureRecord]
       body.zipWithIndex.foreach { case (l, i) =>
         l match {
           case ClassLine(n, r, f, ig, a) =>
             (nat(r), nat(f), nat(ig), nat(a)) match {
               case (Some(r1), Some(f1), Some(i1), Some(a1)) =>
                 classes += ClassResult(n, r1, f1, i1, a1)
-              case _ => bad += i + 3
+              case _ => bad += i + 5
             }
-          case ErrorLine(n, e) => errors += (n -> e)
-          case _ => bad += i + 3
+          case ErrorLine(n, stage, e) => errors += ErrorRecord(n, stage, e)
+          case FailureLine(n, h, e, m) => failures += FailureRecord(n, h, e, m)
+          case _ => bad += i + 5
         }
       }
       val declared = lines(lines.size - 3) match {
         case ClassesLine(k) => nat(k)
         case _ => None
       }
+      val counted = classes.size + errors.size
       if (bad.nonEmpty) Left(s"$JUnitResultFile has malformed line(s) ${bad.mkString(", ")}")
-      else if (!declared.contains(body.size))
-        Left(s"$JUnitResultFile: the classes= line does not match the ${body.size} class line(s)")
-      else Right(RunnerResult(classes.toList, errors.toList))
+      else if (!declared.contains(counted))
+        Left(s"$JUnitResultFile: the classes= line does not match the $counted class line(s)")
+      else Right(RunnerResult(core, res, failures.toList, classes.toList, errors.toList))
     }
   }
 
   /**
    * The PASS rule. PASS (the total test count) only when: the JVM exited 0 within the bound; the
    * runner consumed the nonce file; the result file is complete and carries this run's nonce; the
-   * classes that ran equal the expected SparkIT classes (n > 0; none missing, extra or repeated);
-   * no class has an error line; and every class ran at least one test with zero failures, zero
-   * ignored tests and zero assumption failures. Everything else is a failure that names every
-   * problem found.
+   * runner loaded JUnitCore and Result from exactly the expected JUnit jar (and any recorded
+   * Implementation-Version equals the expected revision); the classes that ran equal the expected
+   * classes (n > 0; none missing, extra or repeated); no class has an error line; no failure line
+   * exists; each class's failure lines match its failure count; and every class ran at least one
+   * test with zero failures, zero ignored tests and zero assumption failures. Everything else is a
+   * failure that names every problem found, JUnit failures FIRST (BE-P6-06), so that no later
+   * diagnostic can hide them. Missing required data is never a pass.
    */
   def verdict(
       exit: Option[Int],
       nonceConsumed: Boolean,
       result: Either[String, String],
       expected: Seq[String],
-      nonce: String
+      nonce: String,
+      junit: JUnitExpectation,
+      timeoutSeconds: Long = TimeoutSeconds
   ): Either[String, Int] = {
     val want = expected.distinct.sorted
     val exitText = exit.fold("no exit code")(n => s"exit $n")
     if (exit.isEmpty)
-      Left(s"exceeded the ${TimeoutSeconds}s bound; the forked JVM was stopped; NOT a pass")
+      Left(s"exceeded the ${timeoutSeconds}s bound; the forked JVM was stopped; NOT a pass")
     else if (want.isEmpty) Left("no expected test class; zero tests is NOT a pass")
     else {
+      val parsed = result.flatMap(parseResult(_, nonce))
       val p = ListBuffer.empty[String]
+      parsed.foreach(_.failures.foreach { f =>
+        p += s"JUnit FAILURE in ${f.cls}: ${f.header}: ${f.exception}: ${f.message}"
+      })
       if (!exit.contains(SparkItJUnitRunner.EXIT_PASS)) p += s"the runner JVM ended with $exitText"
       if (!nonceConsumed)
         p += "the runner did not consume its nonce file (it never started its run)"
-      result.flatMap(parseResult(_, nonce)) match {
+      parsed match {
         case Left(m) => p += m
         case Right(r) =>
+          Seq("JUnitCore" -> r.junitCore, "Result" -> r.junitResult).foreach { case (k, l) =>
+            if (l.path == SparkItJUnitRunner.UNKNOWN)
+              p += s"the runner could not record where org.junit.runner.$k was loaded from " +
+                "(required)"
+            else if (!Try(Paths.get(l.path)).toOption.exists(samePath(_, junit.jar)))
+              p += s"org.junit.runner.$k was loaded from ${l.path}, not from the expected JUnit " +
+                s"jar ${junit.jar}"
+            if (
+              l.implementationVersion != SparkItJUnitRunner.UNKNOWN &&
+              l.implementationVersion != junit.revision
+            )
+              p += s"org.junit.runner.$k has Implementation-Version ${l.implementationVersion}, " +
+                s"not ${junit.revision}"
+          }
           val names = r.names
           val missing = want.filterNot(names.contains)
           val extra = names.distinct.filterNot(want.contains)
@@ -1149,17 +1307,88 @@ object SparkItRuns {
             p += s"expected class(es) that did not run: ${missing.mkString(", ")}"
           if (extra.nonEmpty) p += s"unexpected class(es) in the result: ${extra.mkString(", ")}"
           if (repeated.nonEmpty) p += s"class(es) recorded twice: ${repeated.mkString(", ")}"
-          r.errors.foreach { case (n, e) => p += s"$n could not be run ($e)" }
+          val listed = r.failures.groupBy(_.cls).map { case (k, v) => k -> v.size }
+          listed.keys.toSeq.sorted
+            .filterNot(names.contains)
+            .foreach(k => p += s"failure line(s) for $k, which has no class or error line")
+          r.errors.foreach { e =>
+            p += s"${e.cls} could not be run (${e.exception}) [runner stage ${e.stage}]"
+          }
           r.classes.foreach { c =>
+            val lines = listed.getOrElse(c.name, 0)
+            val need = math.min(c.failures, SparkItJUnitRunner.MAX_FAILURE_LINES)
+            if (lines != need)
+              p += s"${c.name}: $lines failure line(s) recorded for ${c.failures} failure(s) " +
+                "(required failure data missing or inconsistent)"
             if (c.run <= 0) p += s"${c.name} ran no test"
             if (c.failures > 0) p += s"${c.name} had ${c.failures} failure(s)"
             if (c.ignored > 0) p += s"${c.name} had ${c.ignored} ignored test(s)"
             if (c.assumptionFailures > 0)
               p += s"${c.name} had ${c.assumptionFailures} assumption failure(s) (skipped)"
           }
-          if (p.isEmpty) return Right(r.classes.map(_.run).sum)
       }
-      Left(s"FAILED ($exitText): ${p.mkString("; ")}; NOT a pass")
+      if (p.isEmpty) parsed.map(_.classes.map(_.run).sum)
+      else Left(s"FAILED ($exitText): ${p.mkString("; ")}; NOT a pass")
+    }
+  }
+
+  /** One fork of the real runner: what [[runRunner]] observed and decided. */
+  final case class RunnerRun(
+      nonce: String,
+      exit: Option[Int],
+      nonceConsumed: Boolean,
+      read: Either[String, String],
+      parsed: Option[RunnerResult],
+      verdict: Either[String, Int]
+  )
+
+  /** The forked JVM's base options: Java 17 opens and scratch under the attempt. */
+  def baseJvmOptions(java17: Seq[String], attempt: Path): Seq[String] =
+    java17 ++ Seq(
+      s"-Djava.io.tmpdir=${attempt.resolve("tmp")}",
+      s"-XX:ErrorFile=${attempt.resolve("hs_err_pid%p.log")}"
+    )
+
+  /**
+   * BE-P6-06: the one code path that forks the runner, used by both `sparkIT` and
+   * `verifySparkItRunner`: installs the meta-build runner class with a fresh nonce in
+   * `<attempt>/runner/`, forks [[RunnerMain]] on `runner/` plus `classpath` (working directory the
+   * attempt, inherited [[StrippedPrefixes]] removed, `isolation` added, output to the task log,
+   * bounded), then reads the result file and applies [[verdict]].
+   */
+  def runRunner(
+      task: String,
+      attempt: Path,
+      javaHome: Option[File],
+      classpath: Seq[File],
+      jvm: Seq[String],
+      isolation: Map[String, String],
+      tests: Seq[String],
+      junit: JUnitExpectation,
+      timeoutSeconds: Long,
+      log: Logger
+  ): Either[String, RunnerRun] = {
+    val nonce = newNonce()
+    installRunner(attempt, nonce).map { runnerDir =>
+      val exit = LocalRuns.runForked(
+        task,
+        attempt.toFile,
+        javaHome,
+        runnerDir.toFile +: classpath,
+        jvm,
+        isolation,
+        RunnerMain,
+        runnerArgs(attempt, tests),
+        timeoutSeconds,
+        LocalRuns.ToLog(log),
+        log,
+        StrippedPrefixes
+      )
+      val consumed = !Files.exists(runnerDir.resolve(NonceFile), LinkOption.NOFOLLOW_LINKS)
+      val read = readResult(attempt)
+      val parsed = read.toOption.flatMap(parseResult(_, nonce).toOption)
+      val v = verdict(exit, consumed, read, tests, nonce, junit, timeoutSeconds)
+      RunnerRun(nonce, exit, consumed, read, parsed, v)
     }
   }
 
@@ -1232,7 +1461,8 @@ object SparkItRuns {
       projectTargets: Seq[File],
       sparkTarget: File,
       javaHome: Option[File],
-      classpath: Seq[File],
+      classpath: Seq[Attributed[File]],
+      junitRevision: String,
       testNames: Seq[String],
       java17: Seq[String],
       isolation: Map[String, String],
@@ -1241,6 +1471,10 @@ object SparkItRuns {
     val tests = testNames.distinct.sorted
     testsProblem(tests).foreach(fail)
     val p = preflight(buildBase, home, inherited, projectTargets, sparkTarget, log)
+    // BE-P6-06: exactly one JUnit (the ledger's revision) on the SparkIT classpath, before any
+    // attempt directory exists.
+    val (junit, junitNote) = orRefuse(junitOnClasspath(cpEntries(classpath), junitRevision))
+    log.info(s"$Task: SparkIT classpath: $junitNote")
     val out = orRefuse(outputRoot(p.repo))
     val attempt = orRefuse(nextAttempt(out))
     val attemptRel = p.repo.relativize(attempt).toString
@@ -1259,36 +1493,26 @@ object SparkItRuns {
     )
     if (inherited.keys.exists(strippedFromChild))
       log.info(s"$Task: inherited ${StrippedPrefixes.mkString("*, ")}* variables are not passed on")
-    val nonce = newNonce()
-    val runnerDir = orFail(installRunner(attempt, nonce))
-    val nonceFile = runnerDir.resolve(NonceFile)
-    val exit = LocalRuns.runForked(
-      Task,
-      attempt.toFile,
-      javaHome,
-      runnerDir.toFile +: classpath,
-      jvm,
-      isolation,
-      RunnerMain,
-      runnerArgs(attempt, tests),
-      TimeoutSeconds,
-      LocalRuns.ToLog(log),
-      log,
-      StrippedPrefixes
+    val rr = orFail(
+      runRunner(
+        Task,
+        attempt,
+        javaHome,
+        classpath.map(_.data),
+        jvm,
+        isolation,
+        tests,
+        junit,
+        TimeoutSeconds,
+        log
+      )
     )
-    val consumed = !Files.exists(nonceFile, LinkOption.NOFOLLOW_LINKS)
-    val read = readResult(attempt)
-    val v = verdict(exit, consumed, read, tests, nonce)
-    val evidence = read.toOption.flatMap(parseResult(_, nonce).toOption)
-    val perClass = evidence.toList.flatMap { r =>
-      r.classes.map(c =>
-        s"class=${c.name} run=${c.run} failures=${c.failures} ignored=${c.ignored} " +
-          s"assumptionFailures=${c.assumptionFailures}"
-      ) ++ r.errors.map { case (n, e) => s"class=${n} error=$e" }
-    }
+    val v = rr.verdict
+    val exit = rr.exit
     val result = v.fold(m => s"status=fail\nreason=$m\n", n => s"status=pass\ntests=$n\n") +
       s"exit=${exit.fold("none")(_.toString)}\nexpectedClasses=${tests.size}\n" +
-      s"evidence=$JUnitResultFile\n" + perClass.map(_ + "\n").mkString
+      s"expectedJUnit=${junit.jar} (junit:junit:${junit.revision})\n" +
+      s"evidence=$JUnitResultFile\n" + evidenceLines(rr).map(_ + "\n").mkString
     Files.write(
       attempt.resolve(ResultFile),
       result.getBytes(StandardCharsets.UTF_8),
@@ -1309,6 +1533,20 @@ object SparkItRuns {
     case Right(a) => a
     case Left(m) => fail(m)
   }
+
+  /** result.txt evidence: where JUnit was loaded from, the failures FIRST, then per class. */
+  def evidenceLines(rr: RunnerRun): Seq[String] =
+    rr.parsed.toList.flatMap { r =>
+      Seq(
+        s"junit.JUnitCore=${r.junitCore.path} implementationVersion=${r.junitCore.implementationVersion}",
+        s"junit.Result=${r.junitResult.path} implementationVersion=${r.junitResult.implementationVersion}"
+      ) ++ r.failures.map(f =>
+        s"failure class=${f.cls} test=${f.header} exception=${f.exception} message=${f.message}"
+      ) ++ r.classes.map(c =>
+        s"class=${c.name} run=${c.run} failures=${c.failures} ignored=${c.ignored} " +
+          s"assumptionFailures=${c.assumptionFailures}"
+      ) ++ r.errors.map(e => s"class=${e.cls} error=${e.exception} stage=${e.stage}")
+    }
 
   /** Every SparkIT route of [[RefusedRoutes]] (build.sbt): refused, naming `sbt sparkIT`. */
   def refuseSbtRoute(name: String): Nothing =
@@ -1534,6 +1772,13 @@ object SparkItRuns {
       checkSteps.mkString(" ; ")
     )
     expect("task name names no held-out split", !LocalRuns.namesHeldout(Task), Task)
+    expect(
+      s"`check` runs $RunnerCheck after $SelfTest and before markTestRun (BE-P6-06)",
+      checkSteps.indexOf(RunnerCheck) > checkSteps.indexOf(SelfTest) &&
+        checkSteps.indexOf(SelfTest) >= 0 &&
+        checkSteps.indexOf(RunnerCheck) < checkSteps.indexOf("markTestRun"),
+      checkSteps.mkString(" ; ")
+    )
     expect(
       "AWS_*, SCHOLARCHAIN_* and GIT_* are stripped from the forked JVM",
       Seq("AWS_", "SCHOLARCHAIN_", "GIT_").forall(StrippedPrefixes.contains),
@@ -1778,21 +2023,33 @@ object SparkItRuns {
     val expectedSuites = Seq(suiteB, suiteA)
     def cl(n: String, run: Int = 2, f: Int = 0, ig: Int = 0, a: Int = 0): String =
       s"class\t$n\trun=$run\tfailures=$f\tignored=$ig\tassumptionFailures=$a"
+    // BE-P6-06: format v2 carries where JUnitCore and Result were loaded from (fixture path only).
+    val fixtureJUnit =
+      JUnitExpectation(Paths.get("/fixture/cache/junit/junit-fixture.jar"), "9.9.9")
+    def jl(kind: String, path: String = fixtureJUnit.jar.toString, v: String = "9.9.9"): String =
+      s"junit\t$kind\t$path\t$v"
+    val junitLines = Seq(jl("JUnitCore"), jl("Result"))
     def res(
         body: Seq[String],
         n: String = nonce,
         complete: Boolean = true,
-        count: Option[Int] = None
+        count: Option[Int] = None,
+        junitHeader: Seq[String] = junitLines
     ): String =
-      (Seq(s"format=${SparkItJUnitRunner.FORMAT}", s"nonce=$n") ++ body ++
-        Seq(s"classes=${count.getOrElse(body.size)}") ++
+      (Seq(s"format=${SparkItJUnitRunner.FORMAT}", s"nonce=$n") ++ junitHeader ++ body ++
+        Seq(
+          s"classes=${count.getOrElse(body.count(l => l.startsWith("class\t") || l.startsWith("error\t")))}"
+        ) ++
         (if (complete) Seq(s"complete=$n") else Nil)).mkString("\n") + "\n"
     def vd(
         exit: Option[Int],
         text: Either[String, String],
         consumed: Boolean = true,
-        exp: Seq[String] = expectedSuites
-    ): Either[String, Int] = verdict(exit, consumed, text, exp, nonce)
+        exp: Seq[String] = expectedSuites,
+        junit: JUnitExpectation = fixtureJUnit
+    ): Either[String, Int] = verdict(exit, consumed, text, exp, nonce, junit)
+    def fl(n: String, header: String = "t(x)", ex: String = "java.lang.AssertionError"): String =
+      s"failure\t$n\t$header\t$ex\tboom"
     val clean = res(Seq(cl(suiteA), cl(suiteB, run = 3)))
     expect(
       "verdict: exit 0, complete result, both expected classes clean (PASS with 5 tests)",
@@ -1840,7 +2097,7 @@ object SparkItRuns {
       "a class that could not be run",
       vd(
         Some(1),
-        Right(res(Seq(s"error\t$suiteA\tjava.lang.ClassNotFoundException", cl(suiteB))))
+        Right(res(Seq(s"error\t$suiteA\trun\tjava.lang.ClassNotFoundException", cl(suiteB))))
       ),
       s"$suiteA could not be run (java.lang.ClassNotFoundException)"
     )
@@ -1884,7 +2141,7 @@ object SparkItRuns {
     vRefused(
       "result with a printed summary line",
       vd(Some(0), Right(res(Seq(cl(suiteA), "OK (5 tests)", cl(suiteB))))),
-      "malformed line(s) 4"
+      "malformed line(s) 6"
     )
     vRefused(
       "result whose classes= line does not match",
@@ -1900,6 +2157,134 @@ object SparkItRuns {
       "runner refused MUNIT_* (exit 4)",
       vd(Some(SparkItJUnitRunner.EXIT_MUNIT_ENV), Left("no file")),
       "ended with exit 4"
+    )
+    // BE-P6-06: failures first, required data, JUnit provenance, format v2.
+    val withFailure =
+      vd(Some(1), Right(res(Seq(fl(suiteA, "fails(A)"), cl(suiteA, f = 1), cl(suiteB)))))
+    expect(
+      "verdict: a recorded JUnit failure is reported first, before exit and count diagnostics",
+      withFailure.left.exists { m =>
+        val i = m.indexOf(s"JUnit FAILURE in $suiteA: fails(A): java.lang.AssertionError: boom")
+        i >= 0 && i < m.indexOf("the runner JVM ended with exit 1") &&
+        i < m.indexOf(s"$suiteA had 1 failure(s)") && m.endsWith("NOT a pass")
+      },
+      withFailure.toString
+    )
+    vRefused(
+      "a failure line with failures=0 and exit 0 (inconsistent counts are never a pass)",
+      vd(Some(0), Right(res(Seq(fl(suiteA), cl(suiteA), cl(suiteB))))),
+      s"JUnit FAILURE in $suiteA",
+      s"$suiteA: 1 failure line(s) recorded for 0 failure(s)"
+    )
+    vRefused(
+      "failures=1 without its failure line (required failure data missing)",
+      vd(Some(1), Right(res(Seq(cl(suiteA, f = 1), cl(suiteB))))),
+      s"$suiteA: 0 failure line(s) recorded for 1 failure(s)"
+    )
+    vRefused(
+      "a failure line for a class with no class or error line",
+      vd(Some(1), Right(res(Seq(fl(suiteC), cl(suiteA), cl(suiteB))))),
+      s"JUnit FAILURE in $suiteC",
+      s"failure line(s) for $suiteC, which has no class or error line"
+    )
+    vRefused(
+      "failures recorded, then the counts could not be read (error stage counts)",
+      vd(
+        Some(1),
+        Right(
+          res(
+            Seq(fl(suiteA), s"error\t$suiteA\tcounts\tjava.lang.NoSuchMethodException", cl(suiteB))
+          )
+        )
+      ),
+      s"JUnit FAILURE in $suiteA",
+      s"$suiteA could not be run (java.lang.NoSuchMethodException) [runner stage counts]"
+    )
+    vRefused(
+      "error line with an unknown stage",
+      vd(Some(1), Right(res(Seq(s"error\t$suiteA\tother\tX", cl(suiteB))))),
+      "malformed line(s) 5"
+    )
+    vRefused(
+      "result without its junit Result line (required datum missing)",
+      vd(Some(0), Right(res(Seq(cl(suiteA), cl(suiteB)), junitHeader = Seq(jl("JUnitCore"))))),
+      "malformed line(s)"
+    )
+    vRefused(
+      "junit lines in the wrong order",
+      vd(
+        Some(0),
+        Right(res(Seq(cl(suiteA), cl(suiteB)), junitHeader = Seq(jl("Result"), jl("JUnitCore"))))
+      ),
+      "malformed line(s) 3, 4"
+    )
+    vRefused(
+      "JUnit location unknown",
+      vd(
+        Some(0),
+        Right(
+          res(
+            Seq(cl(suiteA), cl(suiteB)),
+            junitHeader = Seq(jl("JUnitCore", path = "-"), jl("Result"))
+          )
+        )
+      ),
+      "could not record where org.junit.runner.JUnitCore was loaded from"
+    )
+    vRefused(
+      "Result loaded from another jar than the expected JUnit",
+      vd(
+        Some(0),
+        Right(
+          res(
+            Seq(cl(suiteA), cl(suiteB)),
+            junitHeader = Seq(jl("JUnitCore"), jl("Result", path = "/fixture/other/junit-4.12.jar"))
+          )
+        )
+      ),
+      "org.junit.runner.Result was loaded from /fixture/other/junit-4.12.jar, not from the expected"
+    )
+    vRefused(
+      "Implementation-Version differs from the expected revision",
+      vd(
+        Some(0),
+        Right(
+          res(
+            Seq(cl(suiteA), cl(suiteB)),
+            junitHeader = Seq(jl("JUnitCore", v = "4.12"), jl("Result"))
+          )
+        )
+      ),
+      "org.junit.runner.JUnitCore has Implementation-Version 4.12, not 9.9.9"
+    )
+    expect(
+      "verdict: unknown Implementation-Version (no manifest entry) alone does not refuse",
+      vd(
+        Some(0),
+        Right(
+          res(
+            Seq(cl(suiteA), cl(suiteB, run = 3)),
+            junitHeader = Seq(jl("JUnitCore", v = "-"), jl("Result", v = "-"))
+          )
+        )
+      ) == Right(5),
+      "refused"
+    )
+    vRefused(
+      "a format v1 result file (the run 03 format) is refused",
+      vd(
+        Some(0),
+        Right(
+          (Seq(
+            "format=scholarchain.sparkit.junit-result.v1",
+            s"nonce=$nonce",
+            cl(suiteA),
+            cl(suiteB)
+          ) ++
+            Seq("classes=2", s"complete=$nonce")).mkString("\n") + "\n"
+        )
+      ),
+      "does not start with format="
     )
     refused(
       "verdict: bound reached",
@@ -2616,7 +3001,14 @@ object SparkItRuns {
           )
           val noJunitExit = fork(Map.empty)
           val consumed = !Files.exists(rDir.resolve(NonceFile), LinkOption.NOFOLLOW_LINKS)
-          val v = verdict(noJunitExit, consumed, readResult(rAttempt), Seq(suiteA), rNonce)
+          val v = verdict(
+            noJunitExit,
+            consumed,
+            readResult(rAttempt),
+            Seq(suiteA),
+            rNonce,
+            fixtureJUnit
+          )
           expect(
             "runner fork without JUnit: nonce consumed, exit 2, no result file, verdict NOT a pass",
             noJunitExit.contains(SparkItJUnitRunner.EXIT_SETUP) && consumed &&
@@ -2624,6 +3016,83 @@ object SparkItRuns {
             s"exit $noJunitExit; nonce consumed=$consumed; verdict $v"
           )
       }
+
+      // BE-P6-06: the SparkIT classpath JUnit check on synthetic jars (zip files with entries).
+      val jars = t.resolve("cp-jars")
+      Files.createDirectories(jars)
+      def jar(name: String, entries: String*): File = {
+        val f = jars.resolve(name)
+        val z = new java.util.zip.ZipOutputStream(Files.newOutputStream(f))
+        try
+          entries.foreach { e =>
+            z.putNextEntry(new java.util.zip.ZipEntry(e)); z.closeEntry()
+          }
+        finally z.close()
+        f.toFile
+      }
+      val junitJar = jar("junit-fx.jar", JUnitResources: _*)
+      val hamJar = jar("hamcrest-core-fx.jar", HamcrestResource)
+      val otherJar = jar("spark-fx.jar", "org/apache/spark/X.class")
+      val rev = "9.9.9"
+      val goodCp = Seq(
+        CpEntry(otherJar, Some(("org.apache.spark", "spark-fx", "1"))),
+        CpEntry(junitJar, Some(("junit", "junit", rev))),
+        CpEntry(hamJar, Some(("org.hamcrest", "hamcrest-core", "1.3"))),
+        CpEntry(t.resolve("absent-dir").toFile, None)
+      )
+      expect(
+        "SparkIT classpath control: exactly one junit:junit jar provides JUnitCore and Result",
+        junitOnClasspath(goodCp, rev).toOption.map(_._1) ==
+          Some(JUnitExpectation(junitJar.toPath, rev)),
+        junitOnClasspath(goodCp, rev).toString
+      )
+      def cpRefused(name: String, cp: Seq[CpEntry], sub: String): Unit =
+        refused(s"SparkIT classpath: $name", junitOnClasspath(cp, rev).left.toOption, sub)
+      cpRefused(
+        "a second (shaded) jar provides org.junit.runner.Result",
+        goodCp :+ CpEntry(jar("shaded-fx.jar", "org/junit/runner/Result.class"), None),
+        "are provided by"
+      )
+      val classesDir = t.resolve("cp-classes/org/junit/runner")
+      Files.createDirectories(classesDir)
+      touch(classesDir.resolve("JUnitCore.class"))
+      cpRefused(
+        "a classes directory provides org.junit.runner.JUnitCore",
+        goodCp :+ CpEntry(t.resolve("cp-classes").toFile, None),
+        "are provided by"
+      )
+      cpRefused(
+        "no junit:junit module",
+        goodCp.filterNot(_.file == junitJar),
+        "expected exactly one junit:junit module on the SparkIT classpath, found 0"
+      )
+      cpRefused(
+        "two junit:junit modules",
+        goodCp :+ CpEntry(jar("junit-fx2.jar", JUnitResources: _*), Some(("junit", "junit", rev))),
+        "found 2"
+      )
+      cpRefused(
+        "junit:junit at another revision than the ledger's",
+        goodCp.map(e =>
+          if (e.file == junitJar) e.copy(module = Some(("junit", "junit", "4.12"))) else e
+        ),
+        s"is 4.12, not the ledger's junit=$rev"
+      )
+      cpRefused(
+        "two hamcrest providers",
+        goodCp :+ CpEntry(
+          jar("hamcrest-fx2.jar", HamcrestResource),
+          Some(("org.hamcrest", "hamcrest", "2.2"))
+        ),
+        s"more than one SparkIT classpath entry provides $HamcrestResource"
+      )
+      val corrupt = jars.resolve("corrupt-fx.jar")
+      Files.write(corrupt, "not a zip".getBytes(StandardCharsets.UTF_8))
+      cpRefused(
+        "an unreadable classpath jar (fail closed)",
+        goodCp :+ CpEntry(corrupt.toFile, None),
+        "cannot read SparkIT classpath entry"
+      )
     } finally deleteTree(tmp)
 
     // The committed configuration, and a read-only report of the real archive root (not enforced).
@@ -2653,5 +3122,329 @@ object SparkItRuns {
     if (failures.nonEmpty)
       selfFail(s"FAIL: ${failures.size} case(s) wrong: ${failures.mkString(" | ")}")
     log.info(s"$SelfTest: PASS: $cases cases gave the expected verdict")
+  }
+
+  // --- Real-runner check (BE-P6-06, part of `sbt check`) ---------------------------------------
+
+  val FixturePackage = "scholarchain.sparkitcheck"
+  val PassFixture = s"$FixturePackage.PassFixture"
+  val FailFixture = s"$FixturePackage.FailFixture"
+  val IgnoreFixture = s"$FixturePackage.IgnoreFixture"
+  val AssumeFixture = s"$FixturePackage.AssumeFixture"
+  val ExitFixture = s"$FixturePackage.ExitFixture"
+  val FixtureFailureMessage = "sparkit-runner-check fixture failure"
+
+  /** The fixture JUnit 4 classes (Java source), written to the scratch directory and compiled. */
+  val FixtureSources: Seq[(String, String)] = Seq(
+    "PassFixture" ->
+      """  @Test public void adds() { Assert.assertEquals(2, 1 + 1); }
+        |  @Test public void same() { Assert.assertEquals("a", "a"); }""".stripMargin,
+    "FailFixture" ->
+      s"""  @Test public void passes() { Assert.assertTrue(true); }
+         |  @Test public void fails() { Assert.assertEquals("$FixtureFailureMessage", 1, 2); }""".stripMargin,
+    "IgnoreFixture" ->
+      """  @Test public void passes() { Assert.assertTrue(true); }
+        |  @Ignore("fixture") @Test public void ignored() { Assert.fail("never runs"); }""".stripMargin,
+    "AssumeFixture" ->
+      """  @Test public void passes() { Assert.assertTrue(true); }
+        |  @Test public void skipped() { Assume.assumeTrue("fixture assumption", false); }""".stripMargin,
+    "ExitFixture" ->
+      """  @Test public void exits() { System.exit(0); }""".stripMargin
+  )
+
+  private def fixtureSource(cls: String, body: String): String =
+    s"package $FixturePackage;\n\n" +
+      "import org.junit.Assert;\nimport org.junit.Assume;\nimport org.junit.Ignore;\n" +
+      "import org.junit.Test;\n\n" +
+      s"/** Generated by sbt check ($RunnerCheck, build-engineer BE-P6-06); never committed. */\n" +
+      s"public class $cls {\n$body\n}\n"
+
+  /** Compiles the fixtures with the sbt JVM's system Java compiler against `cp`. */
+  private def compileFixtures(src: Path, out: Path, cp: Seq[File]): Either[String, Int] = {
+    val javac = javax.tools.ToolProvider.getSystemJavaCompiler
+    if (javac == null)
+      Left("the sbt JVM has no system Java compiler; the fixtures cannot be compiled")
+    else {
+      val files = FixtureSources.map { case (c, _) => src.resolve(s"$c.java").toFile }
+      val fm = javac.getStandardFileManager(null, null, StandardCharsets.UTF_8)
+      try {
+        val units = fm.getJavaFileObjectsFromFiles(files.asJava)
+        val sw = new java.io.StringWriter
+        val opts = Seq(
+          "--release",
+          "17",
+          "-proc:none",
+          "-implicit:none",
+          "-encoding",
+          "UTF-8",
+          "-classpath",
+          cp.map(_.getAbsolutePath).mkString(File.pathSeparator),
+          "-d",
+          out.toString
+        )
+        val ok =
+          javac.getTask(new java.io.PrintWriter(sw), fm, null, opts.asJava, null, units).call()
+        if (ok) Right(files.size)
+        else Left(s"javac failed on the fixtures: ${sw.toString.take(4000)}")
+      } finally fm.close()
+    }
+  }
+
+  private def sha256(b: Array[Byte]): String =
+    java.security.MessageDigest
+      .getInstance("SHA-256")
+      .digest(b)
+      .map(x => f"${x & 0xff}%02x")
+      .mkString
+
+  /**
+   * `verifySparkItRunner` (BE-P6-06), part of `check`: forks the REAL runner through [[runRunner]],
+   * the function `sparkIT` uses (same runner class file from the meta-build, same nonce and
+   * result-file protocol, same [[LocalRuns.runForked]] call with [[StrippedPrefixes]], same
+   * [[verdict]]), on the classpath `sparkIT` forks with (sparkAnalytics/SparkIT/fullClasspath,
+   * passed in by build.sbt) plus a directory of fixture classes compiled here. First it checks that
+   * classpath with [[junitOnClasspath]] (exactly one JUnit, the ledger's revision; at most one
+   * hamcrest). Cases: a passing fixture must PASS and record JUnitCore and Result as loaded from
+   * that one jar; a failing, an @Ignore, an assumption-skip, a System.exit and a mixed
+   * pass-plus-fail fixture must be refused, the failure reported first; and the passing run's own
+   * result file must be refused against another JUnit jar and with its junit Result line removed.
+   * Writes only a fresh directory under [[RunnerCheckScratchRel]] and deletes it afterwards; never
+   * reads the archive, never writes under [[OutputRootRel]], never runs `sparkIT` or a SparkIT
+   * route.
+   */
+  def runnerCheck(
+      buildBase: File,
+      javaHome: Option[File],
+      classpath: Seq[Attributed[File]],
+      junitRevision: String,
+      java17: Seq[String],
+      isolation: Map[String, String],
+      log: Logger
+  ): Unit = {
+    def stop(m: String): Nothing = throw new MessageOnlyException(s"$RunnerCheck: FAIL: $m")
+    val wrong = ListBuffer.empty[String]
+    var cases = 0
+    def judge(name: String, why: Option[String]): Unit = {
+      cases += 1
+      why match {
+        case None => log.info(s"$RunnerCheck: case '$name': as expected")
+        case Some(w) => wrong += s"case '$name': $w"
+      }
+    }
+    def clip(s: String): String = if (s.length > 2000) s.take(2000) + "..." else s
+
+    val (junit, note) = junitOnClasspath(cpEntries(classpath), junitRevision) match {
+      case Right(x) => x
+      case Left(m) => stop(m)
+    }
+    log.info(
+      s"$RunnerCheck: SparkIT classpath (sparkAnalytics/SparkIT/fullClasspath, the classpath " +
+        s"sparkIT forks with; ${classpath.size} entries): $note; ledger junit=$junitRevision"
+    )
+    val repo = buildBase.toPath.toRealPath()
+    val scratchRoot = repo.resolve(RunnerCheckScratchRel)
+    val segs = RunnerCheckScratchRel.split('/').toSeq
+    (1 to segs.length).map(n => repo.resolve(segs.take(n).mkString("/"))).foreach { q =>
+      if (Files.isSymbolicLink(q)) stop(s"$q is a symbolic link; nothing written")
+    }
+    Files.createDirectories(scratchRoot)
+    if (
+      scratchRoot.toRealPath() != scratchRoot || scratchRoot.startsWith(repo.resolve(OutputRootRel))
+    )
+      stop(s"$scratchRoot is not a plain directory outside $OutputRootRel")
+    val tmp = Files.createTempDirectory(scratchRoot, "check-")
+    try {
+      val src = Files.createDirectory(tmp.resolve("src"))
+      val classes = Files.createDirectory(tmp.resolve("classes"))
+      FixtureSources.foreach { case (c, body) =>
+        Files.write(
+          src.resolve(s"$c.java"),
+          fixtureSource(c, body).getBytes(StandardCharsets.UTF_8),
+          StandardOpenOption.CREATE_NEW
+        )
+      }
+      val compiled = compileFixtures(src, classes, classpath.map(_.data)) match {
+        case Right(n) => n
+        case Left(m) => stop(m)
+      }
+      val runnerBytes = runnerClassBytes() match {
+        case Right(b) => b
+        case Left(m) => stop(m)
+      }
+      log.info(
+        s"$RunnerCheck: compiled $compiled fixture classes against the SparkIT classpath into " +
+          s"${repo.relativize(classes)}; runner $RunnerMain.class sha256 ${sha256(runnerBytes)} " +
+          "(the meta-build class sparkIT installs)"
+      )
+      val forkCp = classes.toFile +: classpath.map(_.data)
+      def runCase(label: String, names: Seq[String]): RunnerRun = {
+        val attempt = Files.createDirectory(tmp.resolve(s"case-$label"))
+        Files.createDirectory(attempt.resolve("tmp"))
+        val rr = runRunner(
+          RunnerCheck,
+          attempt,
+          javaHome,
+          forkCp,
+          baseJvmOptions(java17, attempt),
+          isolation,
+          names.distinct.sorted,
+          junit,
+          RunnerCheckTimeoutSeconds,
+          log
+        ) match {
+          case Right(r) => r
+          case Left(m) => stop(s"case '$label': the runner could not be installed: $m")
+        }
+        val installed = Try(
+          Files.readAllBytes(attempt.resolve(RunnerDir).resolve(s"$RunnerMain.class"))
+        )
+        if (!installed.toOption.exists(java.util.Arrays.equals(_, runnerBytes)))
+          wrong += s"case '$label': the installed runner differs from the meta-build class"
+        log.info(
+          s"$RunnerCheck: case '$label' (${names.map(_.stripPrefix(FixturePackage + ".")).mkString(", ")}): " +
+            s"exit ${rr.exit.fold("none")(_.toString)}; verdict " +
+            rr.verdict.fold(m => clip(m), n => s"PASS ($n tests)")
+        )
+        rr
+      }
+      def loadedFromLine(rr: RunnerRun): String =
+        rr.parsed.fold("no parsed result") { r =>
+          s"JUnitCore from ${r.junitCore.path} (Implementation-Version " +
+            s"${r.junitCore.implementationVersion}); Result from ${r.junitResult.path} " +
+            s"(Implementation-Version ${r.junitResult.implementationVersion})"
+        }
+      def refusedWith(rr: RunnerRun, exit: Option[Int], subs: String*): Option[String] =
+        rr.verdict match {
+          case Right(n) => Some(s"PASS ($n tests), expected a refusal")
+          case Left(m) =>
+            val missing = (subs :+ "NOT a pass").filterNot(m.contains)
+            if (exit.nonEmpty && rr.exit != exit) Some(s"exit ${rr.exit}, expected $exit; $m")
+            else if (missing.nonEmpty) Some(s"missing ${missing.mkString(" | ")} in: $m")
+            else None
+        }
+
+      // 1. Passing fixture: PASS, and JUnit from the one expected jar.
+      val pass = runCase("pass", Seq(PassFixture))
+      judge(
+        "pass: 2 passing tests give PASS; JUnitCore and Result loaded from the expected JUnit jar",
+        if (
+          pass.verdict == Right(2) && pass.exit.contains(SparkItJUnitRunner.EXIT_PASS) &&
+          pass.nonceConsumed &&
+          pass.parsed.exists(r =>
+            Seq(r.junitCore, r.junitResult)
+              .forall(l => Try(Paths.get(l.path)).toOption.exists(samePath(_, junit.jar)))
+          )
+        ) None
+        else Some(s"verdict ${pass.verdict}, exit ${pass.exit}; ${loadedFromLine(pass)}")
+      )
+      log.info(
+        s"$RunnerCheck: loaded JUnit jar ${junit.jar} (junit:junit:${junit.revision}); " +
+          loadedFromLine(pass)
+      )
+
+      // 2. Failing fixture: refused, the failure first.
+      val failRun = runCase("fail", Seq(FailFixture))
+      val failText =
+        s"JUnit FAILURE in $FailFixture: fails($FailFixture): java.lang.AssertionError: " +
+          FixtureFailureMessage
+      judge(
+        "fail: a failing test is refused and its failure (test, exception, message) is reported first",
+        refusedWith(
+          failRun,
+          Some(SparkItJUnitRunner.EXIT_TESTS_NOT_CLEAN),
+          failText,
+          s"$FailFixture had 1 failure(s)"
+        )
+          .orElse(
+            failRun.verdict.left.toOption.flatMap { m =>
+              if (m.indexOf(failText) < m.indexOf(s"$FailFixture had 1 failure(s)")) None
+              else Some(s"the failure is not reported before the counts: $m")
+            }
+          )
+      )
+
+      // 3. @Ignore fixture: refused.
+      judge(
+        "ignore: an @Ignore test is refused",
+        refusedWith(
+          runCase("ignore", Seq(IgnoreFixture)),
+          Some(SparkItJUnitRunner.EXIT_TESTS_NOT_CLEAN),
+          s"$IgnoreFixture had 1 ignored test(s)"
+        )
+      )
+
+      // 4. Assumption-skip fixture: refused.
+      judge(
+        "assume: an assumption-skipped test is refused",
+        refusedWith(
+          runCase("assume", Seq(AssumeFixture)),
+          Some(SparkItJUnitRunner.EXIT_TESTS_NOT_CLEAN),
+          s"$AssumeFixture had 1 assumption failure(s)"
+        )
+      )
+
+      // 5. A test calls System.exit(0): no result file, refused although the JVM exited 0.
+      val exitRun = runCase("exit", Seq(ExitFixture))
+      judge(
+        "exit: a test calling System.exit(0) leaves no result file and is refused",
+        refusedWith(exitRun, Some(0), s"the runner wrote no $JUnitResultFile")
+      )
+
+      // 6. Mixed: a passing and a failing class in one fork; the failing one decides.
+      val mixed = runCase("mixed", Seq(PassFixture, FailFixture))
+      judge(
+        "mixed: a passing class does not hide a failing class in the same fork",
+        refusedWith(mixed, Some(SparkItJUnitRunner.EXIT_TESTS_NOT_CLEAN), failText).orElse(
+          mixed.verdict.left.toOption.flatMap(m =>
+            if (m.contains(s"$PassFixture had") || m.contains(s"$PassFixture ran no test"))
+              Some(s"the passing class is reported as not clean: $m")
+            else None
+          )
+        )
+      )
+
+      // 7. The passing run's own result file against another JUnit jar: refused.
+      val other = JUnitExpectation(tmp.resolve("other-junit.jar"), junit.revision)
+      judge(
+        "pass result against another expected JUnit jar is refused",
+        verdict(
+          pass.exit,
+          pass.nonceConsumed,
+          pass.read,
+          Seq(PassFixture),
+          pass.nonce,
+          other
+        ).left.toOption match {
+          case Some(m)
+              if m.contains("org.junit.runner.Result was loaded from") && m
+                .contains("NOT a pass") =>
+            None
+          case got => Some(s"got ${got.getOrElse("PASS")}")
+        }
+      )
+
+      // 8. The passing run's own result file without its junit Result line: refused.
+      val stripped =
+        pass.read.map(_.split("\n", -1).filterNot(_.startsWith("junit\tResult\t")).mkString("\n"))
+      judge(
+        "pass result with its junit Result line removed (required datum missing) is refused",
+        verdict(
+          pass.exit,
+          pass.nonceConsumed,
+          stripped,
+          Seq(PassFixture),
+          pass.nonce,
+          junit
+        ).left.toOption match {
+          case Some(m) if m.contains("malformed line(s)") && m.contains("NOT a pass") => None
+          case got => Some(s"got ${got.getOrElse("PASS")}")
+        }
+      )
+    } finally deleteTree(tmp)
+    if (wrong.nonEmpty) stop(s"${wrong.size} case(s) wrong: ${wrong.mkString(" | ")}")
+    log.info(
+      s"$RunnerCheck: PASS: $cases cases gave the expected verdict with the real runner on the " +
+        s"SparkIT classpath (JUnit ${junit.jar}); scratch ${RunnerCheckScratchRel}/ cleaned"
+    )
   }
 }

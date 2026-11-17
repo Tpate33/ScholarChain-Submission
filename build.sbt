@@ -105,6 +105,11 @@ lazy val verifySparkItGuards =
     "Tests the sparkIT refusals, pass rule and SparkIT route/format wiring on constants, " +
       "temporary directories and the loaded build; never reads the archive"
   )
+lazy val verifySparkItRunner =
+  taskKey[Unit](
+    "Forks the real sparkIT JUnit runner on the SparkIT classpath against compiled fixture " +
+      "classes (pass, fail, ignore, assume, exit, mixed); never reads the archive"
+  )
 
 // SparkIT: the integration-test configuration of sparkAnalytics. It extends Test (test classes and
 // munit/JUnit are on its classpath) and has its own source directory modules/spark/src/it/.
@@ -494,7 +499,9 @@ lazy val root = project
           targets,
           sparkTarget,
           javaHome.value,
-          (sparkAnalytics / SparkIT / fullClasspath).value.map(_.data),
+          // BE-P6-06: Attributed entries (module IDs), so sparkIT can check the one JUnit jar.
+          (sparkAnalytics / SparkIT / fullClasspath).value,
+          versionLedger.value("junit"),
           (sparkAnalytics / SparkIT / definedTestNames).value,
           java17Opens,
           awsIsolationEnv(target.value / "no-aws"),
@@ -511,6 +518,18 @@ lazy val root = project
       Project.extract(state.value).structure,
       (sparkAnalytics / thisProjectRef).value,
       javaHome.value,
+      streams.value.log
+    ),
+    // BE-P6-06, run by `check`: the real runner (SparkItRuns.runRunner, as sparkIT uses it) forked
+    // on the SparkIT classpath plus fixture classes compiled into target/sparkit-runner-check/.
+    // No archive read; nothing under modules/spark/target/spark-it/; no sparkIT or SparkIT route.
+    verifySparkItRunner := SparkItRuns.runnerCheck(
+      (ThisBuild / baseDirectory).value,
+      javaHome.value,
+      (sparkAnalytics / SparkIT / fullClasspath).value,
+      versionLedger.value("junit"),
+      java17Opens,
+      awsIsolationEnv(target.value / "no-aws"),
       streams.value.log
     ),
     // Synthetic held-out output-route check (decisions-17/19), run by `check`. The probe's task
@@ -553,6 +572,7 @@ lazy val checkSteps = Seq(
   "verifyHeldoutGuards",
   "verifyErDevRunGuards",
   "verifySparkItGuards",
+  "verifySparkItRunner", // BE-P6-06: real runner on fixtures; no archive, no sparkIT
   "markTestRun"
 )
 addCommandAlias("check", checkSteps.mkString("; ", " ; ", ""))

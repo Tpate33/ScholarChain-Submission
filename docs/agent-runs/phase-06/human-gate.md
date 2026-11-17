@@ -35,3 +35,15 @@ I approve one standalone `sbt sparkIT` run by spark-engineer using the
 reviewed build in the commit containing this entry. This supersedes
 the retry approval at 7244398. The allowlist scope is unchanged.
 The archive and Phase 5 acceptance are preserved.
+
+## SparkIT runner repair and run 04 approval (2026-11-17)
+
+I accept BE-P6-06 following CR-P6-23 (APPROVE). Run 03 remains failed
+evidence. The corrected JUnit lookup and result handling passed the
+archive-independent runner checks. I defer F1 and F2. I accept the
+JUnit ledger entry as a validation value for the already-resolved
+dependency. G5 remains open and ownership permissions are unchanged.
+
+I approve one standalone `sbt sparkIT` run by spark-engineer using the
+reviewed build in the commit containing this entry. This supersedes the
+run 03 approval at 982eecf. Phase 5 remains accepted.
