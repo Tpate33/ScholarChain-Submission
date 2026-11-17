@@ -70,6 +70,9 @@ import sbt.internal.util.MessageOnlyException
  * The archive is opened read-only by convention only: the build cannot stop test code from writing
  * there. `verifySparkItGuards` (part of `check`) tests the refusals on temporary directories and
  * synthetic results, forks the runner twice without JUnit, and never reads the real archive.
+ * `check` also compiles the SparkIT sources ([[CompileCheckStep]], BE-P6-05) against Test's
+ * classpath with the Provided jars (`SparkIT / classpathConfiguration :=
+ * Configurations.TestInternal`), without reading the archive, forking or running a suite.
  */
 object SparkItRuns {
 
@@ -166,6 +169,15 @@ object SparkItRuns {
 
   /** The format check step of `check` for modules/spark/src/it/scala (CR-P6-16 F2). */
   val FormatCheckStep = "sparkAnalytics/SparkIT/scalafmtCheck"
+
+  /**
+   * BE-P6-05: the archive-independent compile step of `check` for modules/spark/src/it/scala. It
+   * compiles only (no archive read, no fork, no test run, no attempt directory).
+   */
+  val CompileCheckStep = "sparkAnalytics/SparkIT/compile"
+
+  /** BE-P6-05: SparkIT's classpath configuration (Test + Optional + Provided). */
+  val ClasspathConfigName = "Configurations.TestInternal"
 
   val SuccessMarker = "_SUCCESS"
   val UnverifiedMarker = "_UNVERIFIED"
@@ -1405,6 +1417,63 @@ object SparkItRuns {
     p.toList
   }
 
+  /**
+   * BE-P6-05: the effective (last) `sparkAnalytics / SparkIT / classpathConfiguration` in the
+   * loaded build must come from build.sbt, on a line that names [[ClasspathConfigName]]. Without it
+   * sbt resolves SparkIT's classpath from `sparkit` itself (Configurations.internalMap maps only
+   * Compile, Test and Runtime), which extends Test, Runtime and Compile but not Provided, so the
+   * Provided Spark and Hadoop jars are missing from the SparkIT compiler and the forked runner.
+   */
+  def classpathWiringProblems(
+      settings: Seq[Def.Setting[_]],
+      ref: ProjectRef,
+      buildSbtLines: IndexedSeq[String]
+  ): Seq[String] = {
+    val defs = settings.filter(s =>
+      s.key.key.label == "classpathConfiguration" && isSparkItScope(s.key.scope, ref)
+    )
+    defs.lastOption match {
+      case None => Seq("no setting defines sparkAnalytics/SparkIT/classpathConfiguration")
+      case Some(s) =>
+        positionOf(s.pos) match {
+          case Some((path, a, b)) if path.endsWith("build.sbt") =>
+            val text = (a to b).flatMap(i => buildSbtLines.lift(i - 1)).mkString("\n")
+            if (text.contains(s":= $ClasspathConfigName")) Nil
+            else
+              Seq(
+                s"sparkAnalytics/SparkIT/classpathConfiguration is defined at build.sbt:$a-$b, " +
+                  s"not as $ClasspathConfigName (the Provided Spark jars would be missing)"
+              )
+          case other =>
+            Seq(
+              s"sparkAnalytics/SparkIT/classpathConfiguration is defined at " +
+                s"${other.fold(s.pos.toString)(_._1)}, not as $ClasspathConfigName in build.sbt " +
+                "(the Provided Spark jars would be missing)"
+            )
+        }
+    }
+  }
+
+  /**
+   * BE-P6-05: `check` runs [[CompileCheckStep]] after [[FormatCheckStep]], and no step of `check`
+   * is `sparkIT` or a run-capable SparkIT route ([[RunCapableKeys]]), so `check` compiles the
+   * SparkIT sources without reading the archive or running a suite.
+   */
+  def compileGateProblems(checkSteps: Seq[String]): Seq[String] = {
+    val p = ListBuffer.empty[String]
+    val i = checkSteps.indexOf(CompileCheckStep)
+    val f = checkSteps.indexOf(FormatCheckStep)
+    if (i < 0) p += s"`check` does not run $CompileCheckStep"
+    else if (f >= 0 && i < f) p += s"`check` runs $CompileCheckStep before $FormatCheckStep"
+    val words = checkSteps.map(_.trim.split("\\s+").head)
+    if (words.exists(w => w == Task || w.endsWith("/" + Task)))
+      p += s"`check` runs $Task"
+    RunCapableKeys
+      .filter(k => words.exists(w => lower(w) == lower(s"sparkAnalytics/SparkIT/$k")))
+      .foreach(k => p += s"`check` runs sparkAnalytics/SparkIT/$k")
+    p.toList
+  }
+
   // --- Self-test (part of `sbt check`) -------------------------------------------------------
 
   private def deleteTree(p: Path): Unit =
@@ -1541,6 +1610,39 @@ object SparkItRuns {
         )
       ),
       s"`check` does not run $FormatCheckStep"
+    )
+    // BE-P6-05: SparkIT classpath (Provided jars) and the archive-independent compile step.
+    allowed(
+      s"sparkAnalytics/SparkIT/classpathConfiguration is $ClasspathConfigName, set in build.sbt " +
+        "(Provided Spark and Hadoop jars on the SparkIT compile and runner classpaths)",
+      problems(classpathWiringProblems(structure.settings, sparkRef, buildSbtLines))
+    )
+    val withoutCp = buildSbtLines.map(l =>
+      if (l.contains("classpathConfiguration") && l.contains(s":= $ClasspathConfigName"))
+        l.replace(s":= $ClasspathConfigName", ":= SparkIT")
+      else l
+    )
+    refused(
+      "classpath counter-test: build.sbt text without the TestInternal classpath configuration",
+      problems(classpathWiringProblems(structure.settings, sparkRef, withoutCp)),
+      "sparkAnalytics/SparkIT/classpathConfiguration is defined at build.sbt:",
+      s"not as $ClasspathConfigName"
+    )
+    allowed(
+      s"`check` runs $CompileCheckStep after $FormatCheckStep and never $Task or a run-capable " +
+        "SparkIT route",
+      problems(compileGateProblems(checkSteps))
+    )
+    refused(
+      "compile gate counter-test: checkSteps without the SparkIT compile step",
+      problems(compileGateProblems(checkSteps.filterNot(_ == CompileCheckStep))),
+      s"`check` does not run $CompileCheckStep"
+    )
+    refused(
+      "compile gate counter-test: checkSteps with sparkAnalytics/SparkIT/test and sparkIT added",
+      problems(compileGateProblems(checkSteps ++ Seq("sparkAnalytics/SparkIT/test", Task))),
+      "`check` runs sparkAnalytics/SparkIT/test",
+      s"`check` runs $Task"
     )
     expect(
       "the time bound is positive and below one agent tool call (600 s)",

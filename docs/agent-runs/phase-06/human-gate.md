@@ -24,3 +24,14 @@ the reviewed build in the commit containing this entry. This supersedes
 the e8c6ecc build approval for this retry. The allowlist scope is unchanged.
 Carry CR-P6-21 m1, n1, and n2 forward before any step reads curated data
 parts. Phase 5 remains accepted.
+
+## SparkIT classpath repair and run 03 approval (2026-11-17)
+
+I accept BE-P6-05 following CR-P6-22 (APPROVE) and defer N1 and N2.
+Run 02 passed archive preflight but failed to compile. The repaired
+integration suite now compiles under sbt check without archive access.
+
+I approve one standalone `sbt sparkIT` run by spark-engineer using the
+reviewed build in the commit containing this entry. This supersedes
+the retry approval at 7244398. The allowlist scope is unchanged.
+The archive and Phase 5 acceptance are preserved.

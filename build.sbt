@@ -106,13 +106,22 @@ lazy val verifySparkItGuards =
       "temporary directories and the loaded build; never reads the archive"
   )
 
-// SparkIT: the integration-test configuration of sparkAnalytics. It extends Test (test classes,
-// munit/JUnit and the Provided Spark jars are on its classpath) but has its own source directory
-// modules/spark/src/it/. No routine command compiles or runs it: `Test/compile`, `test` and
-// `sparkAnalytics/test` are Test-scoped, markTestRun reads Test/executeTests only, and the SparkIT
-// routes test, testOnly, testQuick, executeTests, run, runMain, bgRun, bgRunMain, fgRun, fgRunMain,
-// console, consoleQuick and consoleProject refuse. Only `sbt sparkIT` compiles and runs it; `check`
-// only format-checks its sources (sparkAnalytics/SparkIT/scalafmtCheck, which does not compile).
+// SparkIT: the integration-test configuration of sparkAnalytics. It extends Test (test classes and
+// munit/JUnit are on its classpath) and has its own source directory modules/spark/src/it/.
+// Extending Test does NOT bring the Provided jars: sbt resolves a configuration's classpath from
+// `classpathConfiguration`, and only Compile, Test and Runtime are mapped to their internal
+// configurations (Test -> TestInternal = Test + Optional + Provided); a custom configuration maps to
+// itself, and sparkit -> test -> runtime -> compile never reaches Provided. BE-P6-05 therefore sets
+// `SparkIT / classpathConfiguration := Configurations.TestInternal` below, so SparkIT compiles
+// and forks against exactly the classpath Test uses (Provided Spark and its Hadoop client jars
+// included). Compile and Runtime are untouched, so the job jars (assembly on Runtime) still
+// exclude Provided.
+// No routine command runs it: `test` and `sparkAnalytics/test` are Test-scoped, markTestRun reads
+// Test/executeTests only, and the SparkIT routes test, testOnly, testQuick, executeTests, run,
+// runMain, bgRun, bgRunMain, fgRun, fgRunMain, console, consoleQuick and consoleProject refuse.
+// `check` format-checks its sources (sparkAnalytics/SparkIT/scalafmtCheck) and compiles them
+// (sparkAnalytics/SparkIT/compile, BE-P6-05: no archive read, no fork, no test run). Only
+// `sbt sparkIT` reads the archive and runs the suites.
 lazy val SparkIT = config("sparkit").extend(Test)
 
 ThisBuild / versionLedger := Ledger.load((ThisBuild / baseDirectory).value)
@@ -307,8 +316,8 @@ lazy val sparkAnalytics = project
     libraryDependencies += sparkSql.value % Provided,
     Test / javaOptions ++= java17Opens
   )
-  // BE-P6-03: the opt-in SparkIT configuration (see its definition above). Compiling and running
-  // happen only in sparkIT.
+  // BE-P6-03: the opt-in SparkIT configuration (see its definition above). Running happens only in
+  // sparkIT; `check` also compiles it (BE-P6-05).
   .settings(inConfig(SparkIT)(Defaults.testSettings))
   // CR-P6-16 F2: the sbt-scalafmt 2.5.5 per-configuration settings (signature
   // `scalafmtConfigSettings(configuration: Configuration)`, as the compiler reports it), so
@@ -319,6 +328,8 @@ lazy val sparkAnalytics = project
   // build). `testFull` is not a key in sbt 1.11.7. One setting per line: the self-test reads it.
   .settings(
     SparkIT / sourceDirectory := baseDirectory.value / "src" / "it",
+    // BE-P6-05: SparkIT uses Test's classpath, Provided jars included (see the SparkIT definition).
+    SparkIT / classpathConfiguration := Configurations.TestInternal,
     SparkIT / test := SparkItRuns.refuseSbtRoute("test"),
     SparkIT / executeTests := SparkItRuns.refuseSbtRoute("executeTests"),
     SparkIT / console := SparkItRuns.refuseSbtRoute("console"),
@@ -537,6 +548,7 @@ lazy val checkSteps = Seq(
   "scalafmtCheckAll",
   SparkItRuns.FormatCheckStep, // CR-P6-16 F2: modules/spark/src/it/scala
   "Test/compile",
+  SparkItRuns.CompileCheckStep, // BE-P6-05: compiles modules/spark/src/it/scala; no archive, no run
   "verifyHeldoutOutputRoute",
   "verifyHeldoutGuards",
   "verifyErDevRunGuards",
