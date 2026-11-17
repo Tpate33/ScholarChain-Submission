@@ -4,13 +4,27 @@ import java.nio.file.Path
 
 import scala.collection.immutable.SortedMap
 
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 
 import scholarchain.core.*
 import scholarchain.core.config.AnalysisRunSettings
-import scholarchain.spark.graph.{CoauthorEdgeJob, EdgeContext, WindowInputSummary}
+import scholarchain.spark.graph.{
+  CoauthorEdgeJob,
+  EdgeContext,
+  IdentityJob,
+  MetricsWindowSummary,
+  ResearcherMetricsJob,
+  WindowInputSummary
+}
 import scholarchain.spark.input.VerifiedInput
-import scholarchain.spark.output.{CoauthorEdgeRows, ParquetDataset, PublishedRun, RunPublisher}
+import scholarchain.spark.output.{
+  CoauthorEdgeRows,
+  ParquetDataset,
+  PublishedRun,
+  ResearcherMetricsRows,
+  RunPublisher
+}
 
 /**
  * Settings of one analysis job, all supplied by the caller.
@@ -35,24 +49,37 @@ final case class AnalysisJobConfig(
     partitions: Int
 )
 
-/** The outcome of the edge stage: the published run and the per-window counts. */
-final case class EdgeRunResult(
+/**
+ * The outcome of the collaboration run: the published run, the per-window input and edge counts,
+ * and the per-window metrics totals.
+ */
+final case class CollaborationRunResult(
     published: PublishedRun,
     runId: String,
     lineage: AnalysisLineage,
     summaries: Vector[WindowInputSummary],
-    edgeCount: Long
+    edgeCount: Long,
+    metricsCount: Long,
+    metricsSummaries: Vector[MetricsWindowSummary]
 )
 
 /**
- * The collaboration-analysis run of SP-P6-02 step 1: from a verified input to the published
- * `coauthor-edge.v2` dataset. Later steps add metrics, structure, paths, windows and summaries to
- * the same run.
+ * The collaboration-analysis run of SP-P6-02 steps 1A and 1B: from a verified input to one
+ * published run holding the `coauthor-edge.v2` dataset (`edges/`) and the `researcher-metrics.v2`
+ * dataset (`metrics/`). Later steps add structure, paths, windows and summaries.
+ *
+ * The run manifest names the published datasets in the chain parameter [[OutputsParameter]], so a
+ * run of another output set is another run ID (the step-1A edge-only runs named only the edges).
  */
 object AnalysisRun {
 
   val Stage = "spark.collaboration-analysis"
   val EdgesDataset = "edges"
+  val MetricsDataset = "metrics"
+
+  /** Run manifest parameter naming the published outputs (set by the run, never by the caller). */
+  val OutputsParameter = "outputs"
+  val Outputs = "coauthor-edges,researcher-metrics"
 
   private val A = AnalysisValidation.AnalysisManifestKeys
   private val G = AnalysisValidation.GroupingManifestKeys
@@ -77,7 +104,8 @@ object AnalysisRun {
       A.BenchmarkPairsDigest -> BenchmarkPairList.digest(pairs),
       A.DecisionRunId -> input.decision.runId,
       A.GroupingRunId -> input.grouping.runId,
-      A.InputRunId -> input.curated.runId
+      A.InputRunId -> input.curated.runId,
+      OutputsParameter -> Outputs
     )
     val clash = cfg.extraParameters.keySet.intersect(chain.keySet)
     if (clash.nonEmpty)
@@ -130,16 +158,23 @@ object AnalysisRun {
     }
   }
 
+  private def firstRefusals[T](results: RDD[Either[String, T]]): Vector[String] =
+    results.filter(_.isLeft).map(_.left.toOption.get).take(20).toVector
+
   /**
-   * Builds, checks and publishes the coauthor edges of every configured window under `outputRoot`.
+   * Builds, checks and publishes, under `outputRoot`, the coauthor edges and the researcher metrics
+   * of every configured window as one run. Order: counted teams; edges (refused on any edge
+   * refusal); identities from the grouping and decision runs ([[IdentityJob]]); metrics from the
+   * counted teams, the edges and the identities ([[ResearcherMetricsJob]], refused on any record
+   * refusal); then one staged publication of both datasets ([[RunPublisher.publish]]).
    */
-  def runEdges(
+  def runCollaboration(
       spark: SparkSession,
       cfg: AnalysisJobConfig,
       input: VerifiedInput,
       pairs: BenchmarkPairList,
       outputRoot: Path
-  ): Either[Vector[String], EdgeRunResult] =
+  ): Either[Vector[String], CollaborationRunResult] =
     if (cfg.settings.exportFormat != PartFormat.Parquet)
       Left(
         Vector(
@@ -177,23 +212,60 @@ object AnalysisRun {
           result <- {
             val results = CoauthorEdgeJob.edges(teams, ctx, cfg.partitions)
             try {
-              val bad = results.filter(_.isLeft).map(_.left.toOption.get).take(20).toVector
+              val bad = firstRefusals(results)
               if (bad.nonEmpty) Left(bad)
               else {
                 val edges = results.map(_.toOption.get)
                 val n = edges.count()
                 val summaries = CoauthorEdgeJob.summaries(teams, edges, ctx.windows)
-                val frame =
-                  spark.createDataFrame(edges.map(CoauthorEdgeRows.toRow), CoauthorEdgeRows.schema)
-                RunPublisher
-                  .publish(
-                    spark,
-                    outputRoot,
-                    m,
-                    Vector(ParquetDataset(EdgesDataset, SchemaVersions.CoauthorEdgeV2, frame, n)),
-                    input.limits.maxMetadataBytes
-                  )
-                  .map(p => EdgeRunResult(p, runId, l, summaries, n))
+                withMetrics(spark, cfg, input, teams, edges, ctx).flatMap {
+                  case (metricResults, metrics, metricsCount, metricsSummaries) =>
+                    try {
+                      val edgeFrame = spark.createDataFrame(
+                        edges.map(CoauthorEdgeRows.toRow),
+                        CoauthorEdgeRows.schema
+                      )
+                      val metricsFrame = spark.createDataFrame(
+                        metrics.map(ResearcherMetricsRows.toRow),
+                        ResearcherMetricsRows.schema
+                      )
+                      RunPublisher
+                        .publish(
+                          spark,
+                          outputRoot,
+                          m,
+                          Vector(
+                            ParquetDataset(
+                              EdgesDataset,
+                              SchemaVersions.CoauthorEdgeV2,
+                              edgeFrame,
+                              n
+                            ),
+                            ParquetDataset(
+                              MetricsDataset,
+                              SchemaVersions.ResearcherMetricsV2,
+                              metricsFrame,
+                              metricsCount
+                            )
+                          ),
+                          input.limits.maxMetadataBytes
+                        )
+                        .map(p =>
+                          CollaborationRunResult(
+                            p,
+                            runId,
+                            l,
+                            summaries,
+                            n,
+                            metricsCount,
+                            metricsSummaries
+                          )
+                        )
+                    } finally {
+                      metricResults.unpersist(blocking = false)
+                      ()
+                    }
+                }
               }
             } finally {
               results.unpersist(blocking = false)
@@ -202,4 +274,48 @@ object AnalysisRun {
           }
         } yield result
     }
+
+  /**
+   * The identities and the metrics of the run: the persisted metric results (the caller unpersists
+   * them on success, this method on refusal), the checked metrics, their count and per-window
+   * totals.
+   */
+  private def withMetrics(
+      spark: SparkSession,
+      cfg: AnalysisJobConfig,
+      input: VerifiedInput,
+      teams: RDD[PublicationTeam],
+      edges: RDD[CoauthorEdgeV2],
+      ctx: EdgeContext
+  ): Either[
+    Vector[String],
+    (
+        RDD[Either[String, ResearcherMetricsV2]],
+        RDD[ResearcherMetricsV2],
+        Long,
+        Vector[MetricsWindowSummary]
+    )
+  ] =
+    IdentityJob
+      .identities(
+        spark.sparkContext,
+        input.grouping.partsOf(SchemaVersions.ResearcherAssignment),
+        input.grouping.rowsOf(SchemaVersions.ResearcherAssignment),
+        input.decision.partsOf(SchemaVersions.MatchDecision),
+        input.decision.rowsOf(SchemaVersions.MatchDecision),
+        cfg.partitions
+      )
+      .flatMap { identities =>
+        val results =
+          ResearcherMetricsJob.metrics(teams, edges, identities, ctx, cfg.partitions)
+        val bad = firstRefusals(results)
+        if (bad.nonEmpty) {
+          results.unpersist(blocking = false)
+          Left(bad)
+        } else {
+          val metrics = results.map(_.toOption.get)
+          val count = metrics.count()
+          Right((results, metrics, count, ResearcherMetricsJob.summaries(metrics, ctx.windows)))
+        }
+      }
 }

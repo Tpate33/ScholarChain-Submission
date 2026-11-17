@@ -166,7 +166,15 @@ class RunPublisherSuite extends munit.FunSuite {
 
   test("N1: a record schema without a Parquet layout is refused") {
     assert(
+      RecordSchemas.problem(SchemaVersions.ComponentMembership, CoauthorEdgeRows.schema).nonEmpty
+    )
+    // A layout of another label is refused, so edges and metrics can never be listed as each other.
+    assert(
       RecordSchemas.problem(SchemaVersions.ResearcherMetricsV2, CoauthorEdgeRows.schema).nonEmpty
+    )
+    assertEquals(
+      RecordSchemas.problem(SchemaVersions.ResearcherMetricsV2, ResearcherMetricsRows.schema),
+      None
     )
     assertEquals(
       RecordSchemas.problem(SchemaVersions.CoauthorEdgeV2, CoauthorEdgeRows.schema),

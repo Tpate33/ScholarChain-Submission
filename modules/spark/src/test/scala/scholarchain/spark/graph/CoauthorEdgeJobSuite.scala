@@ -46,7 +46,7 @@ class CoauthorEdgeJobSuite extends munit.FunSuite {
   private def run(out: String) = {
     val root = Files.createDirectories(tmp.resolve(out))
     AnalysisRun
-      .runEdges(spark, cfg, input, benchmarkPairs(written.groupingRunId), root)
+      .runCollaboration(spark, cfg, input, benchmarkPairs(written.groupingRunId), root)
       .fold(e => fail(e.mkString("\n")), identity)
   }
 
@@ -174,7 +174,7 @@ class CoauthorEdgeJobSuite extends munit.FunSuite {
   }
 
   test("a second run of the same manifest into the same output root is refused") {
-    val again = AnalysisRun.runEdges(
+    val again = AnalysisRun.runCollaboration(
       spark,
       cfg,
       input,

@@ -73,7 +73,7 @@ object CoauthorEdgeJob {
 
   private def uri(p: Path): String = p.toUri.toString
 
-  private def lines(sc: SparkContext, parts: Vector[Path], partitions: Int): RDD[String] =
+  private[graph] def lines(sc: SparkContext, parts: Vector[Path], partitions: Int): RDD[String] =
     if (parts.isEmpty) sc.emptyRDD[String]
     else sc.textFile(parts.map(uri).mkString(","), partitions)
 
@@ -86,7 +86,7 @@ object CoauthorEdgeJob {
     Json.decode[WorkAssignment](line).left.map(_.mkString("; "))
 
   /** Decoded rows, or the first refusals; refuses when the decoded count differs from `rows`. */
-  private def checked[T](label: String, rdd: RDD[Either[String, T]], rows: Long)(using
+  private[graph] def checked[T](label: String, rdd: RDD[Either[String, T]], rows: Long)(using
       ct: scala.reflect.ClassTag[T]
   ): Either[Vector[String], RDD[T]] = {
     val bad = rdd.filter(_.isLeft).map(_.left.toOption.get).take(20).toVector

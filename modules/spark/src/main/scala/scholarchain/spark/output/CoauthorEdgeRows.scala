@@ -167,7 +167,10 @@ object CoauthorEdgeRows {
 object RecordSchemas {
 
   val parquet: Map[String, StructType] =
-    Map(SchemaVersions.CoauthorEdgeV2 -> CoauthorEdgeRows.schema)
+    Map(
+      SchemaVersions.CoauthorEdgeV2 -> CoauthorEdgeRows.schema,
+      SchemaVersions.ResearcherMetricsV2 -> ResearcherMetricsRows.schema
+    )
 
   /**
    * Same field names, order and types at every level, ignoring nullability (Spark writes file

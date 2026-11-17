@@ -137,10 +137,10 @@ object RunFixtures {
 
   // ---------------------------------------------------------------- records
 
-  private val fakeDecision = "match:" + Canonical.sha256HexUtf8("fixture supporting decision")
-  private val fakePending = "match:" + Canonical.sha256HexUtf8("fixture pending decision")
+  /** A pending decision ID that is not in the decision run (only listed, never looked up). */
+  val fakePending: String = "match:" + Canonical.sha256HexUtf8("fixture pending decision")
 
-  private def gprov(subject: String, schema: String, groupingRunId: String) = Provenance(
+  def gprov(subject: String, schema: String, groupingRunId: String): Provenance = Provenance(
     SourceType.Derived,
     subject,
     snapshot,
@@ -240,7 +240,7 @@ object RunFixtures {
         r.map(_ => "dblp-pid"),
         r.map(anchorOf),
         size,
-        if (status == AssignmentStatus.Resolved) Vector(fakeDecision) else Vector.empty,
+        if (status == AssignmentStatus.Resolved) Vector(decision(d).decisionId) else Vector.empty,
         Vector.empty,
         if (status == AssignmentStatus.Unresolved) Vector(fakePending) else Vector.empty,
         Vector.empty,
@@ -254,15 +254,36 @@ object RunFixtures {
       )
     }
 
-  def decision(runId: String): MatchDecision = ok(
+  /**
+   * The resolved members' supporting decision of the default chain: an ACCEPTED decision of the
+   * decision run `runId` (confidence 0.97), so every resolved researcher's identity confidence can
+   * be derived (`IdentityConfidence.derive`: measured 0.97).
+   */
+  def decision(runId: String): MatchDecision =
+    acceptedDecision(
+      runId,
+      "fixture candidate",
+      ok(MentionId.of(w1, 0)),
+      ok(MentionId.of(w2, 0)),
+      0.97
+    )
+
+  /** An ACCEPTED researcher decision of run `runId` between two mentions, with `confidence`. */
+  def acceptedDecision(
+      runId: String,
+      candidateSeed: String,
+      source: String,
+      target: String,
+      confidence: Double
+  ): MatchDecision = ok(
     MatchDecision.build(
-      candidateId = "mcand:" + Canonical.sha256HexUtf8("fixture candidate"),
+      candidateId = "mcand:" + Canonical.sha256HexUtf8(candidateSeed),
       entityKind = MatchEntityKind.Researcher,
-      sourceId = ok(MentionId.of(w1, 0)),
-      targetId = ok(MentionId.of(w2, 0)),
+      sourceId = source,
+      targetId = target,
       matchPath = MatchDecisionPath.DeterministicBibliographic,
       decision = MatchOutcome.Accepted,
-      confidence = 0.97,
+      confidence = confidence,
       score = None,
       blockingVersion = "er-blocking.v2",
       featureVersion = "er-features.v2",
@@ -274,7 +295,7 @@ object RunFixtures {
       decidedAt = "2026-11-15T00:00:00Z",
       provenance = Provenance(
         SourceType.Derived,
-        "mcand:" + Canonical.sha256HexUtf8("fixture candidate"),
+        "mcand:" + Canonical.sha256HexUtf8(candidateSeed),
         snapshot,
         runId,
         "scholarchain.match-candidate.v1",
@@ -469,6 +490,12 @@ object RunFixtures {
    *   candidate job outputs of the curated run (see [[writeHadoopRun]])
    * @param decisionPartSchema
    *   the record schema the decision part is listed under
+   * @param works
+   *   work assignments of (grouping run, decision run) instead of the default works
+   * @param researchers
+   *   researcher assignments of (grouping run, decision run) instead of the default ones
+   * @param decisions
+   *   the decisions of the decision run (given its run ID) instead of the default single decision
    */
   final case class Spec(
       groupingEdit: SortedMap[String, String] => SortedMap[String, String] = identity,
@@ -488,7 +515,10 @@ object RunFixtures {
       curatedParentDir: Option[String] = None,
       curatedRounds: Int = 2,
       curatedCandidates: Vector[String] = allCandidates,
-      decisionPartSchema: String = SchemaVersions.MatchDecision
+      decisionPartSchema: String = SchemaVersions.MatchDecision,
+      works: Option[(String, String) => Vector[WorkAssignment]] = None,
+      researchers: Option[(String, String) => Vector[ResearcherAssignment]] = None,
+      decisions: Option[String => Vector[MatchDecision]] = None
   )
 
   final case class Written(
@@ -519,7 +549,8 @@ object RunFixtures {
       spec.curatedRounds,
       spec.curatedCandidates
     )
-    val decisions = Vector(decision(spec.decisionRunIdOfDecisions.getOrElse(d)))
+    val decisionRun = spec.decisionRunIdOfDecisions.getOrElse(d)
+    val decisions = spec.decisions.map(_(decisionRun)).getOrElse(Vector(decision(decisionRun)))
     val decisionDir = writeRun(
       archive.resolve(s"er-decisions/run=${hexOf(d)}"),
       dm,
@@ -532,9 +563,13 @@ object RunFixtures {
       (
         "assignments/researcher/part-00000.jsonl",
         SchemaVersions.ResearcherAssignment,
-        lines(researchers(g, d))
+        lines(spec.researchers.map(_(g, d)).getOrElse(researchers(g, d)))
       ),
-      ("assignments/work/part-00000.jsonl", SchemaVersions.WorkAssignment, lines(works(g, d))),
+      (
+        "assignments/work/part-00000.jsonl",
+        SchemaVersions.WorkAssignment,
+        lines(spec.works.map(_(g, d)).getOrElse(works(g, d)))
+      ),
       ("authorships/part-00000.jsonl", SchemaVersions.AuthorshipRecordV2, "")
     ) ++ (if (spec.withTeamsPart)
             Vector(("teams/part-00000.jsonl", SchemaVersions.PublicationTeam, teamText))

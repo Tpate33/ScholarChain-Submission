@@ -47,3 +47,15 @@ dependency. G5 remains open and ownership permissions are unchanged.
 I approve one standalone `sbt sparkIT` run by spark-engineer using the
 reviewed build in the commit containing this entry. This supersedes the
 run 03 approval at 982eecf. Phase 5 remains accepted.
+
+## Spark researcher metrics and run 05 approval (2026-11-17)
+
+I accept SP-P6-02 step 1B following CR-P6-24 (APPROVE).
+Run 04 remains passing evidence for step 1A. I accept the documented
+limits of the within-JVM logical reproducibility check and carry
+CR-P6-24 m1 and n1-n4 forward. Cross-JVM reproducibility remains open.
+
+I approve one standalone `sbt sparkIT` run by spark-engineer using the
+reviewed code in the commit containing this entry. Use the existing
+dev archive and record the nine-test result, metric totals, edge counts,
+and output integrity evidence. Phase 6 remains open.
