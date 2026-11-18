@@ -1,12 +1,11 @@
 package scholarchain.spark.graph
 
-import java.nio.file.Path
-
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 
 import scholarchain.core.*
+import scholarchain.spark.store.StorePath
 
 /**
  * What every edge record of one analysis run shares: the configured windows (in configured order),
@@ -71,9 +70,17 @@ final case class WindowInputSummary(
  */
 object CoauthorEdgeJob {
 
-  private def uri(p: Path): String = p.toUri.toString
+  private def uri(p: StorePath): String = p.toUri.toString
 
-  private[graph] def lines(sc: SparkContext, parts: Vector[Path], partitions: Int): RDD[String] =
+  /**
+   * The text rows of `parts`, read by Spark's own Hadoop FileSystem for each location's URI
+   * (`file:`, `hdfs:`, `s3a:`), so every executor reads them directly (SP-P6-04).
+   */
+  private[graph] def lines(
+      sc: SparkContext,
+      parts: Vector[StorePath],
+      partitions: Int
+  ): RDD[String] =
     if (parts.isEmpty) sc.emptyRDD[String]
     else sc.textFile(parts.map(uri).mkString(","), partitions)
 
@@ -105,9 +112,9 @@ object CoauthorEdgeJob {
    */
   def countedTeams(
       sc: SparkContext,
-      teamParts: Vector[Path],
+      teamParts: Vector[StorePath],
       teamRows: Long,
-      workParts: Vector[Path],
+      workParts: Vector[StorePath],
       workRows: Long,
       partitions: Int
   ): Either[Vector[String], RDD[PublicationTeam]] =

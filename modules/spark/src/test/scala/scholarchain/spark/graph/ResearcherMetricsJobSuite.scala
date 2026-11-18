@@ -313,7 +313,12 @@ class ResearcherMetricsJobSuite extends munit.FunSuite {
     )
     assert(
       RunPublisher
-        .verifyPublished(spark, result.published.dir, result.runId, limits.maxMetadataBytes)
+        .verifyPublished(
+          spark,
+          result.published.dir.localPath,
+          result.runId,
+          limits.maxMetadataBytes
+        )
         .isRight
     )
   }

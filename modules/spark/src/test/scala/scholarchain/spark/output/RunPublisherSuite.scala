@@ -319,12 +319,13 @@ class RunPublisherSuite extends munit.FunSuite {
   test("F3: verifyPublished reads _parts.json and _run-manifest.json with a byte bound") {
     val out = Files.createDirectories(tmp.resolve("out-f3"))
     val p = publishWith(out, PublishHooks.Noop).fold(e => fail(e.mkString("\n")), identity)
-    val partsBytes = Files.size(p.dir.resolve("_parts.json"))
-    val rmBytes = Files.size(p.dir.resolve("_run-manifest.json"))
+    val dir = p.dir.localPath
+    val partsBytes = Files.size(dir.resolve("_parts.json"))
+    val rmBytes = Files.size(dir.resolve("_run-manifest.json"))
     assert(rmBytes < partsBytes, s"fixture: run manifest $rmBytes, parts $partsBytes")
-    val partsBound = RunPublisher.verifyPublished(spark, p.dir, runId, partsBytes - 1)
+    val partsBound = RunPublisher.verifyPublished(spark, dir, runId, partsBytes - 1)
     assert(partsBound.left.exists(_.exists(_.contains("_parts.json' has"))), partsBound)
     // A bound of exactly the _parts.json size admits both files.
-    assert(RunPublisher.verifyPublished(spark, p.dir, runId, partsBytes).isRight)
+    assert(RunPublisher.verifyPublished(spark, dir, runId, partsBytes).isRight)
   }
 }

@@ -1,12 +1,11 @@
 package scholarchain.spark.graph
 
-import java.nio.file.Path
-
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 
 import scholarchain.core.*
+import scholarchain.spark.store.StorePath
 
 /**
  * Identity confidence (contract C5) of every identified researcher of the grouping run, distributed
@@ -49,9 +48,9 @@ object IdentityJob {
   /** Researcher ID -> its identity confidence, or why it cannot be derived. */
   def identities(
       sc: SparkContext,
-      researcherParts: Vector[Path],
+      researcherParts: Vector[StorePath],
       researcherRows: Long,
-      decisionParts: Vector[Path],
+      decisionParts: Vector[StorePath],
       decisionRows: Long,
       partitions: Int
   ): Either[Vector[String], RDD[(String, Either[String, IdentityConfidence])]] =

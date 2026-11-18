@@ -1,12 +1,11 @@
 package scholarchain.spark.testkit
 
-import java.nio.file.Path
-
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.{col, count, lit}
 import org.apache.spark.sql.types.StructType
 
 import scholarchain.spark.input.RunTree
+import scholarchain.spark.store.{HadoopRunStore, NioRunStore, StorePath}
 
 /**
  * Logical reproducibility of two published datasets (carried forward from sparkIT run 04: equal run
@@ -54,10 +53,16 @@ object LogicalReproducibility {
   def multiset(df: DataFrame): DataFrame =
     df.groupBy(df.columns.toSeq.map(col)*).agg(count(lit(1)).as(MultiplicityColumn))
 
-  private def bytesOf(parts: Vector[Path]): Vector[String] =
+  /** The SHA-256 of every part (a local part through java.nio, any other through Hadoop). */
+  private def bytesOf(spark: SparkSession, parts: Vector[StorePath]): Vector[String] = {
+    lazy val hadoop = new HadoopRunStore(spark.sparkContext.hadoopConfiguration)
     parts.map(p =>
-      RunTree.observe(p.getParent, p.getFileName.toString).map(_.sha256).fold(identity, identity)
+      RunTree
+        .observe(if (p.isLocal) NioRunStore else hadoop, p.getParent, p.getFileName)
+        .map(_.sha256)
+        .fold(identity, identity)
     )
+  }
 
   def compareFrames(
       a: DataFrame,
@@ -70,16 +75,29 @@ object LogicalReproducibility {
     (a.count(), b.count(), show(ma.except(mb)), show(mb.except(ma)))
   }
 
-  private def report(a: Vector[Path], b: Vector[Path], fa: DataFrame, fb: DataFrame, limit: Int) = {
+  private def report(
+      spark: SparkSession,
+      a: Vector[StorePath],
+      b: Vector[StorePath],
+      fa: DataFrame,
+      fb: DataFrame,
+      limit: Int
+  ) = {
     val (na, nb, onlyA, onlyB) =
       if (fa.schema == fb.schema) compareFrames(fa, fb, limit)
       else (fa.count(), fb.count(), Vector.empty, Vector.empty)
-    Report(fa.schema, fb.schema, na, nb, onlyA, onlyB, bytesOf(a) == bytesOf(b))
+    Report(fa.schema, fb.schema, na, nb, onlyA, onlyB, bytesOf(spark, a) == bytesOf(spark, b))
   }
 
   /** Compares the Parquet parts `a` and `b` (each read back with the schema of its files). */
-  def compare(spark: SparkSession, a: Vector[Path], b: Vector[Path], limit: Int = 20): Report =
+  def compare(
+      spark: SparkSession,
+      a: Vector[StorePath],
+      b: Vector[StorePath],
+      limit: Int = 20
+  ): Report =
     report(
+      spark,
       a,
       b,
       spark.read.parquet(a.map(_.toUri.toString)*),
@@ -92,7 +110,7 @@ object LogicalReproducibility {
    * is its header (the column names; all columns read as strings, no inference), quoted fields may
    * hold LF, and a doubled double quote is a quote (the `NeptuneCsv` quoting rule).
    */
-  def readCsv(spark: SparkSession, parts: Vector[Path]): DataFrame =
+  def readCsv(spark: SparkSession, parts: Vector[StorePath]): DataFrame =
     spark.read
       .option("header", "true")
       .option("multiLine", "true")
@@ -105,6 +123,11 @@ object LogicalReproducibility {
    * Compares the CSV parts `a` and `b` as row multisets (header columns equal, every row with its
    * multiplicity), as [[compare]] does for Parquet; bytes again a diagnosis only.
    */
-  def compareCsv(spark: SparkSession, a: Vector[Path], b: Vector[Path], limit: Int = 20): Report =
-    report(a, b, readCsv(spark, a), readCsv(spark, b), limit)
+  def compareCsv(
+      spark: SparkSession,
+      a: Vector[StorePath],
+      b: Vector[StorePath],
+      limit: Int = 20
+  ): Report =
+    report(spark, a, b, readCsv(spark, a), readCsv(spark, b), limit)
 }

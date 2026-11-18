@@ -74,3 +74,12 @@ Cross-JVM reproducibility remains untested.
 
 Phase 6 remains open for the bounded EMR run and its required evidence.
 AWS execution requires my approval. Phase 5 remains accepted.
+
+## Cloud I/O milestone acceptance (2026-11-17)
+
+I accept SP-P6-04 following CR-P6-26 (APPROVE), using the existing
+sbt check and sparkIT run 08 evidence. Carry the documented nits forward.
+
+I approve Option A for local preparation and runtime compatibility
+validation. Cloud execution, uploads, infrastructure changes and spending
+require approval of the concrete plan. Phase 6 remains open.

@@ -450,7 +450,7 @@ class PathSummaryRunSuite extends munit.FunSuite {
 
   test("load manifests: one per store, every accepted part listed, re-verified; counter-tests") {
     val loads = result.step2C.loads
-    assertEquals(loads.dir, out.resolve("load=" + result.runId.stripPrefix("run:")))
+    assertEquals(loads.dir.localPath, out.resolve("load=" + result.runId.stripPrefix("run:")))
     val pm = result.published.partManifest
     assertEquals(
       StructureValidation.checkLoadManifests(loads.manifests, Right(pm), loads.partManifestSha256),
@@ -521,7 +521,7 @@ class PathSummaryRunSuite extends munit.FunSuite {
     val copy = Files.createDirectories(tmp.resolve("tampered-loads"))
     TargetStore.values.foreach { t =>
       Files.copy(
-        loads.dir.resolve(LoadManifests.fileName(t)),
+        loads.dir.resolve(LoadManifests.fileName(t)).localPath,
         copy.resolve(LoadManifests.fileName(t))
       )
     }
@@ -534,7 +534,9 @@ class PathSummaryRunSuite extends munit.FunSuite {
         .getBytes(StandardCharsets.UTF_8)
     )
     assert(LoadManifests.verify(copy, result.published, limits.maxMetadataBytes).isLeft)
-    assert(LoadManifests.verify(loads.dir, result.published, limits.maxMetadataBytes).isRight)
+    assert(
+      LoadManifests.verify(loads.dir.localPath, result.published, limits.maxMetadataBytes).isRight
+    )
     assert(
       LoadManifests
         .publish(out, result.published, limits.maxMetadataBytes)

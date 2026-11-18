@@ -6,6 +6,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.util.control.NonFatal
 
 import scholarchain.core.*
+import scholarchain.spark.store.{NioRunStore, RunStore, StorePath}
 
 /**
  * The Hadoop curated-run contract the verified reader applies to the one pinned curated dev run
@@ -147,18 +148,22 @@ object HadoopCuratedRun {
   // ---------------------------------------------------------------- rule 1
 
   /** The `snapshot=` token of the curated run's parent directory, when it has one. */
-  def snapshotToken(dir: Path): Option[String] =
-    Option(dir.getParent).flatMap(p => Option(p.getFileName)).map(_.toString).flatMap {
+  def snapshotToken(dir: StorePath): Option[String] =
+    dir.parent.map(_.name).flatMap {
       case SnapshotDirName(t) => Some(t)
       case _ => None
     }
+  def snapshotToken(dir: Path): Option[String] = snapshotToken(StorePath.local(dir))
+
+  def locationProblems(dir: Path, pinnedRunId: String): Vector[String] =
+    locationProblems(StorePath.local(dir), pinnedRunId)
 
   /**
    * Rule 1 beyond the run-name check: the directory's run ID is `pinnedRunId` (supplied by the
    * caller from a committed constant) and the run lies in `hadoop/snapshot=<token>/`.
    */
-  def locationProblems(dir: Path, pinnedRunId: String): Vector[String] = {
-    val name = Option(dir.getFileName).map(_.toString).getOrElse("")
+  def locationProblems(dir: StorePath, pinnedRunId: String): Vector[String] = {
+    val name = dir.name
     val runId = "run:" + name.stripPrefix("run=")
     val pin =
       if (!PinnedRunIdText.matches(pinnedRunId))
@@ -173,8 +178,8 @@ object HadoopCuratedRun {
     val snapshot =
       if (snapshotToken(dir).isDefined) Vector.empty
       else Vector(s"the parent of $dir is not a snapshot=<token> directory (HD-P6-01 rule 1)")
-    val hadoop = Option(dir.getParent).flatMap(p => Option(p.getParent)) match {
-      case Some(g) if Option(g.getFileName).map(_.toString).contains(HadoopDir) => Vector.empty
+    val hadoop = dir.parent.flatMap(_.parent) match {
+      case Some(g) if g.name == HadoopDir => Vector.empty
       case _ => Vector(s"the snapshot directory of $dir is not under $HadoopDir/ (HD-P6-01 rule 1)")
     }
     pin ++ snapshot ++ hadoop
@@ -196,7 +201,15 @@ object HadoopCuratedRun {
    * `_UNVERIFIED` entries; they take no further part here. Sizes come from a NOFOLLOW stat; no file
    * content is read.
    */
-  def structureProblems(dir: Path, entries: Vector[TreeEntry]): Vector[String] = {
+  def structureProblems(dir: Path, entries: Vector[TreeEntry]): Vector[String] =
+    structureProblems(NioRunStore, StorePath.local(dir), entries)
+
+  /** As the `Path` overload, for the run `dir` in `store`. */
+  def structureProblems(
+      store: RunStore,
+      dir: StorePath,
+      entries: Vector[TreeEntry]
+  ): Vector[String] = {
     val p = ArrayBuffer.empty[String]
     val nodes: Map[Vector[String], Node] = entries.flatMap { e =>
       val segs = e.relativePath.split('/').toVector
@@ -207,7 +220,7 @@ object HadoopCuratedRun {
         Some(segs -> (e.kind match {
           case TreeEntry.Kind.Directory => Node.Dir
           case TreeEntry.Kind.Regular =>
-            RunTree.sizeOf(dir.resolve(e.relativePath)) match {
+            RunTree.sizeOf(store, dir.resolve(e.relativePath)) match {
               case Some(n) => Node.File(n)
               case None =>
                 p += s"'${e.relativePath}' cannot be stat'ed (NOFOLLOW)"
@@ -446,7 +459,11 @@ object HadoopCuratedRun {
    * Rule 2 content of the decoded manifest `m` of the curated run in `dir`, beyond the run-ID
    * binding (checked by the reader): the producer's stage and the DBLP snapshot token.
    */
-  def manifestProblems(dir: Path, m: RunManifest): Vector[String] = {
+  def manifestProblems(dir: Path, m: RunManifest): Vector[String] =
+    manifestProblems(StorePath.local(dir), m)
+
+  /** As the `Path` overload, for a run location in any store. */
+  def manifestProblems(dir: StorePath, m: RunManifest): Vector[String] = {
     val stage =
       if (m.stage == ManifestStage) Vector.empty
       else Vector(s"the run manifest stage is '${m.stage}', expected '$ManifestStage'")

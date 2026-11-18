@@ -37,6 +37,7 @@ import scholarchain.spark.graph.{
   WindowInputSummary
 }
 import scholarchain.spark.input.VerifiedInput
+import scholarchain.spark.store.{NioRunStore, RunStore, StorePath}
 import scholarchain.spark.output.{
   AnalysisWindowRows,
   BridgeMeasureRows,
@@ -363,7 +364,15 @@ object AnalysisRun {
    * `community.randomSeed` must be unset; `community.maxIterations` >= 1; a local checkpoint root
    * outside the output root.
    */
-  def structureProblems(cfg: AnalysisJobConfig, outputRoot: Path): Vector[String] = {
+  def structureProblems(cfg: AnalysisJobConfig, outputRoot: Path): Vector[String] =
+    structureProblems(cfg, StorePath.local(outputRoot))
+
+  /**
+   * As the `Path` overload, for an output root in any store: the checkpoint root (an absolute local
+   * path or a URI) may neither lie inside the output root nor contain it (same scheme and
+   * authority); a checkpoint root that cannot be compared is refused.
+   */
+  def structureProblems(cfg: AnalysisJobConfig, outputRoot: StorePath): Vector[String] = {
     val s = cfg.settings
     Vector(
       Option.when(s.communityAlgorithm != CommunityAlgorithm)(
@@ -379,12 +388,25 @@ object AnalysisRun {
         s"community.maxIterations ${s.communityParameters.getOrElse("maxIterations", "(missing)")} must be an integer >= 1"
       ),
       GraphStructureJob.checkpointProblem(cfg.checkpointing),
-      GraphStructureJob
-        .localCheckpointPath(cfg.checkpointing)
-        .filter(p => p.startsWith(outputRoot) || outputRoot.startsWith(p))
-        .map(p => s"the checkpoint directory $p overlaps the output root $outputRoot")
+      GraphStructureJob.checkpointProblem(cfg.checkpointing) match {
+        case Some(_) => None // reported above
+        case None =>
+          checkpointLocation(cfg.checkpointing) match {
+            case Left(w) =>
+              Some(s"the checkpoint directory cannot be compared with the output root: $w")
+            case Right(p) =>
+              Option.when(p.startsWith(outputRoot) || outputRoot.startsWith(p))(
+                s"the checkpoint directory $p overlaps the output root $outputRoot"
+              )
+          }
+      }
     ).flatten
   }
+
+  /** The checkpoint root as a location (an absolute local path or a URI). */
+  def checkpointLocation(c: Checkpointing): Either[String, StorePath] =
+    if (c.dir.startsWith("/")) Right(StorePath.local(java.nio.file.Paths.get(c.dir)))
+    else StorePath.parse(c.dir)
 
   private def maxIterations(s: AnalysisRunSettings): Option[Int] =
     s.communityParameters.get("maxIterations").flatMap(_.toIntOption)
@@ -433,6 +455,21 @@ object AnalysisRun {
       pairs: BenchmarkPairList,
       outputRoot: Path
   ): Either[Vector[String], CollaborationRunResult] =
+    runCollaborationTo(spark, cfg, input, pairs, NioRunStore, StorePath.local(outputRoot))
+
+  /**
+   * As [[runCollaboration]], publishing under `outputRoot` in `store` (SP-P6-04): the local
+   * staged-rename protocol for the java.nio store, the commit-marker protocol (no rename) for any
+   * Hadoop FileSystem ([[RunPublisher]], [[LoadManifests]]). The computation is the same.
+   */
+  def runCollaborationTo(
+      spark: SparkSession,
+      cfg: AnalysisJobConfig,
+      input: VerifiedInput,
+      pairs: BenchmarkPairList,
+      store: RunStore,
+      outputRoot: StorePath
+  ): Either[Vector[String], CollaborationRunResult] =
     if (cfg.settings.exportFormat != PartFormat.Parquet)
       Left(
         Vector(
@@ -461,7 +498,7 @@ object AnalysisRun {
           )
           result <- {
             teams.persist(StorageLevel.MEMORY_AND_DISK)
-            try withStructure(spark, cfg, input, pairs, teams, l, snapshot, outputRoot)
+            try withStructure(spark, cfg, input, pairs, teams, l, snapshot, store, outputRoot)
             finally { teams.unpersist(blocking = false); () }
           }
         } yield result
@@ -475,7 +512,8 @@ object AnalysisRun {
       teams: RDD[PublicationTeam],
       l: AnalysisLineage,
       snapshot: String,
-      outputRoot: Path
+      store: RunStore,
+      outputRoot: StorePath
   ): Either[Vector[String], CollaborationRunResult] = {
     val windows = cfg.settings.windows
     GraphStructureJob
@@ -496,7 +534,20 @@ object AnalysisRun {
               m <- manifest(cfg, input, pairs, convergenceParameters(structure.communityOutcomes))
               runId <- RunId.of(m).left.map(e => Vector(e.toString))
               ctx = EdgeContext(windows, cfg.settings.graphPolicyVersion, l, runId, snapshot)
-              r <- build(spark, cfg, input, pairs, teams, structure, m, runId, l, ctx, outputRoot)
+              r <- build(
+                spark,
+                cfg,
+                input,
+                pairs,
+                teams,
+                structure,
+                m,
+                runId,
+                l,
+                ctx,
+                store,
+                outputRoot
+              )
             } yield r
           finally released = structure.release(spark.sparkContext)
         result.flatMap(r =>
@@ -529,7 +580,8 @@ object AnalysisRun {
       runId: String,
       l: AnalysisLineage,
       ctx: EdgeContext,
-      outputRoot: Path
+      store: RunStore,
+      outputRoot: StorePath
   ): Either[Vector[String], CollaborationRunResult] = {
     val keep = mutable.ArrayBuffer.empty[RDD[?]]
     val p = cfg.partitions
@@ -680,8 +732,9 @@ object AnalysisRun {
                 s"semantic-summary inputs: ${summaryInputs.count}, expected one per metrics record, community and stored path"
               )
             )
-        published <- RunPublisher.publish(
+        published <- RunPublisher.publishTo(
           spark,
+          store,
           outputRoot,
           m,
           Vector(
@@ -822,7 +875,7 @@ object AnalysisRun {
           input.limits.maxMetadataBytes
         )
         loads <- LoadManifests
-          .publish(outputRoot, published, input.limits.maxMetadataBytes)
+          .publishTo(store, outputRoot, published, input.limits.maxMetadataBytes)
           .left
           .map(
             _.map(w => s"load manifests: $w") :+

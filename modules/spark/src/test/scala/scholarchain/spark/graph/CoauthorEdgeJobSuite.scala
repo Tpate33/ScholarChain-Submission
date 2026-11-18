@@ -10,6 +10,7 @@ import scholarchain.core.*
 import scholarchain.spark.analysis.{AnalysisJobConfig, AnalysisRun}
 import scholarchain.spark.input.{ReaderLimits, VerifiedArchiveReader, VerifiedInput}
 import scholarchain.spark.output.{CoauthorEdgeRows, RunPublisher}
+import scholarchain.spark.store.StorePath
 import scholarchain.spark.testkit.{LocalSpark, RunFixtures}
 import scholarchain.spark.testkit.RunFixtures.*
 
@@ -57,7 +58,7 @@ class CoauthorEdgeJobSuite extends munit.FunSuite {
       .fold(e => fail(e.mkString("\n")), identity)
   }
 
-  private def readEdges(paths: Vector[Path]): Vector[CoauthorEdgeV2] =
+  private def readEdges(paths: Vector[StorePath]): Vector[CoauthorEdgeV2] =
     spark.read
       .schema(CoauthorEdgeRows.schema)
       .parquet(paths.map(_.toUri.toString)*)
@@ -153,25 +154,28 @@ class CoauthorEdgeJobSuite extends munit.FunSuite {
     )
   }
 
+  /** The published run directory (a local run: the java.nio protocol). */
+  private def dir: Path = result.published.dir.localPath
+
   test("the published run re-verifies from its bytes, and a changed part byte is refused") {
     val again =
       RunPublisher.verifyPublished(
         spark,
-        result.published.dir,
+        dir,
         result.runId,
         limits.maxMetadataBytes
       )
     assert(again.isRight, again)
     assertEquals(
-      result.published.dir.getFileName.toString,
+      dir.getFileName.toString,
       "run=" + result.runId.stripPrefix("run:")
     )
-    val part = result.published.partsOf(SchemaVersions.CoauthorEdgeV2).head
+    val part = result.published.partsOf(SchemaVersions.CoauthorEdgeV2).head.localPath
     val copy =
-      Files.createDirectories(tmp.resolve("tampered")).resolve(result.published.dir.getFileName)
+      Files.createDirectories(tmp.resolve("tampered")).resolve(dir.getFileName)
     Files.createDirectories(copy.resolve("edges"))
     Vector("_SUCCESS", "_parts.json", "_run-manifest.json").foreach(n =>
-      Files.copy(result.published.dir.resolve(n), copy.resolve(n))
+      Files.copy(dir.resolve(n), copy.resolve(n))
     )
     val bytes = Files.readAllBytes(part)
     bytes(bytes.length / 2) = (bytes(bytes.length / 2) ^ 1).toByte
@@ -186,7 +190,7 @@ class CoauthorEdgeJobSuite extends munit.FunSuite {
       cfg,
       input,
       benchmarkPairs(written.groupingRunId),
-      result.published.dir.getParent
+      dir.getParent
     )
     assert(again.left.exists(_.exists(_.contains("never overwritten"))), again)
   }

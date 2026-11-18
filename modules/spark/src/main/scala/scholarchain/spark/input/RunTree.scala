@@ -3,14 +3,13 @@ package scholarchain.spark.input
 import java.io.IOException
 import java.nio.charset.{CharacterCodingException, CodingErrorAction, StandardCharsets}
 import java.nio.ByteBuffer
-import java.nio.file.{Files, LinkOption, Path}
-import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file.Path
 
 import scala.collection.mutable.ArrayBuffer
-import scala.jdk.CollectionConverters.*
 import scala.util.Using
 
 import scholarchain.core.ObservedFile
+import scholarchain.spark.store.{NioRunStore, RunStore, StorePath, StoreStat}
 
 /**
  * The checks of the verified archive reader (work order SP-P6-02 step 1, CR-P6-14 nit 3, CR-P6-19
@@ -126,9 +125,12 @@ object TreeEntry {
 }
 
 /**
- * File-system helpers of the reader. Every stat uses `NOFOLLOW_LINKS`, every read opens the file
- * with `NOFOLLOW_LINKS`, and nothing is ever written. Driver-side by design: run directories are
- * observed on the driver's file system (local or a mounted copy), one buffered stream at a time.
+ * File-system helpers of the reader, over a [[RunStore]] (SP-P6-04): the local java.nio store
+ * ([[NioRunStore]], used by every `java.nio.file.Path` overload below, unchanged behaviour) or any
+ * Hadoop FileSystem ([[scholarchain.spark.store.HadoopRunStore]]: HDFS, S3A, `file:` URIs). Every
+ * stat and listing reports links without following them (the NOFOLLOW mapping per store is on the
+ * store), and nothing is ever written. Driver-side by design: run directories are observed by the
+ * driver through the store of their location, one buffered stream at a time.
  */
 object RunTree {
 
@@ -139,25 +141,27 @@ object RunTree {
   val UnverifiedMarker = "_UNVERIFIED"
   private val BufferBytes = 64 * 1024
 
-  private def attrs(p: Path): Option[BasicFileAttributes] =
-    try Some(Files.readAttributes(p, classOf[BasicFileAttributes], LinkOption.NOFOLLOW_LINKS))
-    catch { case _: IOException => None }
+  private def local(p: Path): StorePath = StorePath.local(p)
 
-  def kindOf(p: Path): Option[TreeEntry.Kind] =
-    attrs(p).map { a =>
-      if (a.isSymbolicLink) TreeEntry.Kind.SymbolicLink
-      else if (a.isDirectory) TreeEntry.Kind.Directory
-      else if (a.isRegularFile) TreeEntry.Kind.Regular
-      else TreeEntry.Kind.Other
-    }
+  /** The NOFOLLOW stat; None when absent or when it cannot be stat'ed (fail closed). */
+  def statOf(store: RunStore, p: StorePath): Option[StoreStat] = store.stat(p).toOption.flatten
 
-  def isRealDirectory(p: Path): Boolean = kindOf(p).contains(TreeEntry.Kind.Directory)
-  def isRegularFile(p: Path): Boolean = kindOf(p).contains(TreeEntry.Kind.Regular)
-  def exists(p: Path): Boolean = kindOf(p).isDefined
+  def kindOf(store: RunStore, p: StorePath): Option[TreeEntry.Kind] = statOf(store, p).map(_.kind)
+  def kindOf(p: Path): Option[TreeEntry.Kind] = kindOf(NioRunStore, local(p))
+
+  def isRealDirectory(store: RunStore, p: StorePath): Boolean =
+    kindOf(store, p).contains(TreeEntry.Kind.Directory)
+  def isRegularFile(store: RunStore, p: StorePath): Boolean =
+    kindOf(store, p).contains(TreeEntry.Kind.Regular)
+  def exists(store: RunStore, p: StorePath): Boolean = kindOf(store, p).isDefined
+  def isRealDirectory(p: Path): Boolean = isRealDirectory(NioRunStore, local(p))
+  def isRegularFile(p: Path): Boolean = isRegularFile(NioRunStore, local(p))
+  def exists(p: Path): Boolean = exists(NioRunStore, local(p))
 
   /** The size of a regular file (NOFOLLOW stat); None for anything else or a failed stat. */
-  def sizeOf(p: Path): Option[Long] =
-    attrs(p).filter(a => a.isRegularFile && !a.isSymbolicLink).map(_.size)
+  def sizeOf(store: RunStore, p: StorePath): Option[Long] =
+    statOf(store, p).filter(_.kind == TreeEntry.Kind.Regular).map(_.size)
+  def sizeOf(p: Path): Option[Long] = sizeOf(NioRunStore, local(p))
 
   def isStagingName(name: String): Boolean = StagingPrefixes.exists(name.startsWith)
 
@@ -165,63 +169,63 @@ object RunTree {
    * Names in `dir`, sorted; Left(why) when it cannot be listed (fail closed, CR-P6-19 F5: an
    * unlistable directory is never treated as empty).
    */
-  def names(dir: Path): Either[String, Vector[String]] =
-    try
-      Right(Using.resource(Files.newDirectoryStream(dir)) { s =>
-        s.iterator().asScala.map(_.getFileName.toString).toVector.sorted
-      })
-    catch { case e: IOException => Left(s"cannot list '$dir': $e") }
+  def names(store: RunStore, dir: StorePath): Either[String, Vector[String]] =
+    store.list(dir).map(_.map(_.name)).left.map(e => s"cannot list '$dir': $e")
+  def names(dir: Path): Either[String, Vector[String]] = names(NioRunStore, local(dir))
 
   /**
    * Walks `root` without following links. Right(entries) in depth-first, name-sorted order, or
    * Left(why) when the walk exceeds a bound or a directory cannot be listed. Symbolic links and
    * special files are returned as entries (never entered), so the caller refuses them.
    */
-  def walk(root: Path, maxEntries: Int, maxDepth: Int): Either[String, Vector[TreeEntry]] = {
+  def walk(
+      store: RunStore,
+      root: StorePath,
+      maxEntries: Int,
+      maxDepth: Int
+  ): Either[String, Vector[TreeEntry]] = {
     val out = ArrayBuffer.empty[TreeEntry]
-    def go(dir: Path, rel: Vector[String], depth: Int): Option[String] =
+    def go(dir: StorePath, rel: Vector[String], depth: Int): Option[String] =
       if (depth > maxDepth) Some(s"deeper than $maxDepth level(s) at '${rel.mkString("/")}'")
-      else {
-        val listed =
-          try
-            Right(Using.resource(Files.newDirectoryStream(dir)) { s =>
-              s.iterator().asScala.map(_.getFileName.toString).toVector.sorted
-            })
-          catch { case e: IOException => Left(s"cannot list '${rel.mkString("/")}': $e") }
-        listed match {
-          case Left(why) => Some(why)
+      else
+        store.list(dir) match {
+          case Left(e) => Some(s"cannot list '${rel.mkString("/")}': $e")
           case Right(children) =>
             children.iterator
-              .map { name =>
-                val r = rel :+ name
-                val p = dir.resolve(name)
-                val k = kindOf(p).getOrElse(TreeEntry.Kind.Other)
-                out += TreeEntry(r.mkString("/"), k, depth)
+              .map { c =>
+                val r = rel :+ c.name
+                out += TreeEntry(r.mkString("/"), c.kind, depth)
                 if (out.size > maxEntries) Some(s"more than $maxEntries entries")
-                else if (k == TreeEntry.Kind.Directory) go(p, r, depth + 1)
+                else if (c.kind == TreeEntry.Kind.Directory) go(dir.resolve(c.name), r, depth + 1)
                 else None
               }
               .collectFirst { case Some(why) => why }
         }
-      }
     go(root, Vector.empty, 1).toLeft(out.toVector)
   }
+  def walk(root: Path, maxEntries: Int, maxDepth: Int): Either[String, Vector[TreeEntry]] =
+    walk(NioRunStore, local(root), maxEntries, maxDepth)
 
   /** The observation of one regular file, streamed (never follows a link). */
-  def observe(root: Path, relativePath: String): Either[String, ObservedFile] =
+  def observe(
+      store: RunStore,
+      root: StorePath,
+      relativePath: String
+  ): Either[String, ObservedFile] =
     try {
       val acc = new ObservedFile.Accumulator
-      Using.resource(Files.newInputStream(root.resolve(relativePath), LinkOption.NOFOLLOW_LINKS)) {
-        in =>
-          val buf = new Array[Byte](BufferBytes)
-          var n = in.read(buf)
-          while (n >= 0) {
-            if (n > 0) acc.update(buf, 0, n)
-            n = in.read(buf)
-          }
+      Using.resource(store.open(root.resolve(relativePath))) { in =>
+        val buf = new Array[Byte](BufferBytes)
+        var n = in.read(buf)
+        while (n >= 0) {
+          if (n > 0) acc.update(buf, 0, n)
+          n = in.read(buf)
+        }
       }
       Right(acc.result(relativePath))
     } catch { case e: IOException => Left(s"cannot read '$relativePath': $e") }
+  def observe(root: Path, relativePath: String): Either[String, ObservedFile] =
+    observe(NioRunStore, local(root), relativePath)
 
   /**
    * Largest byte array the JVM allocates (a property of the platform, not a tunable threshold).
@@ -234,60 +238,43 @@ object RunTree {
    * `maxBytes` before the file is opened, and the read itself stops after `maxBytes + 1` bytes, so
    * a file that grows between the stat and the read is refused, never read unbounded.
    */
+  def readUtf8(store: RunStore, file: StorePath, maxBytes: Long): Either[String, String] =
+    readBytes(store, file, maxBytes).flatMap { bytes =>
+      try {
+        val decoder = StandardCharsets.UTF_8
+          .newDecoder()
+          .onMalformedInput(CodingErrorAction.REPORT)
+          .onUnmappableCharacter(CodingErrorAction.REPORT)
+        Right(decoder.decode(ByteBuffer.wrap(bytes)).toString)
+      } catch { case e: CharacterCodingException => Left(s"'$file' is not valid UTF-8: $e") }
+    }
   def readUtf8(file: Path, maxBytes: Long): Either[String, String] =
-    if (maxBytes < 0L || maxBytes > MaxArrayBytes)
-      Left(s"read bound $maxBytes is outside 0..$MaxArrayBytes")
-    else
-      attrs(file) match {
-        case None => Left(s"cannot read '$file': no such file, or it cannot be stat'ed")
-        case Some(a) if a.isSymbolicLink || !a.isRegularFile =>
-          Left(s"'$file' is not a regular file")
-        case Some(a) if a.size > maxBytes =>
-          Left(s"'$file' has ${a.size} bytes, more than the read bound $maxBytes")
-        case Some(_) =>
-          try {
-            val bytes = Using.resource(Files.newInputStream(file, LinkOption.NOFOLLOW_LINKS))(
-              _.readNBytes(maxBytes.toInt + 1)
-            )
-            if (bytes.length.toLong > maxBytes)
-              Left(s"'$file' grew beyond the read bound $maxBytes while it was read")
-            else {
-              val decoder = StandardCharsets.UTF_8
-                .newDecoder()
-                .onMalformedInput(CodingErrorAction.REPORT)
-                .onUnmappableCharacter(CodingErrorAction.REPORT)
-              Right(decoder.decode(ByteBuffer.wrap(bytes)).toString)
-            }
-          } catch {
-            case e: CharacterCodingException => Left(s"'$file' is not valid UTF-8: $e")
-            case e: IOException => Left(s"cannot read '$file': $e")
-          }
-      }
+    readUtf8(NioRunStore, local(file), maxBytes)
 
   /**
    * The bytes of a regular file of at most `maxBytes` bytes, bounded twice as [[readUtf8]] (stat
    * before opening, and the read stops after `maxBytes + 1` bytes).
    */
-  def readBytes(file: Path, maxBytes: Long): Either[String, Array[Byte]] =
+  def readBytes(store: RunStore, file: StorePath, maxBytes: Long): Either[String, Array[Byte]] =
     if (maxBytes < 0L || maxBytes > MaxArrayBytes)
       Left(s"read bound $maxBytes is outside 0..$MaxArrayBytes")
     else
-      attrs(file) match {
+      statOf(store, file) match {
         case None => Left(s"cannot read '$file': no such file, or it cannot be stat'ed")
-        case Some(a) if a.isSymbolicLink || !a.isRegularFile =>
+        case Some(a) if a.kind != TreeEntry.Kind.Regular =>
           Left(s"'$file' is not a regular file")
         case Some(a) if a.size > maxBytes =>
           Left(s"'$file' has ${a.size} bytes, more than the read bound $maxBytes")
         case Some(_) =>
           try {
-            val bytes = Using.resource(Files.newInputStream(file, LinkOption.NOFOLLOW_LINKS))(
-              _.readNBytes(maxBytes.toInt + 1)
-            )
+            val bytes = Using.resource(store.open(file))(_.readNBytes(maxBytes.toInt + 1))
             if (bytes.length.toLong > maxBytes)
               Left(s"'$file' grew beyond the read bound $maxBytes while it was read")
             else Right(bytes)
           } catch { case e: IOException => Left(s"cannot read '$file': $e") }
       }
+  def readBytes(file: Path, maxBytes: Long): Either[String, Array[Byte]] =
+    readBytes(NioRunStore, local(file), maxBytes)
 
   /** Strict UTF-8 decoding of `bytes` (malformed input refused, never replaced). */
   def strictUtf8(bytes: Array[Byte]): Either[String, String] =

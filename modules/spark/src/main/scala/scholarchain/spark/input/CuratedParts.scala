@@ -8,6 +8,7 @@ import java.util.zip.{CRC32, GZIPInputStream}
 import scala.util.Using
 
 import scholarchain.core.*
+import scholarchain.spark.store.{NioRunStore, RunStore, StorePath}
 
 /**
  * The checksum sidecar layout of Hadoop's `ChecksumFileSystem` (the local file system the producer
@@ -62,6 +63,9 @@ object HadoopChecksum {
 
   /** The sidecar path of `p`: `.<name>.crc` beside it. */
   def sidecarOf(p: Path): Path = p.resolveSibling(s".${p.getFileName}.crc")
+
+  /** The sidecar location of `p`: `.<name>.crc` beside it. */
+  def sidecarOf(p: StorePath): StorePath = p.resolveSibling(s".${p.name}.crc")
 }
 
 /**
@@ -69,11 +73,14 @@ object HadoopChecksum {
  * for it (`EMITTED.<leaf>`; the curated run has no part manifest, so the producer's counters are
  * the declared row counts).
  */
-final case class CuratedLeaf(leaf: String, parts: Vector[Path], declaredRows: Long) {
+final case class CuratedLeaf(leaf: String, parts: Vector[StorePath], declaredRows: Long) {
 
-  /** Compressed bytes of the parts (NOFOLLOW stat; an unreadable size counts as unbounded). */
-  def compressedBytes: Long =
-    parts.map(p => RunTree.sizeOf(p).getOrElse(Long.MaxValue / 8)).sum
+  /**
+   * Compressed bytes of the parts in `store` (NOFOLLOW stat; an unreadable size counts as
+   * unbounded).
+   */
+  def compressedBytes(store: RunStore): Long =
+    parts.map(p => RunTree.sizeOf(store, p).getOrElse(Long.MaxValue / 8)).sum
 }
 
 /** The decoded curated records the canonical tables are built from (`CanonicalGraphInput`). */
@@ -103,12 +110,15 @@ final case class CuratedSources(
 object CuratedParts {
 
   /** The part files of each consumed leaf (a missing leaf directory has none), sorted by name. */
-  def listing(runDir: Path): Either[Vector[String], Map[String, Vector[Path]]] = {
+  def listing(
+      store: RunStore,
+      runDir: StorePath
+  ): Either[Vector[String], Map[String, Vector[StorePath]]] = {
     val results = HadoopCuratedRun.ConsumedLeaves.map { leaf =>
       val dir = runDir.resolve("normalize").resolve(leaf)
-      if (!RunTree.exists(dir)) Right(leaf -> Vector.empty[Path])
+      if (!RunTree.exists(store, dir)) Right(leaf -> Vector.empty[StorePath])
       else
-        RunTree.names(dir).map { ns =>
+        RunTree.names(store, dir).map { ns =>
           leaf -> ns
             .filter(n => !n.startsWith(".") && HadoopCuratedRun.PartName.matches(n))
             .map(dir.resolve)
@@ -133,7 +143,7 @@ object CuratedParts {
         else Right(out)
       } catch { case e: IOException => Left(s"is not a readable gzip stream: $e") }
 
-  private def decodeRows[T](leaf: String, p: Path, text: String)(using
+  private def decodeRows[T](leaf: String, p: StorePath, text: String)(using
       c: RecordContract[T]
   ): Vector[Either[String, T]] =
     RunTree.jsonlRows(text).zipWithIndex.map { case (row, i) =>
@@ -144,14 +154,20 @@ object CuratedParts {
     }
 
   /** Reads one part: verified, decompressed, decoded; with the decompressed byte count. */
-  private def part[T](leaf: String, p: Path, budget: Long, maxMetadataBytes: Long)(using
+  private def part[T](
+      store: RunStore,
+      leaf: String,
+      p: StorePath,
+      budget: Long,
+      maxMetadataBytes: Long
+  )(using
       c: RecordContract[T]
   ): Either[Vector[String], (Vector[T], Long)] = {
     val name = s"normalize/$leaf/${p.getFileName}"
     val text: Either[String, (String, Long)] = for {
-      data <- RunTree.readBytes(p, budget).left.map(w => s"$name: $w")
+      data <- RunTree.readBytes(store, p, budget).left.map(w => s"$name: $w")
       crc <- RunTree
-        .readBytes(HadoopChecksum.sidecarOf(p), maxMetadataBytes)
+        .readBytes(store, HadoopChecksum.sidecarOf(p), maxMetadataBytes)
         .left
         .map(w => s"$name crc sidecar: $w")
       _ <- HadoopChecksum.problem(data, crc).map(w => s"$name crc sidecar $w").toLeft(())
@@ -170,7 +186,12 @@ object CuratedParts {
     }
   }
 
-  private def leafRecords[T](l: CuratedLeaf, budget: Long, maxMetadataBytes: Long)(using
+  private def leafRecords[T](
+      store: RunStore,
+      l: CuratedLeaf,
+      budget: Long,
+      maxMetadataBytes: Long
+  )(using
       c: RecordContract[T]
   ): Either[Vector[String], (Vector[T], Long)] = {
     var left = budget
@@ -178,7 +199,7 @@ object CuratedParts {
     var problems = Vector.empty[String]
     l.parts.foreach { p =>
       if (problems.isEmpty)
-        part[T](l.leaf, p, left, maxMetadataBytes) match {
+        part[T](store, l.leaf, p, left, maxMetadataBytes) match {
           case Left(w) => problems = w
           case Right((xs, n)) =>
             out = out ++ xs
@@ -203,23 +224,32 @@ object CuratedParts {
   def read(
       leaves: Map[String, CuratedLeaf],
       budget: Long,
-      maxMetadataBytes: Long
+      maxMetadataBytes: Long,
+      store: RunStore = NioRunStore
   ): Either[Vector[String], CuratedSources] = {
     def leaf(n: String) = leaves.getOrElse(n, CuratedLeaf(n, Vector.empty, 0L))
     for {
-      works <- leafRecords[WorkRecord](leaf("works"), budget, maxMetadataBytes)
-      mentions <- leafRecords[AuthorMention](leaf("mentions"), budget - works._2, maxMetadataBytes)
+      works <- leafRecords[WorkRecord](store, leaf("works"), budget, maxMetadataBytes)
+      mentions <- leafRecords[AuthorMention](
+        store,
+        leaf("mentions"),
+        budget - works._2,
+        maxMetadataBytes
+      )
       venues <- leafRecords[Venue](
+        store,
         leaf("venues"),
         budget - works._2 - mentions._2,
         maxMetadataBytes
       )
       institutions <- leafRecords[Institution](
+        store,
         leaf("institutions"),
         budget - works._2 - mentions._2 - venues._2,
         maxMetadataBytes
       )
       topics <- leafRecords[Topic](
+        store,
         leaf("topics"),
         budget - works._2 - mentions._2 - venues._2 - institutions._2,
         maxMetadataBytes

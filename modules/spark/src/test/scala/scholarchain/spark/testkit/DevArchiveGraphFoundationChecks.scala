@@ -17,6 +17,7 @@ import scholarchain.spark.analysis.{
 import scholarchain.spark.graph.{Checkpointing, MetricsWindowSummary, WindowInputSummary}
 import scholarchain.spark.input.{ArchiveRuns, ReaderLimits, VerifiedArchiveReader, VerifiedInput}
 import scholarchain.spark.input.HadoopCuratedRun
+import scholarchain.spark.store.StorePath
 import scholarchain.spark.output.{
   AnalysisWindowRows,
   BridgeMeasureRows,
@@ -395,14 +396,14 @@ abstract class DevArchiveGraphFoundationChecks extends munit.FunSuite {
 
   test("the written run lies under outputDir and re-verifies against its part manifest") {
     val out = Paths.get(prop("outputDir"))
-    assertEquals(result.published.dir.getParent, out)
+    assertEquals(result.published.dir.getParent, StorePath.local(out))
     assertEquals(
       result.published.dir.getFileName.toString,
       "run=" + result.runId.stripPrefix("run:")
     )
     val again = RunPublisher.verifyPublished(
       spark,
-      result.published.dir,
+      result.published.dir.localPath,
       result.runId,
       limits.maxMetadataBytes
     )

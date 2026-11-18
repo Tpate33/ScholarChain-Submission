@@ -3,6 +3,7 @@ package scholarchain.spark.input
 import java.nio.file.{Path, Paths}
 
 import scholarchain.core.*
+import scholarchain.spark.store.{NioRunStore, RunStore, StorePath}
 
 /**
  * The three run directories a collaboration analysis reads, from configuration (never built in):
@@ -98,24 +99,122 @@ object ArchiveRuns {
   }
 }
 
-/** One verified run: its directory, run ID, run manifest and (when published) part manifest. */
+/**
+ * The three run locations of an analysis in one [[RunStore]] (SP-P6-04): the same rules as
+ * [[ArchiveRuns]] for locations given as URIs or absolute local paths ([[StorePath.parse]]: every
+ * location absolute and normalized), each run strictly inside `archiveRoot` (same scheme and
+ * authority), the three distinct. The curated pin is the committed constant
+ * [[HadoopCuratedRun.PinnedRunId]] for every public constructor (CR-P6-21 n1); the case class
+ * constructor (and so `apply` and `copy`) is private, and the synthetic-fixture seam
+ * [[ArchiveInput.forSyntheticFixture]] is `private[input]`, as on [[ArchiveRuns]].
+ */
+final case class ArchiveInput private (
+    store: RunStore,
+    archiveRoot: StorePath,
+    curatedRun: StorePath,
+    decisionRun: StorePath,
+    groupingRun: StorePath,
+    pinnedCuratedRunId: String
+)
+
+object ArchiveInput {
+
+  /** Builds and checks the locations in `store`; the curated pin is the committed constant. */
+  def of(
+      store: RunStore,
+      archiveRoot: String,
+      curatedRun: String,
+      decisionRun: String,
+      groupingRun: String
+  ): Either[Vector[String], ArchiveInput] =
+    build(store, archiveRoot, curatedRun, decisionRun, groupingRun, HadoopCuratedRun.PinnedRunId)
+
+  /** Synthetic-fixture seam only, as [[ArchiveRuns.forSyntheticFixture]]; never main code. */
+  private[input] def forSyntheticFixture(
+      store: RunStore,
+      archiveRoot: String,
+      curatedRun: String,
+      decisionRun: String,
+      groupingRun: String,
+      pinnedCuratedRunId: String
+  ): Either[Vector[String], ArchiveInput] =
+    build(store, archiveRoot, curatedRun, decisionRun, groupingRun, pinnedCuratedRunId)
+
+  /** The local java.nio form of [[ArchiveRuns]] (already checked; its pin is kept). */
+  private[input] def local(runs: ArchiveRuns): ArchiveInput =
+    ArchiveInput(
+      NioRunStore,
+      StorePath.local(runs.archiveRoot),
+      StorePath.local(runs.curatedRun),
+      StorePath.local(runs.decisionRun),
+      StorePath.local(runs.groupingRun),
+      runs.pinnedCuratedRunId
+    )
+
+  private def build(
+      store: RunStore,
+      archiveRoot: String,
+      curatedRun: String,
+      decisionRun: String,
+      groupingRun: String,
+      pinnedCuratedRunId: String
+  ): Either[Vector[String], ArchiveInput] = {
+    val pinForm =
+      if (
+        pinnedCuratedRunId != null && HadoopCuratedRun.PinnedRunIdText.matches(pinnedCuratedRunId)
+      )
+        Vector.empty
+      else Vector(s"pinnedCuratedRunId '$pinnedCuratedRunId' is not run:<64 lowercase hex>")
+    val parsed = Vector(
+      "archiveRoot" -> archiveRoot,
+      "curatedRun" -> curatedRun,
+      "decisionRun" -> decisionRun,
+      "groupingRun" -> groupingRun
+    ).map { case (l, s) =>
+      if (s == null || s.isEmpty) Left(s"$l is not set")
+      else StorePath.parse(s).left.map(w => s"$l: $w")
+    }
+    val storeProblem =
+      if (store == null) Vector("no run store is given") else Vector.empty
+    val errors = parsed.collect { case Left(e) => e } ++ pinForm ++ storeProblem
+    if (errors.nonEmpty) Left(errors)
+    else {
+      val ps = parsed.collect { case Right(p) => p }
+      val (root, c, d, g) = (ps(0), ps(1), ps(2), ps(3))
+      val localOnly =
+        if (!store.supportsAtomicDirectoryRename || ps.forall(_.isLocal)) Vector.empty
+        else Vector(s"the store '${store.describe}' holds local locations only")
+      val inside = Vector("curatedRun" -> c, "decisionRun" -> d, "groupingRun" -> g).collect {
+        case (l, p) if !(p.startsWith(root) && p != root) => s"$l '$p' is not inside '$root'"
+      }
+      val distinct =
+        if (Set(c, d, g).size != 3) Vector("the three runs must be different directories")
+        else Vector.empty
+      if (localOnly.nonEmpty || inside.nonEmpty || distinct.nonEmpty)
+        Left(localOnly ++ inside ++ distinct)
+      else Right(ArchiveInput(store, root, c, d, g, pinnedCuratedRunId))
+    }
+  }
+}
+
+/** One verified run: its location, run ID, run manifest and (when published) part manifest. */
 final case class VerifiedRun(
     label: String,
-    dir: Path,
+    dir: StorePath,
     runId: String,
     manifest: RunManifest,
     partManifest: Option[PartManifestV2]
 ) {
 
-  /** Absolute paths of the listed parts of `recordSchemaVersion`, sorted by listed path. */
-  def partsOf(recordSchemaVersion: String): Vector[Path] =
+  /** Locations of the listed parts of `recordSchemaVersion`, sorted by listed path. */
+  def partsOf(recordSchemaVersion: String): Vector[StorePath] =
     partManifest.toVector
       .flatMap(_.files)
       .filter(_.recordSchemaVersion == recordSchemaVersion)
       .map(f => dir.resolve(f.path))
 
-  /** The listed parts of `recordSchemaVersion` with their absolute paths, sorted by listed path. */
-  def listedOf(recordSchemaVersion: String): Vector[(Path, PartFileV2)] =
+  /** The listed parts of `recordSchemaVersion` with their locations, sorted by listed path. */
+  def listedOf(recordSchemaVersion: String): Vector[(StorePath, PartFileV2)] =
     partManifest.toVector
       .flatMap(_.files)
       .filter(_.recordSchemaVersion == recordSchemaVersion)
@@ -148,11 +247,11 @@ final case class VerifiedInput(
     curatedLeaves: Map[String, CuratedLeaf],
     curatedSources: CuratedSources
 ) {
-  def teamParts: Vector[Path] = grouping.partsOf(SchemaVersions.PublicationTeam)
-  def workParts: Vector[Path] = grouping.partsOf(SchemaVersions.WorkAssignment)
+  def teamParts: Vector[StorePath] = grouping.partsOf(SchemaVersions.PublicationTeam)
+  def workParts: Vector[StorePath] = grouping.partsOf(SchemaVersions.WorkAssignment)
 
   /** The verified part files of one consumed curated leaf (none when the leaf is absent). */
-  def curatedPartsOf(leaf: String): Vector[Path] =
+  def curatedPartsOf(leaf: String): Vector[StorePath] =
     curatedLeaves.get(leaf).map(_.parts).getOrElse(Vector.empty)
 
   /** The declared (and decoded) rows of one consumed curated leaf. */
@@ -239,23 +338,32 @@ object VerifiedArchiveReader {
 
   private val Keys = AnalysisValidation.GroupingManifestKeys
 
-  def read(runs: ArchiveRuns, limits: ReaderLimits): Either[Vector[Refusal], VerifiedInput] = {
+  /** Reads the local (java.nio) archive runs: the behaviour before SP-P6-04. */
+  def read(runs: ArchiveRuns, limits: ReaderLimits): Either[Vector[Refusal], VerifiedInput] =
+    read(ArchiveInput.local(runs), limits)
+
+  /**
+   * Reads the archive runs of `runs` through its store (local java.nio, HDFS, S3A, `file:` URIs
+   * through Hadoop): the same checks in the same order.
+   */
+  def read(runs: ArchiveInput, limits: ReaderLimits): Either[Vector[Refusal], VerifiedInput] = {
+    val store = runs.store
     val layoutRefusals =
-      curatedLayout(runs.curatedRun, runs.pinnedCuratedRunId, limits) ++
-        layout("decision", runs.decisionRun, limits) ++
-        layout("grouping", runs.groupingRun, limits)
+      curatedLayout(store, runs.curatedRun, runs.pinnedCuratedRunId, limits) ++
+        layout(store, "decision", runs.decisionRun, limits) ++
+        layout(store, "grouping", runs.groupingRun, limits)
     if (layoutRefusals.nonEmpty) Left(layoutRefusals)
     else
       for {
-        cl <- curatedIntegrity(runs.curatedRun, limits)
-        d <- integrity("decision", runs.decisionRun, limits)
-        g <- integrity("grouping", runs.groupingRun, limits)
+        cl <- curatedIntegrity(store, runs.curatedRun, limits)
+        d <- integrity(store, "decision", runs.decisionRun, limits)
+        g <- integrity(store, "grouping", runs.groupingRun, limits)
         _ <- chain(cl._1, d, g)
-        budget <- bound(d, g, cl._2, limits)
-        decoded <- decode(d, g)
+        budget <- bound(store, d, g, cl._2, limits)
+        decoded <- decode(store, d, g)
         _ <- validate(decoded._1, decoded._2, g)
         sources <- CuratedParts
-          .read(cl._2, budget, limits.maxMetadataBytes)
+          .read(cl._2, budget, limits.maxMetadataBytes, store)
           .left
           .map(_.map(w => Refusal(CheckStep.CuratedParts, "curated", w)))
         v = VerifiedInput(
@@ -285,7 +393,23 @@ object VerifiedArchiveReader {
    * content is read. Unchanged by step 1A repair 02.
    */
   def layout(label: String, dir: Path, limits: ReaderLimits): Vector[Refusal] =
-    layoutOf(label, dir, limits.maxTreeEntries, limits.maxTreeDepth, pinnedCuratedRunId = None)
+    layout(NioRunStore, label, StorePath.local(dir), limits)
+
+  /** As the `Path` overload, for a run location in `store`. */
+  def layout(
+      store: RunStore,
+      label: String,
+      dir: StorePath,
+      limits: ReaderLimits
+  ): Vector[Refusal] =
+    layoutOf(
+      store,
+      label,
+      dir,
+      limits.maxTreeEntries,
+      limits.maxTreeDepth,
+      pinnedCuratedRunId = None
+    )
 
   /**
    * Layout refusals of the Hadoop curated run, in check order; no file content is read. HD-P6-01
@@ -295,7 +419,17 @@ object VerifiedArchiveReader {
    * walk, so files lie at most [[HadoopCuratedRun.MaxFileDepth]] levels below the run).
    */
   def curatedLayout(dir: Path, pinnedCuratedRunId: String, limits: ReaderLimits): Vector[Refusal] =
+    curatedLayout(NioRunStore, StorePath.local(dir), pinnedCuratedRunId, limits)
+
+  /** As the `Path` overload, for a curated run location in `store`. */
+  def curatedLayout(
+      store: RunStore,
+      dir: StorePath,
+      pinnedCuratedRunId: String,
+      limits: ReaderLimits
+  ): Vector[Refusal] =
     layoutOf(
+      store,
       "curated",
       dir,
       limits.maxTreeEntries,
@@ -304,32 +438,33 @@ object VerifiedArchiveReader {
     )
 
   private def layoutOf(
+      store: RunStore,
       label: String,
-      dir: Path,
+      dir: StorePath,
       maxEntries: Int,
       maxDepth: Int,
       pinnedCuratedRunId: Option[String]
   ): Vector[Refusal] = {
-    val name = Option(dir.getFileName).map(_.toString).getOrElse("")
+    val name = dir.name
     lazy val location =
       pinnedCuratedRunId.toVector.flatMap(pin => HadoopCuratedRun.locationProblems(dir, pin))
     if (!RunTree.RunDirName.matches(name))
       Vector(Refusal(CheckStep.RunName, label, s"'$name' is not run=<64 lowercase hex>"))
     else if (location.nonEmpty) location.map(w => Refusal(CheckStep.CuratedRun, label, w))
-    else if (!RunTree.isRealDirectory(dir))
+    else if (!RunTree.isRealDirectory(store, dir))
       Vector(Refusal(CheckStep.Tree, label, s"$dir is not a real directory (missing or a link)"))
     else {
-      val walked = RunTree.walk(dir, maxEntries, maxDepth)
+      val walked = RunTree.walk(store, dir, maxEntries, maxDepth)
       val entries = walked.getOrElse(Vector.empty)
       val unverified =
-        if (RunTree.exists(dir.resolve(RunTree.UnverifiedMarker)))
+        if (RunTree.exists(store, dir.resolve(RunTree.UnverifiedMarker)))
           Vector(Refusal(CheckStep.UnverifiedMarker, label, "_UNVERIFIED is present"))
         else Vector.empty
       // The parent must be listable: an unlistable parent is refused, never read as empty (F5).
-      val siblings: Vector[Either[String, String]] = Option(dir.getParent) match {
+      val siblings: Vector[Either[String, String]] = dir.parent match {
         case None => Vector(Left(s"$dir has no parent directory"))
         case Some(parent) =>
-          RunTree.names(parent) match {
+          RunTree.names(store, parent) match {
             case Left(why) => Vector(Left(why))
             case Right(ns) => ns.filter(RunTree.isStagingName).map(n => Right(n))
           }
@@ -355,7 +490,8 @@ object VerifiedArchiveReader {
       // the curated structure check); every other run needs one.
       val success =
         if (pinnedCuratedRunId.isDefined) Vector.empty
-        else if (RunTree.isRegularFile(dir.resolve(PartManifest.SuccessMarker))) Vector.empty
+        else if (RunTree.isRegularFile(store, dir.resolve(PartManifest.SuccessMarker)))
+          Vector.empty
         else Vector(Refusal(CheckStep.SuccessMarker, label, "no regular _SUCCESS"))
       val tree = walked match {
         case Left(why) =>
@@ -371,7 +507,7 @@ object VerifiedArchiveReader {
       val hadoop = (pinnedCuratedRunId, walked) match {
         case (Some(_), Right(es)) =>
           HadoopCuratedRun
-            .structureProblems(dir, es)
+            .structureProblems(store, dir, es)
             .map(w => Refusal(CheckStep.HadoopLayout, label, w))
         case _ => Vector.empty
       }
@@ -393,8 +529,8 @@ object VerifiedArchiveReader {
 
   // ---------------------------------------------------------------- 2-3. integrity, run manifest
 
-  private def runIdOf(dir: Path): String =
-    "run:" + dir.getFileName.toString.stripPrefix("run=")
+  private def runIdOf(dir: StorePath): String =
+    "run:" + dir.name.stripPrefix("run=")
 
   /**
    * Content checks of the Hadoop curated run (HD-P6-01 rules 2 and 4): [[CheckStep.RunManifest]],
@@ -402,7 +538,8 @@ object VerifiedArchiveReader {
    * No data part is read (rules 7 and 8 content are not enforced: not consumed, not decoded).
    */
   private def curatedIntegrity(
-      dir: Path,
+      store: RunStore,
+      dir: StorePath,
       limits: ReaderLimits
   ): Either[Vector[Refusal], (VerifiedRun, Map[String, CuratedLeaf])] = {
     val label = "curated"
@@ -411,7 +548,7 @@ object VerifiedArchiveReader {
     val expected = runIdOf(dir)
     val manifest: Either[Vector[Refusal], (String, RunManifest)] =
       RunTree
-        .readUtf8(dir.resolve(PartManifest.RunManifestFile), limits.maxMetadataBytes)
+        .readUtf8(store, dir.resolve(PartManifest.RunManifestFile), limits.maxMetadataBytes)
         .left
         .map(w => Vector(Refusal(CheckStep.RunManifest, label, w)))
         .flatMap { text =>
@@ -434,6 +571,7 @@ object VerifiedArchiveReader {
     manifest.flatMap { case (id, m) =>
       val texts = HadoopCuratedRun.Stages.map { stage =>
         stage -> RunTree.readUtf8(
+          store,
           dir.resolve(stage).resolve(HadoopCuratedRun.CountersFile),
           limits.maxMetadataBytes
         )
@@ -447,7 +585,7 @@ object VerifiedArchiveReader {
         // SP-P6-03 step 2B: the rows the normalize counters declare for the consumed leaves.
         val normalize = texts.collectFirst { case ("normalize", Right(t)) => t }.getOrElse("")
         val leaves = for {
-          parts <- CuratedParts.listing(dir)
+          parts <- CuratedParts.listing(store, dir)
           rows <- HadoopCuratedRun.emittedRows(normalize, leaf => parts(leaf).nonEmpty)
         } yield HadoopCuratedRun.ConsumedLeaves.map { leaf =>
           leaf -> CuratedLeaf(leaf, parts(leaf), rows(leaf))
@@ -462,30 +600,32 @@ object VerifiedArchiveReader {
 
   /** Part-manifest and run-manifest checks of the decision or grouping run (unchanged). */
   private def integrity(
+      store: RunStore,
       label: String,
-      dir: Path,
+      dir: StorePath,
       limits: ReaderLimits
   ): Either[Vector[Refusal], VerifiedRun] = {
     def refuse(step: CheckStep, why: String) = Left(Vector(Refusal(step, label, why)))
     val expected = runIdOf(dir)
     val partsFile = dir.resolve(PartManifest.FileName)
     val parts: Either[Vector[Refusal], Option[PartManifestV2]] =
-      if (!RunTree.exists(partsFile)) refuse(CheckStep.PartManifest, "no _parts.json")
+      if (!RunTree.exists(store, partsFile)) refuse(CheckStep.PartManifest, "no _parts.json")
       else
         RunTree
-          .readUtf8(partsFile, limits.maxMetadataBytes)
+          .readUtf8(store, partsFile, limits.maxMetadataBytes)
           .left
           .map(w => Vector(Refusal(CheckStep.PartManifest, label, w)))
           .flatMap { text =>
             PartManifests.decode(text) match {
               case Left(e) => refuse(CheckStep.PartManifest, s"_parts.json: ${e.mkString("; ")}")
               case Right(pm) =>
-                val walked = RunTree.walk(dir, limits.maxTreeEntries, limits.maxTreeDepth)
+                val walked =
+                  RunTree.walk(store, dir, limits.maxTreeEntries, limits.maxTreeDepth)
                 val observed = walked match {
                   case Left(why) => Vector(Left(why))
                   case Right(es) =>
                     es.filter(_.kind == TreeEntry.Kind.Regular)
-                      .map(f => RunTree.observe(dir, f.relativePath))
+                      .map(f => RunTree.observe(store, dir, f.relativePath))
                 }
                 observed.collectFirst { case Left(w) => w } match {
                   case Some(w) => refuse(CheckStep.PartManifest, w)
@@ -514,7 +654,7 @@ object VerifiedArchiveReader {
           }
     parts.flatMap { pm =>
       RunTree
-        .readUtf8(dir.resolve(PartManifest.RunManifestFile), limits.maxMetadataBytes)
+        .readUtf8(store, dir.resolve(PartManifest.RunManifestFile), limits.maxMetadataBytes)
         .left
         .map(w => Vector(Refusal(CheckStep.RunManifest, label, w)))
         .flatMap { text =>
@@ -599,6 +739,7 @@ object VerifiedArchiveReader {
    * the grouping and decision parts).
    */
   private def bound(
+      store: RunStore,
       d: VerifiedRun,
       g: VerifiedRun,
       leaves: Map[String, CuratedLeaf],
@@ -607,7 +748,7 @@ object VerifiedArchiveReader {
     val declaredBytes = Consumed.map(g.bytesOf).sum + d.bytesOf(SchemaVersions.MatchDecision)
     val rows = Consumed.map(g.rowsOf).sum + d.rowsOf(SchemaVersions.MatchDecision) +
       leaves.values.map(_.declaredRows).sum
-    val bytes = declaredBytes + leaves.values.map(_.compressedBytes).sum
+    val bytes = declaredBytes + leaves.values.map(_.compressedBytes(store)).sum
     def over(what: String, n: Long, max: Long) =
       if (n <= max) Vector.empty
       else
@@ -628,11 +769,15 @@ object VerifiedArchiveReader {
    * Decodes every row of `parts`; each part is read with at most its declared byte count (verified
    * at the part-manifest check), so a part that grew afterwards is refused, never read unbounded.
    */
-  private def decodeAll[T](label: String, parts: Vector[(Path, PartFileV2)])(using
+  private def decodeAll[T](
+      store: RunStore,
+      label: String,
+      parts: Vector[(StorePath, PartFileV2)]
+  )(using
       c: RecordContract[T]
   ): Either[Vector[Refusal], Vector[T]] = {
     val results = parts.flatMap { case (p, listed) =>
-      RunTree.readUtf8(p, listed.byteCount) match {
+      RunTree.readUtf8(store, p, listed.byteCount) match {
         case Left(w) => Vector(Left(Refusal(CheckStep.Decode, label, w)))
         case Right(text) =>
           RunTree.jsonlRows(text).zipWithIndex.map { case (row, i) =>
@@ -654,21 +799,36 @@ object VerifiedArchiveReader {
   }
 
   private def decode(
+      store: RunStore,
       d: VerifiedRun,
       g: VerifiedRun
   ): Either[Vector[Refusal], (GraphInput, Vector[MatchDecision], Vector[AuthorshipRecordV2])] =
     for {
-      teams <- decodeAll[PublicationTeam]("grouping", g.listedOf(SchemaVersions.PublicationTeam))
-      works <- decodeAll[WorkAssignment]("grouping", g.listedOf(SchemaVersions.WorkAssignment))
+      teams <- decodeAll[PublicationTeam](
+        store,
+        "grouping",
+        g.listedOf(SchemaVersions.PublicationTeam)
+      )
+      works <- decodeAll[WorkAssignment](
+        store,
+        "grouping",
+        g.listedOf(SchemaVersions.WorkAssignment)
+      )
       researchers <- decodeAll[ResearcherAssignment](
+        store,
         "grouping",
         g.listedOf(SchemaVersions.ResearcherAssignment)
       )
       authorships <- decodeAll[AuthorshipRecordV2](
+        store,
         "grouping",
         g.listedOf(SchemaVersions.AuthorshipRecordV2)
       )
-      decisions <- decodeAll[MatchDecision]("decision", d.listedOf(SchemaVersions.MatchDecision))
+      decisions <- decodeAll[MatchDecision](
+        store,
+        "decision",
+        d.listedOf(SchemaVersions.MatchDecision)
+      )
     } yield (GraphInput(teams, works, researchers), decisions, authorships)
 
   // ---------------------------------------------------------------- 6. core validators

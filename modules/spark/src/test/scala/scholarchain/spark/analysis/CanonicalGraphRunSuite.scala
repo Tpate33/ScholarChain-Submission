@@ -266,7 +266,7 @@ class CanonicalGraphRunSuite extends munit.FunSuite {
     def text(name: String): Vector[String] =
       pm.files
         .filter(_.path.startsWith(name + "/"))
-        .map(f => Files.readString(result.published.dir.resolve(f.path)))
+        .map(f => Files.readString(result.published.dir.resolve(f.path).localPath))
     def rows(name: String, header: String): Vector[String] = text(name).flatMap { t =>
       val lines = t.split("\n", -1).toVector
       assertEquals(lines.head, header, name)

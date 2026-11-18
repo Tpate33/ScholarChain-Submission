@@ -11,10 +11,11 @@ import scala.util.control.NonFatal
 
 import scholarchain.core.*
 import scholarchain.spark.input.{RunTree, TreeEntry}
+import scholarchain.spark.store.{NioRunStore, RunStore, StorePath}
 
 /** The published, re-verified load manifests of one run. */
 final case class PublishedLoads(
-    dir: Path,
+    dir: StorePath,
     partManifestSha256: String,
     manifests: Vector[StoreLoadManifest]
 ) {
@@ -37,10 +38,20 @@ final case class PublishedLoads(
  *
  * Location: a load manifest names the `_parts.json` hash, so it cannot be inside the run it
  * describes (the part manifest would have to list it). The manifests are written beside the run,
- * under the same output root: `load=<run hex>/<store tag>.json` (one LF-terminated JSON row each),
- * staged in `.staging-load-<run hex>` (create-once), claimed with a create-once `mkdir` and one
- * `ATOMIC_MOVE` rename (the [[RunPublisher]] scheme), then re-read and checked against the
- * published run ([[verify]]). Nothing else is created; nothing is overwritten.
+ * under the same output root: `load=<run hex>/<store tag>.json` (one LF-terminated JSON row each).
+ * Two protocols, as [[RunPublisher]]:
+ *   - local java.nio store: staged in `.staging-load-<run hex>` (create-once), claimed with a
+ *     create-once `mkdir` and one `ATOMIC_MOVE` rename, then re-read and checked against the
+ *     published run ([[verify]]);
+ *   - any other store (HDFS, S3A; SP-P6-04): refused when anything exists at `load=<run hex>`; each
+ *     manifest is created once directly at its final name (no rename, no conditional put), then the
+ *     directory is re-read and checked ([[verify]]). The directory has no commit marker: it is
+ *     complete exactly when it holds the four regular files, each one LF-terminated row that
+ *     decodes and passes `checkLoadManifests` against the run's observed `_parts.json` hash. A
+ *     partial directory (fewer files, or on HDFS a file still being written) fails that check and
+ *     is refused by every reader; it is never deleted by this code, and the load manifests of that
+ *     run cannot be written again (the location exists): publish the run again as a new attempt.
+ * Nothing else is created; nothing is overwritten.
  */
 object LoadManifests {
 
@@ -101,14 +112,64 @@ object LoadManifests {
         }
       }
 
-  /** The SHA-256 of the published `_parts.json` bytes, observed from the file. */
+  /** The SHA-256 of the published `_parts.json` bytes, observed from the file in its store. */
   def partManifestSha256(published: PublishedRun): Either[String, String] =
-    RunTree.observe(published.dir, PartManifest.FileName).map(_.sha256)
+    RunTree.observe(published.store, published.dir, PartManifest.FileName).map(_.sha256)
+
+  /**
+   * Builds, writes and re-verifies the load manifests of `published` under `outputRoot` (its
+   * parent) in `store`: the local staged-rename protocol for the java.nio store, create-once files
+   * without rename otherwise (see the object's Scaladoc).
+   */
+  def publishTo(
+      store: RunStore,
+      outputRoot: StorePath,
+      published: PublishedRun,
+      maxMetadataBytes: Long
+  ): Either[Vector[String], PublishedLoads] =
+    if (store.supportsAtomicDirectoryRename)
+      if (outputRoot.isLocal) publish(outputRoot.localPath, published, maxMetadataBytes)
+      else Left(Vector(s"output root $outputRoot is not local, but the store is ${store.describe}"))
+    else {
+      val hex = published.runId.stripPrefix("run:")
+      val finalDir = outputRoot.resolve(DirPrefix + hex)
+      if (published.dir.getParent != outputRoot)
+        Left(Vector(s"the run ${published.dir} is not directly under the output root $outputRoot"))
+      else
+        store.stat(finalDir) match {
+          case Left(e) => Left(Vector(s"$finalDir cannot be checked (fail closed): $e"))
+          case Right(Some(_)) => Left(Vector(s"$finalDir already exists: never overwritten"))
+          case Right(None) =>
+            for {
+              sha <- partManifestSha256(published).left.map(Vector(_))
+              manifests <- build(published.partManifest, sha)
+              _ <- manifests.foldLeft(Right(()): Either[Vector[String], Unit]) { (acc, m) =>
+                acc.flatMap { _ =>
+                  val p = finalDir.resolve(fileName(m.targetStore))
+                  try {
+                    Using.resource(store.createNew(p))(
+                      _.write((Json.write(m) + "\n").getBytes(StandardCharsets.UTF_8))
+                    )
+                    Right(())
+                  } catch {
+                    case NonFatal(e) =>
+                      Left(
+                        Vector(
+                          s"cannot create $p (create-once): $e; $finalDir is incomplete and is refused by every reader"
+                        )
+                      )
+                  }
+                }
+              }
+              loads <- verify(store, finalDir, published, maxMetadataBytes)
+            } yield loads
+        }
+    }
 
   /**
    * Builds, writes (staged, create-once, renamed) and re-verifies the load manifests of `published`
-   * under `outputRoot` (its parent). Refuses when `load=<hex>` or the staging directory exists; on
-   * any refusal before the rename the staging directory this call created is removed.
+   * under the local `outputRoot` (its parent). Refuses when `load=<hex>` or the staging directory
+   * exists; on any refusal before the rename the staging directory this call created is removed.
    */
   def publish(
       outputRoot: Path,
@@ -118,7 +179,7 @@ object LoadManifests {
     val hex = published.runId.stripPrefix("run:")
     val finalDir = outputRoot.resolve(DirPrefix + hex)
     val staging = outputRoot.resolve(StagingPrefix + hex)
-    if (published.dir.getParent != outputRoot)
+    if (!published.dir.isLocal || published.dir.getParent != StorePath.local(outputRoot))
       Left(Vector(s"the run ${published.dir} is not directly under the output root $outputRoot"))
     else if (RunTree.exists(finalDir) || RunTree.exists(staging))
       Left(Vector(s"$finalDir or $staging already exists: never overwritten"))
@@ -163,20 +224,30 @@ object LoadManifests {
       } yield loads
   }
 
-  /**
-   * Re-reads a load-manifest directory: exactly one regular file per target store (nothing else),
-   * each at most `maxMetadataBytes`, one LF-terminated row decoding through the core contract, for
-   * its own store; and the four manifests pass `StructureValidation.checkLoadManifests` against the
-   * published run's part manifest and the observed SHA-256 of its `_parts.json`.
-   */
+  /** As the store overload, for a local load-manifest directory. */
   def verify(
       dir: Path,
+      published: PublishedRun,
+      maxMetadataBytes: Long
+  ): Either[Vector[String], PublishedLoads] =
+    verify(NioRunStore, StorePath.local(dir), published, maxMetadataBytes)
+
+  /**
+   * Re-reads a load-manifest directory in `store`: exactly one regular file per target store
+   * (nothing else), each at most `maxMetadataBytes`, one LF-terminated row decoding through the
+   * core contract, for its own store; and the four manifests pass
+   * `StructureValidation.checkLoadManifests` against the published run's part manifest and the
+   * observed SHA-256 of its `_parts.json`.
+   */
+  def verify(
+      store: RunStore,
+      dir: StorePath,
       published: PublishedRun,
       maxMetadataBytes: Long
   ): Either[Vector[String], PublishedLoads] = {
     val expected = TargetStore.values.toVector.map(fileName).sorted
     for {
-      entries <- RunTree.walk(dir, expected.size + 1, 1).left.map(Vector(_))
+      entries <- RunTree.walk(store, dir, expected.size + 1, 1).left.map(Vector(_))
       _ <-
         if (
           entries.map(_.relativePath).sorted == expected &&
@@ -191,7 +262,7 @@ object LoadManifests {
       manifests <- {
         val read = TargetStore.values.toVector.map { t =>
           for {
-            text <- RunTree.readUtf8(dir.resolve(fileName(t)), maxMetadataBytes)
+            text <- RunTree.readUtf8(store, dir.resolve(fileName(t)), maxMetadataBytes)
             _ <-
               if (text.endsWith("\n") && !text.stripSuffix("\n").contains('\n')) Right(())
               else Left(s"${fileName(t)} is not one LF-terminated row")
