@@ -29,12 +29,18 @@ import scholarchain.spark.store.{HadoopRunStore, RunStore}
  * the event log (`spark.eventLog.enabled`, `spark.eventLog.dir`; no code is needed for it). Every
  * file goes through the store of its location ([[HadoopRunStore]] over the SparkContext's Hadoop
  * configuration: `file:`, `hdfs:`, `s3a:`); the job publishes with the commit-marker protocol (no
- * rename; [[scholarchain.spark.output.RunPublisher]]). The configuration is read with an empty
- * environment (no `SCHOLARCHAIN_*` override reaches the run), so the configuration digest describes
- * the file alone.
+ * rename; [[scholarchain.spark.output.RunPublisher]] protocol B) on every scheme, `file:` included:
+ * a `file:` job run goes through Hadoop's local file system (check-then-create, link-following
+ * open) and is not atomic as a whole run; completion is its `_SUCCESS` (CR-P6-26 n5). Whole-run
+ * atomicity by one rename (protocol A) holds only for the java.nio store of
+ * [[AnalysisRun.runCollaboration]] (the sparkIT path), never for this job. The configuration is
+ * read with an empty environment (no `SCHOLARCHAIN_*` override reaches the run), so the
+ * configuration digest describes the file alone.
  *
- * Order: arguments (refused before any Spark session exists), no `file:` input, output or
- * checkpoint root under a cluster master ([[JobArguments.clusterProblems]]), configuration and
+ * Order: arguments (refused before any Spark session exists), the start-up checks of the effective
+ * configuration ([[StartupChecks]]: S3A directory markers kept, one YARN application attempt), no
+ * `file:` input, output or checkpoint root under a cluster master
+ * ([[JobArguments.clusterProblems]]), all before any read or write of job data; configuration and
  * settings, benchmark pair list (form), the verified reader ([[VerifiedArchiveReader]], committed
  * curated pin), the pair binding, the run, the summary lines. Exit status: 0 published and
  * verified; 2 refused arguments; 1 any other refusal or failure (each reason printed, prefix
@@ -117,9 +123,11 @@ object CollaborationJob {
       open: ArchiveOpener
   ): Either[Vector[String], Vector[String]] = {
     val meta = a.limits.maxMetadataBytes
+    val sc = spark.sparkContext
     for {
       _ <- {
-        val p = JobArguments.clusterProblems(spark.sparkContext.master, a)
+        val p = StartupChecks.problems(sc.master, sc.getConf, sc.hadoopConfiguration, a) ++
+          JobArguments.clusterProblems(sc.master, a)
         if (p.isEmpty) Right(()) else Left(p)
       }
       configText <- RunTree

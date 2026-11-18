@@ -303,6 +303,31 @@ class CommitPublisherSuite extends munit.FunSuite {
     assertEquals(Files.readAllBytes(dir.resolve("foreign.txt")).toVector, foreign.toVector)
   }
 
+  test(
+    "CR-P6-26 n6: an existing .spark-<hex> scratch is refused before any write, left untouched"
+  ) {
+    Vector(s3Root("out-scratch-exists-s3sim"), localRoot("out-scratch-exists-file")).foreach {
+      case (out, root) =>
+        val scratch = Files.createDirectories(out.resolve(s".spark-$hex/edges"))
+        val foreign = "another writer's scratch\n".getBytes(StandardCharsets.UTF_8)
+        Files.write(scratch.resolve("part-00000.parquet"), foreign)
+        S3SimFileSystem.renames.clear()
+        val r = publish(root)
+        assert(
+          r.left.exists(_.exists(_.contains(s".spark-$hex already exists: never overwritten"))),
+          r
+        )
+        // No run location was written, and the scratch was neither written nor cleaned up.
+        assertEquals(names(out), Vector(s".spark-$hex"), root.toString)
+        assertEquals(names(scratch), Vector("part-00000.parquet"))
+        assertEquals(
+          Files.readAllBytes(scratch.resolve("part-00000.parquet")).toVector,
+          foreign.toVector
+        )
+        assertEquals(S3SimFileSystem.renameLog, Vector.empty)
+    }
+  }
+
   test("an output root that is a file is refused; an absent root is created by the first write") {
     val file = Files.write(tmp.resolve("root-is-a-file"), Array[Byte](1))
     val asFile = StorePath.parse(file.toUri.toString).fold(e => fail(e), identity)

@@ -184,6 +184,34 @@ class CoauthorEdgeJobSuite extends munit.FunSuite {
     assert(bad.left.exists(_.exists(_.contains("sha256"))), bad)
   }
 
+  test("CR-P6-26 n3: part locations with a comma or a glob character are refused, not split") {
+    // Real files at every name, including the halves of each split: unchecked, textFile would
+    // read "b,c" as the two paths "b" and "c", and expand "x*", "q?", "s[1]" and "{a,b}" as globs
+    // (other files, or a decode refusal of the row), instead of refusing the location.
+    val d = Files.createDirectories(tmp.resolve("glob-parts"))
+    Vector("a", "b", "c", "b,c", "x*", "xy", "q?", "s[1]", "s1", "{a,b}").foreach(n =>
+      Files.writeString(d.resolve(n), "not a team row\n")
+    )
+    def loc(n: String) = StorePath.local(d.resolve(n))
+    Vector("b,c", "x*", "q?", "s[1]", "{a,b}").foreach { n =>
+      val r = CoauthorEdgeJob.countedTeams(
+        spark.sparkContext,
+        Vector(loc("a"), loc(n)),
+        2L,
+        Vector.empty,
+        0L,
+        1
+      )
+      assert(
+        r.left.exists(_.exists(w => w.startsWith("input parts: ") && w.contains("glob character"))),
+        s"$n: $r"
+      )
+      intercept[IllegalArgumentException](
+        CoauthorEdgeJob.lines(spark.sparkContext, Vector(loc(n)), 1)
+      )
+    }
+  }
+
   test("a second run of the same manifest into the same output root is refused") {
     val again = AnalysisRun.runCollaboration(
       spark,

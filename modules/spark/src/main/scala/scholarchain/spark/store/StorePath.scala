@@ -97,6 +97,54 @@ object StorePath {
     new StorePath(FileScheme, None, names)
   }
 
+  private val PortSuffix = "^(.*):[0-9]*$".r
+
+  /**
+   * The host part of a URI authority (user info is refused by [[parse]]): the authority without a
+   * trailing `:port` (an empty port included); an IPv6 literal keeps its brackets.
+   */
+  def hostOf(authority: String): String = authority match {
+    case PortSuffix(host) => host
+    case other => other
+  }
+
+  /**
+   * Characters refused in the path of a data location (CR-P6-26 n3): `SparkContext.textFile` splits
+   * its argument on commas, and Hadoop expands glob patterns (`*`, `?`, `[...]`, `{a,b}`, with `\`
+   * as the escape) in the paths Spark reads, so such a location could name other files than the one
+   * meant.
+   */
+  val GlobCharacters: Set[Char] = Set(',', '*', '?', '[', ']', '{', '}', '\\')
+
+  /** Why the path of `p` is not safe to hand to `textFile` or a Hadoop glob read, or None. */
+  def globProblem(p: StorePath): Option[String] =
+    Option.when(p.path.exists(GlobCharacters))(
+      s"$p contains a comma or a Hadoop glob character (${GlobCharacters.toVector.sorted.mkString(" ")}), " +
+        "which textFile splits on or Hadoop expands"
+    )
+
+  /**
+   * The part of a location's root that the overlap checks compare (CR-P6-26 n2), chosen to fail
+   * closed against different spellings of one file system: `hdfs` ignores the authority entirely (a
+   * name node can be spelled by host, fully qualified name, address or nameservice, with or without
+   * the port, and a job runs against one cluster), every other scheme compares the host
+   * case-insensitively without the port (an S3 bucket has no port; `file` has no authority).
+   * Limitation: two distinct HDFS clusters are treated as one, so prefix-related paths on them are
+   * refused as overlapping (an over-refusal, never a missed overlap).
+   */
+  private def overlapRoot(p: StorePath): (String, Option[String]) =
+    if (p.scheme == "hdfs") (p.scheme, None)
+    else (p.scheme, p.authority.map(a => hostOf(a).toLowerCase(java.util.Locale.ROOT)))
+
+  /**
+   * True when `a` and `b` may name the same location or one may lie inside the other: same scheme,
+   * same root as compared by `overlapRoot` (above), and the segments of one are leading segments of
+   * the other. Used for the job's root overlap refusals; [[StorePath.startsWith]] stays exact.
+   */
+  def mayOverlap(a: StorePath, b: StorePath): Boolean =
+    a != null && b != null && overlapRoot(a) == overlapRoot(b) &&
+      (a.segments.startsWith(b.segments) || b.segments.startsWith(a.segments))
+
   private def segmentProblem(s: String): Option[String] =
     if (s.isEmpty) Some("has an empty segment")
     else if (s == "." || s == "..") Some("has a '.' or '..' segment")
@@ -105,13 +153,15 @@ object StorePath {
   /**
    * A location from configuration or arguments: an absolute, normalized local path (`/...`), or a
    * hierarchical URI `scheme://authority/path` (`file:/path` or `file:///path` for local paths).
-   * One trailing slash of a URI path is ignored. Refused: a relative path, whitespace, control
-   * characters, backslashes, percent escapes, a query, a fragment, user info, a port-only or
-   * missing authority (except `file`), a `file` authority other than empty, and empty, `.` or `..`
-   * segments.
+   * One trailing slash of a URI path is ignored; two or more are refused (CR-P6-26 n1). Refused: a
+   * relative path, whitespace, control characters, backslashes, percent escapes, a query, a
+   * fragment, user info, a port-only (empty host, `s3a://:80/x`, CR-P6-26 u2) or missing authority
+   * (except `file`), a `file` authority other than empty, and empty, `.` or `..` segments.
    */
   def parse(text: String): Either[String, StorePath] =
     if (text == null || text.isEmpty) Left("the location is empty")
+    else if (!text.startsWith("/") && text.endsWith("//"))
+      Left(s"'$text' ends with more than one slash (at most one trailing slash is ignored)")
     else if (text.exists(c => c.isWhitespace || c.isControl || c == '\\'))
       Left(s"'$text' contains whitespace, a control character or a backslash")
     else if (text.contains('%')) Left(s"'$text' contains a percent escape")
@@ -136,8 +186,11 @@ object StorePath {
               Left(s"'$text': a file URI has no authority (file:/path or file:///path)")
             else if (scheme != FileScheme && authority.isEmpty)
               Left(s"'$text' has no authority (bucket or name node)")
+            else if (scheme != FileScheme && authority.exists(a => hostOf(a).isEmpty))
+              Left(s"'$text' has a port-only authority (no bucket or host before the port)")
             else {
-              val segs = p.split('/').toVector.drop(1).filter(_ => p != "/")
+              // -1: keep trailing empty strings, so no empty segment is dropped silently.
+              val segs = p.split("/", -1).toVector.drop(1).filter(_ => p != "/")
               segs.flatMap(segmentProblem).headOption match {
                 case Some(why) => Left(s"'$text' $why")
                 case None => Right(new StorePath(scheme, authority, segs))

@@ -714,6 +714,27 @@ object LocalRuns {
   }
 
   /**
+   * Whether [[runForked]] removes the inherited variable `name`: it starts with one of `prefixes`
+   * or is exactly one of `names`. The default (no exact names) is the behaviour of the local runs
+   * and sparkIT; sparkSubmitLocal's comparison JVM also passes its exact names (BE-P6-09 repair 01,
+   * CR-P6-27 m3).
+   */
+  def strippedFromFork(name: String, prefixes: Seq[String], names: Set[String]): Boolean =
+    prefixes.exists(name.startsWith) || names.contains(name)
+
+  /**
+   * The environment [[runForked]] gives its child: `inherited` minus the stripped names, plus
+   * `env`.
+   */
+  def forkedEnvironment(
+      inherited: Map[String, String],
+      prefixes: Seq[String],
+      names: Set[String],
+      env: Map[String, String]
+  ): Map[String, String] =
+    inherited.filterNot { case (k, _) => strippedFromFork(k, prefixes, names) } ++ env
+
+  /**
    * Forks one JVM in `base`; Some(exit code), or None when the bound was reached. `log` carries
    * only the envelope messages written here; the child's own output follows `route`.
    *
@@ -736,7 +757,8 @@ object LocalRuns {
       timeoutSeconds: Long,
       route: OutputRoute,
       log: Logger,
-      stripPrefixes: Seq[String] = DefaultStrippedPrefixes
+      stripPrefixes: Seq[String] = DefaultStrippedPrefixes,
+      stripNames: Set[String] = Set.empty
   ): Option[Int] = {
     val javaBin = javaHome.getOrElse(new File(System.getProperty("java.home"))) / "bin" / "java"
     if (!javaBin.isFile) refuse(task, s"no java executable at $javaBin")
@@ -753,10 +775,9 @@ object LocalRuns {
         builder.redirectErrorStream(true)
     }
     val childEnv = builder.environment()
-    childEnv.keySet.asScala.toList
-      .filter(k => stripPrefixes.exists(k.startsWith))
-      .foreach(k => childEnv.remove(k))
-    env.foreach { case (k, v) => childEnv.put(k, v) }
+    val wanted = forkedEnvironment(childEnv.asScala.toMap, stripPrefixes, stripNames, env)
+    childEnv.clear()
+    wanted.foreach { case (k, v) => childEnv.put(k, v) }
     val routeText = route match {
       case ToTerminal => "child output straight to the terminal, not through the sbt log"
       case ToLog(_) => "child output through the sbt task log"
@@ -1407,8 +1428,11 @@ object LocalRuns {
    * compiles no such file). Every other ignored path refuses (for example project/metals.sbt,
    * project/.bloop/, or a source file hidden by .git/info/exclude or core.excludesFile).
    */
-  def erDevIgnoredAllowed(path: String): Boolean =
-    ErDevGeneratedDirs.contains(path) ||
+  def erDevIgnoredAllowed(path: String): Boolean = scopeIgnoredAllowed(ErDevGeneratedDirs)(path)
+
+  /** The ignored-path rule of a code-scope check: the given generated directories, or .DS_Store. */
+  def scopeIgnoredAllowed(generated: Set[String])(path: String): Boolean =
+    generated.contains(path) ||
       (!path.endsWith("/") && path.split('/').lastOption.contains(".DS_Store"))
 
   private val CodeVersionField = "\"codeVersion\"\\s*:\\s*\"([^\"\\\\]*)\"".r
@@ -1457,81 +1481,15 @@ object LocalRuns {
       case None =>
         refuse(task, s"$cmd did not run or exceeded ${GitTimeoutSeconds}s; $what cannot run")
     }
-    val st = readTreeState(task, run, erDevIgnoredAllowed _, ErDevCodeScope, what)
-    if (st.tracked == 0)
-      refuse(task, s"git ls-files lists no tracked file in $scopeText; this is not the repository")
-    if (st.flagged.nonEmpty)
-      refuse(
-        task,
-        s"git ls-files -v -- $scopeText lists ${st.flagged.size} tracked file(s) with an index " +
-          "flag (S = skip-worktree, lower case = assume-unchanged, M = unmerged); git status " +
-          s"cannot see changes behind them; first: ${firstOf(st.flagged)}"
-      )
-    if (st.changes.nonEmpty)
-      refuse(
-        task,
-        s"git status --porcelain --untracked-files=all -- $scopeText lists ${st.changes.size} " +
-          "path(s); the dev run compiles this scope, so it must be committed (no modified, " +
-          s"staged, deleted, or untracked non-ignored path); first: ${firstOf(st.changes)}"
-      )
-    if (st.ignoredRefused.nonEmpty)
-      refuse(
-        task,
-        s"git status --ignored=matching -- $scopeText lists ${st.ignoredRefused.size} ignored " +
-          s"path(s) other than the sbt target directories (${ErDevGeneratedDirs.toSeq.sorted
-              .mkString(", ")}) and .DS_Store files; sbt could read them; first: " +
-          firstOf(st.ignoredRefused)
-      )
-    committedFileWith(task, base, ".gitignore", run)
-
-    val entries = ok(Seq("ls-tree", "-r", "-z", "HEAD") ++ scope, "git ls-tree -r HEAD")
-      .split('\u0000')
-      .filter(_.nonEmpty)
-      .toVector
-      .map { rec =>
-        val tab = rec.indexOf('\t')
-        val meta = if (tab < 0) Array.empty[String] else rec.take(tab).split(' ')
-        if (meta.length != 3)
-          refuse(task, s"git ls-tree printed an unexpected entry: ${rec.take(200)}")
-        (meta(0), meta(2), rec.drop(tab + 1))
-      }
-    val special = entries.filterNot { case (m, _, _) => m == "100644" || m == "100755" }
-    if (special.nonEmpty)
-      refuse(
-        task,
-        s"HEAD holds ${special.size} entr(y/ies) in $scopeText that are not regular files (mode " +
-          "120000 symbolic link or 160000 gitlink), which the raw-byte check refuses; first: " +
-          firstOf(special.map { case (m, _, p) => s"$m $p" })
-      )
-    if (entries.size != st.tracked)
-      refuse(
-        task,
-        s"git ls-tree lists ${entries.size} file(s) at HEAD in $scopeText, but the index holds " +
-          s"${st.tracked}"
-      )
-    val differing = entries
-      .grouped(100)
-      .flatMap { chunk =>
-        val hashes = ok(
-          Seq("hash-object", "--no-filters", "--") ++ chunk.map(_._3),
-          "git hash-object --no-filters"
-        ).split('\n').map(_.trim).filter(_.nonEmpty).toVector
-        if (hashes.size != chunk.size)
-          refuse(
-            task,
-            s"git hash-object --no-filters printed ${hashes.size} hash(es) for ${chunk.size} " +
-              s"path(s); $what cannot run"
-          )
-        chunk.zip(hashes).collect { case ((_, h, p), w) if h != w => p }
-      }
-      .toVector
-    if (differing.nonEmpty)
-      refuse(
-        task,
-        s"${differing.size} tracked file(s) in $scopeText differ from HEAD in raw bytes (git " +
-          "hash-object --no-filters), although git status may call them clean (a clean filter " +
-          s"or a stat setting can hide a change); first: ${firstOf(differing)}"
-      )
+    val st = scopeEqualsHead(
+      task,
+      base,
+      run,
+      ErDevCodeScope,
+      ErDevGeneratedDirs,
+      "the dev run compiles this scope",
+      what
+    )
 
     val versions = ErDevManifests.map(m => m -> codeVersionOf(task, base, m))
     val c = versions.map(_._2).distinct match {
@@ -1595,6 +1553,115 @@ object LocalRuns {
       s"$c in both manifests is ${if (c == head) "HEAD" else s"an ancestor of HEAD $head"}, and " +
       s"$c..HEAD changes ${if (changed.isEmpty) "nothing" else changed.mkString(", ")} in this scope"
   }
+
+  /**
+   * Steps 1 and 2 of a code-scope check over `paths` (BE-P6-02, shared with BE-P6-09
+   * sparkSubmitLocal): every tracked file has no index flag; git status lists no modified, staged,
+   * deleted or untracked (non-ignored) path; every ignored path is one of `generated` (exact
+   * strings) or a .DS_Store file; the root .gitignore is committed and byte-identical to HEAD; and
+   * every HEAD entry in the scope is a regular file whose raw working-tree bytes (`git hash-object
+   * --no-filters`) equal its HEAD blob. `who` completes the uncommitted-path refusal ("<who>, so it
+   * must be committed"). Returns the tree state; refuses otherwise.
+   */
+  def scopeEqualsHead(
+      task: String,
+      base: File,
+      run: GitRunner,
+      paths: Seq[String],
+      generated: Set[String],
+      who: String,
+      what: String
+  ): TreeState = {
+    val scopeText = paths.mkString(" ")
+    val scope = "--" +: paths
+    def ok(args: Seq[String], cmd: String): String = run(TreeGitOptions ++ args) match {
+      case Some((0, out)) => out
+      case Some((n, _)) => refuse(task, s"$cmd exited $n; $what cannot run")
+      case None =>
+        refuse(task, s"$cmd did not run or exceeded ${GitTimeoutSeconds}s; $what cannot run")
+    }
+    val st = readTreeState(task, run, scopeIgnoredAllowed(generated) _, paths, what)
+    if (st.tracked == 0)
+      refuse(task, s"git ls-files lists no tracked file in $scopeText; this is not the repository")
+    if (st.flagged.nonEmpty)
+      refuse(
+        task,
+        s"git ls-files -v -- $scopeText lists ${st.flagged.size} tracked file(s) with an index " +
+          "flag (S = skip-worktree, lower case = assume-unchanged, M = unmerged); git status " +
+          s"cannot see changes behind them; first: ${firstOf(st.flagged)}"
+      )
+    if (st.changes.nonEmpty)
+      refuse(
+        task,
+        s"git status --porcelain --untracked-files=all -- $scopeText lists ${st.changes.size} " +
+          s"path(s); $who, so it must be committed (no modified, " +
+          s"staged, deleted, or untracked non-ignored path); first: ${firstOf(st.changes)}"
+      )
+    if (st.ignoredRefused.nonEmpty)
+      refuse(
+        task,
+        s"git status --ignored=matching -- $scopeText lists ${st.ignoredRefused.size} ignored " +
+          s"path(s) other than the sbt target directories (${generated.toSeq.sorted
+              .mkString(", ")}) and .DS_Store files; sbt could read them; first: " +
+          firstOf(st.ignoredRefused)
+      )
+    committedFileWith(task, base, ".gitignore", run)
+
+    val entries = ok(Seq("ls-tree", "-r", "-z", "HEAD") ++ scope, "git ls-tree -r HEAD")
+      .split('\u0000')
+      .filter(_.nonEmpty)
+      .toVector
+      .map { rec =>
+        val tab = rec.indexOf('\t')
+        val meta = if (tab < 0) Array.empty[String] else rec.take(tab).split(' ')
+        if (meta.length != 3)
+          refuse(task, s"git ls-tree printed an unexpected entry: ${rec.take(200)}")
+        (meta(0), meta(2), rec.drop(tab + 1))
+      }
+    val special = entries.filterNot { case (m, _, _) => m == "100644" || m == "100755" }
+    if (special.nonEmpty)
+      refuse(
+        task,
+        s"HEAD holds ${special.size} entr(y/ies) in $scopeText that are not regular files (mode " +
+          "120000 symbolic link or 160000 gitlink), which the raw-byte check refuses; first: " +
+          firstOf(special.map { case (m, _, p) => s"$m $p" })
+      )
+    if (entries.size != st.tracked)
+      refuse(
+        task,
+        s"git ls-tree lists ${entries.size} file(s) at HEAD in $scopeText, but the index holds " +
+          s"${st.tracked}"
+      )
+    val differing = entries
+      .grouped(100)
+      .flatMap { chunk =>
+        val hashes = ok(
+          Seq("hash-object", "--no-filters", "--") ++ chunk.map(_._3),
+          "git hash-object --no-filters"
+        ).split('\n').map(_.trim).filter(_.nonEmpty).toVector
+        if (hashes.size != chunk.size)
+          refuse(
+            task,
+            s"git hash-object --no-filters printed ${hashes.size} hash(es) for ${chunk.size} " +
+              s"path(s); $what cannot run"
+          )
+        chunk.zip(hashes).collect { case ((_, h, p), w) if h != w => p }
+      }
+      .toVector
+    if (differing.nonEmpty)
+      refuse(
+        task,
+        s"${differing.size} tracked file(s) in $scopeText differ from HEAD in raw bytes (git " +
+          "hash-object --no-filters), although git status may call them clean (a clean filter " +
+          s"or a stat setting can hide a change); first: ${firstOf(differing)}"
+      )
+    st
+  }
+
+  /**
+   * A git runner over `base` with the local runs' hygiene (GIT_* removed, bounded, stdin closed).
+   */
+  def gitRunnerAt(base: File): GitRunner = gitRunner(base)
 
   // --- Dev run guards (BE-P6-02, M3: each refusal is a function the self-test calls) ------
 

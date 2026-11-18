@@ -24,6 +24,13 @@
 //     temporary repository only.
 //   - MUNIT_*: only the NAMES are used: sparkIT removes every inherited MUNIT_* (for example
 //     MUNIT_FLAKY_OK) from its forked JVM, and its runner refuses to run while any is present.
+//   - sparkSubmitLocal (BE-P6-09) passes sbt's environment to its spark-submit children minus,
+//     by NAME, every AWS_*, SCHOLARCHAIN_*, GIT_*, MUNIT_*, SPARK_*, HADOOP_*, YARN_*, PYSPARK_*
+//     and JAVA_TOOL_OPTIONS, _JAVA_OPTIONS, JDK_JAVA_OPTIONS, JAVA_OPTS, SBT_OPTS, CLASSPATH;
+//     it sets JAVA_HOME, SPARK_HOME, SPARK_CONF_DIR, SPARK_LOCAL_IP=127.0.0.1 and
+//     SPARK_WORKER_DIR for them, plus the AWS isolation variables. Its comparison JVM gets
+//     sbt's environment minus the same prefixes and exact names, plus the AWS isolation
+//     variables (CR-P6-27 m3). Values are never read.
 // No other variable is read. (sparkIT and verifySparkItGuards also read the `user.home` JVM
 // system property of sbt, not an environment variable, to resolve the archive root configured
 // in project/spark-it.properties.)
@@ -109,6 +116,23 @@ lazy val verifySparkItRunner =
   taskKey[Unit](
     "Forks the real sparkIT JUnit runner on the SparkIT classpath against compiled fixture " +
       "classes (pass, fail, ignore, assume, exit, mixed); never reads the archive"
+  )
+// EMR Option A packaging and local runtime gate (BE-P6-09): see project/SparkSubmitLocal.scala.
+lazy val sparkJobAssemblyCheck =
+  taskKey[Unit](
+    "Checks the sparkAnalytics job assembly (Main-Class; no Spark, Hadoop, AWS SDK, logging or " +
+      "scala-library 2.13 class) and prints its sha256; run by packageJobs"
+  )
+lazy val sparkSubmitLocal =
+  taskKey[Unit](
+    "Opt-in: runs the pinned Apache Spark distribution's spark-submit with the job assembly over " +
+      "the verified dev archive at local[2] and local-cluster[2,1,1024]; output under " +
+      "target/spark-submit-local/; never part of check"
+  )
+lazy val verifySparkSubmitLocalGuards =
+  taskKey[Unit](
+    "Tests the sparkSubmitLocal pins, tar reader, cache, assembly, command and verdict rules on " +
+      "constants and temporary directories; no network, no fork"
   )
 
 // SparkIT: the integration-test configuration of sparkAnalytics. It extends Test (test classes and
@@ -319,7 +343,18 @@ lazy val sparkAnalytics = project
   .settings(
     name := "scholarchain-spark-analytics",
     libraryDependencies += sparkSql.value % Provided,
-    Test / javaOptions ++= java17Opens
+    Test / javaOptions ++= java17Opens,
+    // BE-P6-09 (EMR Option A): the job entry point; scala-library is supplied by the runtime (the
+    // ledger's spark.runtime.scala-library first on the driver and executor classpath), never by
+    // the jar; scala3-library_3 stays inside. Spark and Hadoop are Provided and absent.
+    // sparkJobAssemblyCheck verifies the content. Repeatable build: sorted entries, fixed times.
+    assembly / mainClass := Some(SparkSubmitLocal.JobMainClass),
+    assembly / assemblyExcludedJars := (assembly / fullClasspath).value.filter(
+      _.get(moduleID.key).exists(m =>
+        m.organization == "org.scala-lang" && m.name == "scala-library"
+      )
+    ),
+    assembly / assemblyRepeatableBuild := true
   )
   // BE-P6-03: the opt-in SparkIT configuration (see its definition above). Running happens only in
   // sparkIT; `check` also compiles it (BE-P6-05).
@@ -532,6 +567,67 @@ lazy val root = project
       awsIsolationEnv(target.value / "no-aws"),
       streams.value.log
     ),
+    // BE-P6-09: the job assembly content check, run by packageJobs (and inside sparkSubmitLocal).
+    sparkJobAssemblyCheck := {
+      SparkSubmitLocal.checkAssembly(
+        SparkSubmitLocal.AssemblyCheckTask,
+        (sparkAnalytics / assembly).value,
+        (sparkAnalytics / Compile / dependencyClasspath).value,
+        versionLedger.value("scala"),
+        versionLedger.value("spark.runtime.scala-library"),
+        streams.value.log
+      )
+      ()
+    },
+    // BE-P6-09: opt-in local runtime gate. Not part of `check`; writes no marker. A dynamic task, so
+    // the Java, ledger, code-scope and archive checks run before sbt builds the assembly and the
+    // sparkAnalytics Test classpath; they run again before anything is downloaded or forked.
+    sparkSubmitLocal := Def.taskDyn {
+      val buildBase = (ThisBuild / baseDirectory).value
+      val home = sys.props.get("user.home")
+      val inherited = sys.env
+      val targets = target.all(ScopeFilter(inAnyProject)).value
+      val sparkTarget = (sparkAnalytics / target).value
+      val ledger = versionLedger.value
+      val jdk = javaHome.value
+      // CR-P6-27 m2: the HEAD seen before compiling; the task refuses if HEAD differs after.
+      val headBefore = SparkSubmitLocal.beforeCompile(
+        buildBase,
+        home,
+        inherited,
+        targets,
+        sparkTarget,
+        ledger,
+        jdk,
+        streams.value.log
+      )
+      Def.task {
+        SparkSubmitLocal.sparkSubmitLocal(
+          buildBase,
+          home,
+          inherited,
+          targets,
+          sparkTarget,
+          ledger,
+          jdk,
+          headBefore,
+          (sparkAnalytics / assembly).value,
+          (sparkAnalytics / Compile / dependencyClasspath).value,
+          (sparkAnalytics / Test / fullClasspath).value.map(_.data),
+          (sparkAnalytics / Test / discoveredMainClasses).value,
+          dependencyResolution.value,
+          java17Opens,
+          awsIsolationEnv(target.value / "no-aws"),
+          streams.value.log
+        )
+      }
+    }.value,
+    verifySparkSubmitLocalGuards := SparkSubmitLocal.guardSelfTest(
+      versionLedger.value,
+      checkSteps,
+      java17Opens,
+      streams.value.log
+    ),
     // Synthetic held-out output-route check (decisions-17/19), run by `check`. The probe's task
     // streams are closed when it completes, before the scan reads every sbt target directory.
     heldoutRouteProbe := LocalRuns.routeProbe(
@@ -573,10 +669,14 @@ lazy val checkSteps = Seq(
   "verifyErDevRunGuards",
   "verifySparkItGuards",
   "verifySparkItRunner", // BE-P6-06: real runner on fixtures; no archive, no sparkIT
+  "verifySparkSubmitLocalGuards", // BE-P6-09: no network, no fork, never sparkSubmitLocal
   "markTestRun"
 )
 addCommandAlias("check", checkSteps.mkString("; ", " ; ", ""))
-addCommandAlias("packageJobs", "; hadoop/assembly ; sparkAnalytics/assembly")
+addCommandAlias(
+  "packageJobs",
+  "; hadoop/assembly ; sparkAnalytics/assembly ; sparkJobAssemblyCheck"
+)
 addCommandAlias("dockerLocal", "; services/Docker/publishLocal")
 // localPipelineDev/Heldout and goldSetEvalDev/Heldout are root tasks, not aliases: see the
 // root project settings and project/LocalRuns.scala.

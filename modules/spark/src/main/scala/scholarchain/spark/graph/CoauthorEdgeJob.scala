@@ -72,17 +72,26 @@ object CoauthorEdgeJob {
 
   private def uri(p: StorePath): String = p.toUri.toString
 
+  /** Every part location `textFile` would split or glob-expand (CR-P6-26 n3). */
+  private[graph] def globProblems(parts: Vector[StorePath]): Vector[String] =
+    parts.flatMap(StorePath.globProblem)
+
   /**
    * The text rows of `parts`, read by Spark's own Hadoop FileSystem for each location's URI
-   * (`file:`, `hdfs:`, `s3a:`), so every executor reads them directly (SP-P6-04).
+   * (`file:`, `hdfs:`, `s3a:`), so every executor reads them directly (SP-P6-04). `textFile` takes
+   * one comma-separated string of glob patterns, so a part location with a comma or a glob
+   * character is refused (IllegalArgumentException; [[countedTeams]] refuses it first).
    */
   private[graph] def lines(
       sc: SparkContext,
       parts: Vector[StorePath],
       partitions: Int
-  ): RDD[String] =
+  ): RDD[String] = {
+    val bad = globProblems(parts)
+    require(bad.isEmpty, bad.mkString("; "))
     if (parts.isEmpty) sc.emptyRDD[String]
     else sc.textFile(parts.map(uri).mkString(","), partitions)
+  }
 
   // Decoders are methods of this top-level object, so task closures reference the object
   // statically and never capture a (non-serializable) RecordContract instance.
@@ -119,6 +128,10 @@ object CoauthorEdgeJob {
       partitions: Int
   ): Either[Vector[String], RDD[PublicationTeam]] =
     for {
+      _ <- {
+        val bad = globProblems(teamParts ++ workParts)
+        if (bad.isEmpty) Right(()) else Left(bad.map(w => s"input parts: $w"))
+      }
       teams <- checked("teams", lines(sc, teamParts, partitions).map(decodeTeam), teamRows)
       works <- checked("works", lines(sc, workParts, partitions).map(decodeWork), workRows)
     } yield {

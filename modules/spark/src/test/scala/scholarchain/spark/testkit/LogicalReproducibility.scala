@@ -4,7 +4,9 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.{col, count, lit}
 import org.apache.spark.sql.types.StructType
 
+import scholarchain.core.SchemaVersions
 import scholarchain.spark.input.RunTree
+import scholarchain.spark.output.NeptuneCsvParts
 import scholarchain.spark.store.{HadoopRunStore, NioRunStore, StorePath}
 
 /**
@@ -23,6 +25,35 @@ import scholarchain.spark.store.{HadoopRunStore, NioRunStore, StorePath}
 object LogicalReproducibility {
 
   val MultiplicityColumn = "__multiplicity"
+
+  /**
+   * The 16 Parquet datasets of a published collaboration-analysis run, by record schema label
+   * (`path-length-estimate.v1` only when the run's configuration sets `analysis.pathLength*`).
+   */
+  val ParquetDatasets: Vector[String] = Vector(
+    SchemaVersions.CoauthorEdgeV2,
+    SchemaVersions.ResearcherMetricsV2,
+    SchemaVersions.ComponentMembership,
+    SchemaVersions.CommunityMembership,
+    SchemaVersions.BridgeMeasure,
+    SchemaVersions.Coreness,
+    SchemaVersions.GraphNodeV2,
+    SchemaVersions.GraphEdgeV2,
+    SchemaVersions.WindowStructure,
+    SchemaVersions.AnalysisWindow,
+    SchemaVersions.EvidencePath,
+    SchemaVersions.PathLengthEstimate,
+    SchemaVersions.WindowComparison,
+    SchemaVersions.ResearcherTemporalChange,
+    SchemaVersions.SemanticSummaryInput,
+    SchemaVersions.EntitySummaryInput
+  )
+
+  /**
+   * The 12 Neptune bulk-load CSV datasets of a run, by dataset directory (vertices, then edges).
+   */
+  val CsvDatasets: Vector[String] =
+    NeptuneCsvParts.vertexDatasets.map(_._2) ++ NeptuneCsvParts.edgeDatasets.map(_._2)
 
   final case class Report(
       schemaA: StructType,

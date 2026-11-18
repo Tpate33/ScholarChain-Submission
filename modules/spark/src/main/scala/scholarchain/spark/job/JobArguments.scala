@@ -136,12 +136,16 @@ object JobArguments {
       v: String
   ): Either[String, StorePath] =
     StorePath.parse(v).left.map(w => s"$flag: $w").flatMap { p =>
-      if (schemes.contains(p.scheme)) Right(p)
-      else
+      if (!schemes.contains(p.scheme))
         Left(
           s"$flag: scheme '${p.scheme}' is not accepted (${schemes.toVector.sorted.mkString(", ")}" +
             "; use s3a:// for S3)"
         )
+      else
+        StorePath.globProblem(p) match {
+          case Some(w) => Left(s"$flag: $w")
+          case None => Right(p)
+        }
     }
 
   private def relative(flag: String, v: String): Either[String, String] =
@@ -229,7 +233,11 @@ object JobArguments {
               case Left(w) => Left(if (w.startsWith(CheckpointDir)) w else s"$CheckpointDir: $w")
               case Right(p) if !Schemes.contains(p.scheme) =>
                 Left(s"$CheckpointDir: scheme '${p.scheme}' is not accepted")
-              case Right(p) => Right((c, p))
+              case Right(p) =>
+                StorePath.globProblem(p) match {
+                  case Some(w) => Left(s"$CheckpointDir: $w")
+                  case None => Right((c, p))
+                }
             }
         }
       }
@@ -257,7 +265,8 @@ object JobArguments {
         val in = inputRoot.toOption.get
         val out = outputRoot.toOption.get
         val ck = checkpoint.toOption.get._2
-        def overlap(a: StorePath, b: StorePath) = a.startsWith(b) || b.startsWith(a)
+        // Authority spellings of one file system are not told apart (CR-P6-26 n2).
+        def overlap(a: StorePath, b: StorePath) = StorePath.mayOverlap(a, b)
         val overlaps = Vector(
           Option.when(overlap(in, out))(
             s"$OutputRoot $out and $InputRoot $in overlap: the job never writes into the archive"

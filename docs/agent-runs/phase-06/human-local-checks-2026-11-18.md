@@ -1,0 +1,10 @@
+# Phase 06: human-run local Terraform and script checks (2026-11-18)
+
+Run by the human in a regular Terminal (commands from ie-p6-03-report.md); two screenshots shared in session at 1:28 PM. Transcribed observations:
+
+- `terraform init -input=false -backend=false` for three stacks: each "Terraform has been successfully initialized!"; provider "Installed hashicorp/aws v6.72.0 (signed by HashiCorp)"; base resolved `">= 6.0.0, 6.72.0, < 7.0.0"` (modules data_bucket and logs_bucket in ../../../modules/private-bucket); emr-run also lists terraform.io/builtin/terraform; each created `.terraform.lock.hcl`.
+- `terraform validate` for three stacks: "Success! The configuration is valid." each; no warning visible in the captured portion.
+- `bash scripts/emr/check-submit-args.sh`: wrapper self-check printed ARGV lines (visible 048-085 include `spark.yarn.maxAppAttempts=1`, `spark.hadoop.fs.s3a.directory.marker.retention=keep`, input `s3a://scholarchain-dev-data-000000000000-us-east-1/input/dev-run-01`, the three pinned run paths, output `s3a://…/output/spark`, checkpoint `hdfs://ip-10-42-0-10.ec2.internal:8020/scholarchain/checkpoints/a1-0123456789abcdef`, 17 job flags) and "RESULT SELF-CHECK-OK fs.defaultFS=hdfs://ip-10-42-0-10.ec2.internal:8020 authority=ip-10-42-0-10.ec2.internal:8020 argc=86"; 4 "CASE ok accepted" lines (host:8020, host:8020/, hdfs://namenode, 10.42.0.10:8020) and 18 "CASE ok refused" lines (hdfs:///, hdfs://, hdfs://:8020, file:///, s3a://bucket, path beyond '/', '//', port 0, 65536, 80:90, -host, host-, ho_st, host,other, user@host, ho*st, [::1]:8020, HDFS://host); "[check-submit-args] RESULT PASS".
+- Not visible in the screenshots (scrolled out): `terraform fmt -check -recursive`, `shellcheck …`, `bash -n scripts/cleanup.sh` output. Pending the human's confirmation that each printed nothing.
+
+Closes CR-P6-27 M1 locally (the exact argv passes the wrapper's checks; the job-side StorePath/JobArguments acceptance was established by CR-P6-28 reading). Provider 6.72.0 now validated against all three stacks.

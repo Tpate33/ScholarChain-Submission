@@ -395,12 +395,30 @@ object AnalysisRun {
             case Left(w) =>
               Some(s"the checkpoint directory cannot be compared with the output root: $w")
             case Right(p) =>
-              Option.when(p.startsWith(outputRoot) || outputRoot.startsWith(p))(
+              // Authority spellings of one file system are not told apart (CR-P6-26 n2).
+              Option.when(StorePath.mayOverlap(p, outputRoot))(
                 s"the checkpoint directory $p overlaps the output root $outputRoot"
               )
           }
       }
     ).flatten
+  }
+
+  /**
+   * The last line of a load-manifest refusal after the run itself was published (CR-P6-26 n4). The
+   * local staged protocol removes its staging directory, so `load=<hex>` is absent; the commit
+   * protocol (no rename, nothing deleted) may leave a partial `load=<hex>` with some manifests,
+   * which every reader refuses ([[LoadManifests.verify]]). Either way the run has no verified load
+   * manifests.
+   */
+  private[analysis] def loadManifestsNotPublished(
+      published: PublishedRun,
+      outputRoot: StorePath
+  ): String = {
+    val loadDir = outputRoot.resolve(LoadManifests.DirPrefix + published.runId.stripPrefix("run:"))
+    s"run ${published.runId} was published and verified at ${published.dir}, but it has no verified load manifests: " +
+      s"$loadDir is absent, or present and incomplete or not written by this call (never deleted), and refused by every reader; " +
+      "publish again as a new attempt (a new run ID), or a human removes that load directory"
   }
 
   /** The checkpoint root as a location (an absolute local path or a URI). */
@@ -879,7 +897,7 @@ object AnalysisRun {
           .left
           .map(
             _.map(w => s"load manifests: $w") :+
-              s"run ${published.runId} was published and verified at ${published.dir}; its load manifests were not written"
+              loadManifestsNotPublished(published, outputRoot)
           )
       } yield CollaborationRunResult(
         published,

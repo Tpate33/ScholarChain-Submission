@@ -14,7 +14,7 @@ import scholarchain.core.config.{AnalysisRunSettings, ConfigLoader}
 import scholarchain.spark.analysis.{AnalysisJobConfig, AnalysisRun, CollaborationRunResult}
 import scholarchain.spark.graph.Checkpointing
 import scholarchain.spark.input.{ReaderLimits, RunTree, SyntheticCuratedPin, VerifiedArchiveReader}
-import scholarchain.spark.output.{LoadManifests, NeptuneCsvParts, PublishedRun, RunPublisher}
+import scholarchain.spark.output.{LoadManifests, PublishedRun, RunPublisher}
 import scholarchain.spark.store.{HadoopRunStore, RunStore, S3SimFileSystem, StorePath}
 import scholarchain.spark.testkit.{LocalSpark, LogicalReproducibility, MetricsFixtures, RunFixtures}
 
@@ -147,6 +147,74 @@ class CollaborationJobSuite extends munit.FunSuite {
     refused(base + (JobArguments.MaxMetadataBytes -> (RunTree.MaxArrayBytes + 1).toString), "1..")
   }
 
+  test("CR-P6-26 n2: root overlap is refused whatever the authority spelling") {
+    // The reviewer's failure input: one name node with and without its port.
+    refused(
+      base ++ Map(
+        JobArguments.OutputRoot -> "hdfs://namenode:8020/analysis",
+        JobArguments.CheckpointDir -> "hdfs://namenode/analysis/ck"
+      ),
+      "--checkpoint-dir hdfs://namenode/analysis/ck and --output-root hdfs://namenode:8020/analysis overlap"
+    )
+    refused(
+      base + (JobArguments.OutputRoot -> "s3a://archive-bucket:443/dev-archive/out"),
+      "never writes into the archive"
+    )
+    // HDFS: another spelling of the name node (an address, no port) is the same file system.
+    refused(
+      base ++ Map(
+        JobArguments.InputRoot -> "hdfs://namenode:8020/scholarchain/archive",
+        JobArguments.CheckpointDir -> "hdfs://10.0.0.1/scholarchain"
+      ),
+      "--checkpoint-dir hdfs://10.0.0.1/scholarchain and --input-root hdfs://namenode:8020/scholarchain/archive overlap"
+    )
+    // Disjoint paths on one name node, and different buckets, stay accepted.
+    assert(
+      JobArguments
+        .parse(
+          argv(
+            base ++ Map(
+              JobArguments.OutputRoot -> "hdfs://namenode/analysis",
+              JobArguments.CheckpointDir -> "hdfs://namenode:8020/checkpoints"
+            )
+          )
+        )
+        .isRight
+    )
+  }
+
+  test("CR-P6-26 n2: the checkpoint and output overlap check of AnalysisRun ignores the port") {
+    val cfg = AnalysisJobConfig(
+      settings,
+      code,
+      1,
+      SortedMap.empty,
+      1,
+      Checkpointing("hdfs://namenode/analysis/ck", 1)
+    )
+    def at(root: String) =
+      AnalysisRun.structureProblems(cfg, StorePath.parse(root).fold(e => fail(e), identity))
+    assert(at("hdfs://namenode:8020/analysis").exists(_.contains("overlaps the output root")))
+    assert(at("hdfs://namenode/analysis/ck/out").exists(_.contains("overlaps the output root")))
+    assertEquals(at("hdfs://namenode:8020/other"), Vector.empty)
+  }
+
+  test("CR-P6-26 n3: a comma or a glob character in any location is refused") {
+    Vector(
+      JobArguments.InputRoot -> "s3a://archive-bucket/dev,archive",
+      JobArguments.InputRoot -> "/data/archive*",
+      JobArguments.OutputRoot -> "s3a://output-bucket/out*",
+      JobArguments.OutputRoot -> "/data/out?",
+      JobArguments.CheckpointDir -> "/data/ck[0]",
+      JobArguments.CheckpointDir -> "hdfs://namenode:8020/ck,x",
+      JobArguments.Config -> "/data/{a,b}.conf",
+      JobArguments.BenchmarkPairs -> "s3a://artifacts-bucket/pairs,x.json"
+    ).foreach { case (flag, v) =>
+      refused(base + (flag -> v), s"$flag: ")
+      refused(base + (flag -> v), "comma or a Hadoop glob character")
+    }
+  }
+
   test("a cluster master refuses local input, output and checkpoint roots (executors' disks)") {
     val local = base ++ Map(
       JobArguments.InputRoot -> "/data/archive",
@@ -192,6 +260,7 @@ class CollaborationJobSuite extends munit.FunSuite {
   private var configPath: Path = null
   private var pairsPath: Path = null
   private var baseline: CollaborationRunResult = null
+  private var settings: AnalysisRunSettings = null
 
   override def beforeAll(): Unit = {
     tmp = Files.createTempDirectory("scholarchain-job-")
@@ -209,7 +278,7 @@ class CollaborationJobSuite extends munit.FunSuite {
     Files.writeString(pairsPath, Json.write(pairs) + "\n")
     // The baseline: the java.nio reader and the staged-rename publisher, same settings and input.
     val text = Files.readString(configPath)
-    val settings = ConfigLoader
+    settings = ConfigLoader
       .resolve(Vector(StorePath.local(configPath).toString -> text), Map.empty)
       .flatMap(AnalysisRunSettings.from)
       .fold(e => fail(e.map(_.message).mkString("\n")), identity)
@@ -286,27 +355,9 @@ class CollaborationJobSuite extends munit.FunSuite {
     (status, bytes.toString(StandardCharsets.UTF_8).split("\n").toVector)
   }
 
-  private val parquetSchemas = Vector(
-    SchemaVersions.CoauthorEdgeV2,
-    SchemaVersions.ResearcherMetricsV2,
-    SchemaVersions.ComponentMembership,
-    SchemaVersions.CommunityMembership,
-    SchemaVersions.BridgeMeasure,
-    SchemaVersions.Coreness,
-    SchemaVersions.GraphNodeV2,
-    SchemaVersions.GraphEdgeV2,
-    SchemaVersions.WindowStructure,
-    SchemaVersions.AnalysisWindow,
-    SchemaVersions.EvidencePath,
-    SchemaVersions.PathLengthEstimate,
-    SchemaVersions.WindowComparison,
-    SchemaVersions.ResearcherTemporalChange,
-    SchemaVersions.SemanticSummaryInput,
-    SchemaVersions.EntitySummaryInput
-  )
+  private val parquetSchemas = LogicalReproducibility.ParquetDatasets
 
-  private val csvDatasets =
-    NeptuneCsvParts.vertexDatasets.map(_._2) ++ NeptuneCsvParts.edgeDatasets.map(_._2)
+  private val csvDatasets = LogicalReproducibility.CsvDatasets
 
   private def hex = baseline.runId.stripPrefix("run:")
 
@@ -420,5 +471,52 @@ class CollaborationJobSuite extends munit.FunSuite {
       VerifiedArchiveReader.layout(store, "analysis", published.dir, limits),
       Vector.empty
     )
+  }
+
+  test("CR-P6-26 u1: s3a: roots without kept directory markers are refused (exit 1) before I/O") {
+    val conf = spark.sparkContext.hadoopConfiguration
+    val key = StartupChecks.MarkerRetentionKey
+    val before = Option(conf.get(key))
+    conf.set(key, "delete")
+    val (status, lines) =
+      try runJob(argv(base))
+      finally before.fold(conf.unset(key))(v => conf.set(key, v))
+    assertEquals(status, CollaborationJob.ExitRefused, lines.mkString("\n"))
+    val refusals = lines.filter(_.startsWith("scholarchain-collaboration-job refused: "))
+    // One per s3a: location of base (input, output, configuration, pairs; the checkpoint is hdfs).
+    assertEquals(refusals.size, 4, lines.mkString("\n"))
+    assert(refusals.forall(_.contains(s"$key is 'delete'")), refusals.mkString("\n"))
+    assert(refusals.exists(_.contains("--output-root s3a://output-bucket/analysis")), refusals)
+    // Refused before the configuration file was read (no S3A client was ever asked for it).
+    assert(!lines.exists(_.contains("configuration:")), lines.mkString("\n"))
+    assert(!lines.exists(_.contains("failure:")), lines.mkString("\n"))
+  }
+
+  test("CR-P6-26 n4: a load-manifest refusal after the run published names the load directory") {
+    val out = tmp.resolve("out-job-load-exists")
+    val foreign = Files.createDirectories(out.resolve(s"load=$hex"))
+    val (status, lines) = runJob(
+      jobArgs(fileUri(written.runs.archiveRoot), fileUri(out), fileUri(tmp.resolve("ck-job-load")))
+    )
+    assertEquals(status, CollaborationJob.ExitRefused, lines.mkString("\n"))
+    val text = lines.mkString("\n")
+    assert(text.contains(s"load manifests: ${out.resolve(s"load=$hex")} already exists"), text)
+    assert(
+      text.contains(
+        s"run ${baseline.runId} was published and verified at ${out.resolve(s"run=$hex")}, " +
+          s"but it has no verified load manifests: ${out.resolve(s"load=$hex")} is absent, or present"
+      ),
+      text
+    )
+    assert(!text.contains("its load manifests were not written"), text)
+    // The run itself verifies; the existing load directory is left exactly as it was.
+    val run = StorePath.local(out.resolve(s"run=$hex"))
+    assert(
+      RunPublisher
+        .verifyPublished(spark, store, run, baseline.runId, limits.maxMetadataBytes)
+        .isRight
+    )
+    assertEquals(names(foreign), Vector.empty)
+    assertEquals(names(out), Vector(s"load=$hex", s"run=$hex"))
   }
 }

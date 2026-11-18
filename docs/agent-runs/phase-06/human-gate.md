@@ -83,3 +83,25 @@ sbt check and sparkIT run 08 evidence. Carry the documented nits forward.
 I approve Option A for local preparation and runtime compatibility
 validation. Cloud execution, uploads, infrastructure changes and spending
 require approval of the concrete plan. Phase 6 remains open.
+
+## Phase 6 EMR preparation: implementation acceptance and account setup (2026-11-18)
+
+I accept SP-P6-05, SP-P6-06, BE-P6-09 with repair 01, IE-P6-02 with repairs 01–03, and IE-P6-03 for commit as preparation only, following reviews CR-P6-27 (REQUEST_CHANGES, repaired), CR-P6-28, CR-P6-29, CR-P6-31 and CR-P6-32 (APPROVE).
+
+Evidence: last reported agent sbt check had 1570 passed, 0 failed, 0 errored and 0 skipped. My local Terraform init -backend=false and validate succeeded for bootstrap, base and emr-run with hashicorp/aws 6.72.0. The submit-argument self-check returned RESULT PASS. ShellCheck on scripts/cleanup.sh and bash -n scripts/cleanup.sh both exited 0.
+
+Manual account setup outside Terraform:
+- Personal AWS Paid account 663570374448; root MFA enabled; no root access keys.
+- ScholarChain-monthly budget alert: USD 10/month. This is an alert, not a spending cap.
+- IAM user scholarchain-admin: console password, MFA, no access keys, AdministratorAccess and SignInLocalDevelopmentAccess.
+- CLI profile scholarchain-login uses aws login. Verified caller: arn:aws:iam::663570374448:user/scholarchain-admin. AWS Organizations and IAM Identity Center are not enabled.
+- Requested quota L-1216C47A in us-east-1 increase to 8; AWS Support approved 16 vCPUs at 13:26 on 2026-11-18. Effective quota remains unverified until rechecked. Cluster deployment must refuse below 8.
+- Read-only checks confirmed emr-7.14.0 and m5.xlarge offerings in use1-az6, use1-az2, use1-az1, use1-az5 and use1-az4.
+
+Decisions: Option A runtime; us-east-1; dev; use1-az4; owner taufeeq; expiration 2026-11-26; D1 (I run deployment commands in my Terminal). The planned cluster stays one primary and one core m5.xlarge. I approve the nine proposed version pins in project/versions.properties for preparation, with the two Scala-library values still subject to confirmation by sparkSubmitLocal, and hashicorp/aws 6.72.0.
+
+I accept the security design for planning only: the proposed IAM roles, tag-scoped emergency termination, account-wide ReadOnlyAccess role assumable only by scholarchain-admin, bucket and key policies, private subnet with S3 and KMS endpoints, and inter-node in-transit encryption off. I understand the read-only role can read account objects and that local programs running as my user may access my active admin credentials; direct-agent command guards do not isolate those programs. This does not approve any Terraform apply.
+
+I ratify FE-P6-06 with D1 and CR-P6-30 amendments m1 (state access only through scripts/plan.sh; tfplan Read denies and secret-path term), m2 (fixture probes reviewed in the applied diff), n1 and n2, for application by factory-engineer and review before the constitutional commit. Deferred nits: CR-P6-29 n4 residuals; CR-P6-30 n3; CR-P6-32 m2, n1 and n2. CR-P6-31 n1 is fixed.
+
+Phase 5 remains accepted. Phase 6 remains open. AWS deployment, uploads and spending remain pending my approval of specific signed plans.

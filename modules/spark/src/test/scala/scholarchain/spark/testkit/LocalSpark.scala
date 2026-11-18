@@ -12,18 +12,19 @@ import org.apache.spark.sql.SparkSession
 import scholarchain.core.config.{AnalysisRunSettings, ConfigLoader, ScholarChainConfig}
 
 /**
- * Local Spark for tests and the sparkIT suites: `local[1]`, UI off, one shuffle partition, driver
- * bound to 127.0.0.1 (loopback listeners only; no outbound network is used), UTC, and every
- * warehouse, local and `hadoop.tmp.dir` directory under `root` (a directory inside
- * `java.io.tmpdir`).
+ * Local Spark for tests and the sparkIT suites: `local[1]` (or the given local master, for example
+ * `local[2]` in [[PublishedRunComparisonMain]]), UI off, one shuffle partition, driver bound to
+ * 127.0.0.1 (loopback listeners only; no outbound network is used), UTC, and every warehouse, local
+ * and `hadoop.tmp.dir` directory under `root` (a directory inside `java.io.tmpdir`).
  */
 object LocalSpark {
 
-  def start(appName: String, root: Path): SparkSession = {
+  def start(appName: String, root: Path, master: String = "local[1]"): SparkSession = {
+    require(master.startsWith("local"), s"LocalSpark starts local masters only, not $master")
     Files.createDirectories(root.resolve("local"))
     val s = SparkSession
       .builder()
-      .master("local[1]")
+      .master(master)
       .appName(appName)
       .config("spark.ui.enabled", "false")
       .config("spark.sql.shuffle.partitions", "1")

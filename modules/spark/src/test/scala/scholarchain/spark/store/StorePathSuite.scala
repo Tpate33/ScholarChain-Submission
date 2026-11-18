@@ -85,4 +85,68 @@ class StorePathSuite extends munit.FunSuite {
     refused("S3A://b/a", "lowercase scheme")
     refused("mailto:x@y", "not a hierarchical URI")
   }
+
+  test("CR-P6-26 n1: one trailing slash is ignored, two or more are refused") {
+    assertEquals(ok("s3a://b/a/"), ok("s3a://b/a"))
+    assertEquals(ok("hdfs://nn:8020/x/"), ok("hdfs://nn:8020/x"))
+    refused("s3a://b/a//", "more than one slash")
+    refused("s3a://b/a///", "more than one slash")
+    refused("s3a://b//", "more than one slash")
+    refused("file:///tmp/a//", "more than one slash")
+    refused("hdfs://nn:8020/x//", "more than one slash")
+  }
+
+  test("CR-P6-26 u2: a port-only (empty host) authority is refused") {
+    refused("s3a://:80/x", "port-only authority")
+    refused("hdfs://:8020/x", "port-only authority")
+    refused("s3a://:/x", "port-only authority")
+    assertEquals(ok("hdfs://nn:8020/x").authority, Some("nn:8020"))
+    assertEquals(StorePath.hostOf("nn:8020"), "nn")
+    assertEquals(StorePath.hostOf("nn:"), "nn")
+    assertEquals(StorePath.hostOf("bucket-a"), "bucket-a")
+    assertEquals(StorePath.hostOf("[::1]:8020"), "[::1]")
+    assertEquals(StorePath.hostOf("[::1]"), "[::1]")
+    assertEquals(StorePath.hostOf(":80"), "")
+  }
+
+  test("CR-P6-26 n2: overlap ignores authority spelling (HDFS authority, port, host case)") {
+    def overlap(a: String, b: String) = StorePath.mayOverlap(ok(a), ok(b))
+    // The reviewer's failure input: one name node spelled with and without its port.
+    assert(overlap("hdfs://nn:8020/x", "hdfs://nn/x/ck"))
+    assert(overlap("hdfs://nn/x/ck", "hdfs://nn:8020/x"), "symmetric")
+    assert(!ok("hdfs://nn/x/ck").startsWith(ok("hdfs://nn:8020/x")), "startsWith stays exact")
+    // HDFS: any authority spelling (FQDN, address, nameservice) is one file system.
+    assert(overlap("hdfs://nn.example.internal:8020/x", "hdfs://10.0.0.1/x/y"))
+    // Other schemes: host without the port, case-insensitive.
+    assert(overlap("s3a://bucket-a:443/x", "s3a://bucket-a/x/y"))
+    assert(overlap("s3a://Bucket-A/x/y", "s3a://bucket-a/x"))
+    assert(overlap("s3a://bucket-a/x", "s3a://bucket-a/x"), "equal")
+    assert(overlap("/data/x", "file:///data/x/y"))
+    // Not overlapping: another bucket, another scheme, a sibling, a string (not segment) prefix.
+    assert(!overlap("s3a://bucket-a/x", "s3a://bucket-b/x/y"))
+    assert(!overlap("s3a://nn/x", "hdfs://nn/x/y"))
+    assert(!overlap("hdfs://nn/x/a", "hdfs://nn:8020/x/b"))
+    assert(!overlap("s3a://b/archive", "s3a://b/archive2"))
+  }
+
+  test("CR-P6-26 n3: a comma or a Hadoop glob character in the path is reported") {
+    Vector(
+      "s3a://b/dev,archive",
+      "s3a://b/dev*",
+      "/data/a,b",
+      "/data/a*b",
+      "/data/a?b",
+      "/data/a[1]",
+      "/data/{a,b}"
+    ).foreach { s =>
+      val p = ok(s)
+      assert(StorePath.globProblem(p).exists(_.contains("comma or a Hadoop glob character")), s)
+    }
+    Vector("s3a://b/run=ab/part-00000.jsonl", "/data/x_y-z.+=", "hdfs://nn:8020/x").foreach { s =>
+      assertEquals(StorePath.globProblem(ok(s)), None, s)
+    }
+    // Backslashes never parse, and the authority is not a path (IPv6 brackets are not refused).
+    refused("/data/a\\b", "backslash")
+    assertEquals(StorePath.globProblem(ok("hdfs://[::1]:8020/x")), None)
+  }
 }

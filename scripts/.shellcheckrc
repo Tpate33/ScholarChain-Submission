@@ -1,0 +1,5 @@
+# ShellCheck configuration for scripts/** (owner: infra-engineer; IE-P6-03).
+# Follow the `# shellcheck source=scripts/lib/common.sh` directives (same as `shellcheck -x`), so the
+# helpers and variables of the sourced library are checked with each script. Run from the repository
+# root: `shellcheck scripts/*.sh scripts/lib/common.sh scripts/emr/*.sh`.
+external-sources=true
