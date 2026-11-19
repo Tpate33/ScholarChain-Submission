@@ -409,3 +409,28 @@ resource "aws_iam_role_policy_attachment" "readonly" {
   role       = aws_iam_role.readonly.name
   policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
 }
+
+# IE-P6-11: ReadOnlyAccess does not grant elasticmapreduce:GetAutoTerminationPolicy (observed
+# AccessDenied for scholarchain-dev-readonly: the emr-run refresh in `cleanup.sh dev plan-destroy
+# emr-run` while the cluster was WAITING/TERMINATING, and the @AWS-RO get-auto-termination-policy row).
+# The aws provider 6.72.0 aws_emr_cluster Read calls DescribeCluster, ListInstanceGroups or
+# ListInstanceFleets, ListBootstrapActions, ListSteps and GetAutoTerminationPolicy (from provider
+# source knowledge, UNVERIFIED in this session); ReadOnlyAccess covers the Describe*/List* ones, which
+# the observed refresh got past. GetManagedScalingPolicy is not added: emr-run declares no managed
+# scaling policy, the cluster Read does not call it, and no @AWS-RO row names it.
+# Scope: EMR clusters of this account and Region. No aws:ResourceTag condition: support for this
+# action is UNVERIFIED, an unsupported key would fail closed and reproduce the refresh failure, and R5
+# already describes every cluster through ReadOnlyAccess. Privilege delta: + one read action.
+data "aws_iam_policy_document" "readonly_emr_extra" {
+  statement {
+    sid       = "ReadClusterAutoTerminationPolicy"
+    actions   = ["elasticmapreduce:GetAutoTerminationPolicy"]
+    resources = [local.emr_cluster_arns]
+  }
+}
+
+resource "aws_iam_role_policy" "readonly_emr_extra" {
+  name   = "scholarchain-readonly-emr-extra"
+  role   = aws_iam_role.readonly.id
+  policy = data.aws_iam_policy_document.readonly_emr_extra.json
+}
