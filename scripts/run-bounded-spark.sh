@@ -133,6 +133,22 @@ need_hex code_version "$C_code_version" 40
 [[ $C_code_version != 0000000000000000000000000000000000000000 ]] || die "$EX_USAGE" "code_version must be a real commit"
 git cat-file -e "$C_code_version^{commit}" 2>/dev/null || die "$EX_REFUSED" "code_version $C_code_version is not a commit in this repository"
 git merge-base --is-ancestor "$C_code_version" HEAD || die "$EX_REFUSED" "code_version is not an ancestor of HEAD"
+# Code-scope binding (CR-P6-37 m1, IE-P6-04 repair 01), every mode: the jar was built and gated at
+# code_version, so the build and the code it runs (and the analysis config and benchmark pairs read from
+# the run HEAD under modules/spark) must be unchanged between code_version and HEAD. Tree-to-tree
+# comparison of committed blobs (the tree is clean, checked above); exit 1 = differs, other = git error.
+readonly CODE_SCOPE="build.sbt project modules/core modules/spark"
+CS_RC=0
+# shellcheck disable=SC2086 # CODE_SCOPE is a fixed list of plain paths, split on purpose
+git diff --quiet --no-ext-diff --no-textconv "$C_code_version" HEAD -- $CODE_SCOPE || CS_RC=$?
+if ((CS_RC == 1)); then
+  # shellcheck disable=SC2086
+  git diff --name-only --no-ext-diff "$C_code_version" HEAD -- $CODE_SCOPE | head -n 50 >&2 || true
+  die "$EX_REFUSED" "code scope ($CODE_SCOPE) differs between code_version $C_code_version and HEAD $HEAD_SHA (files above); the job jar no longer matches the run tree: rerun sbt sparkSubmitLocal at the new commit and update code_version, the jar and its pins in the run config"
+elif ((CS_RC != 0)); then
+  die "$EX_REFUSED" "git diff of the code scope between code_version $C_code_version and HEAD failed (exit $CS_RC)"
+fi
+ok "code scope ($CODE_SCOPE) unchanged between code_version $C_code_version and HEAD"
 for k in job_jar_sha256 spark_dist_sha256 scala_library_sha256 hadoop_aws_sha256 sdk_bundle_sha256 input_tree_sha256; do
   v="C_$k"
   need_hex "$k" "${!v}" 64

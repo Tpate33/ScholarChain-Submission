@@ -171,3 +171,18 @@ My Terminal sbt check at 5242754 with the fix in the work tree: exit 0, 1574 pas
 sparkSubmitLocal run by build-engineer at the commit containing this entry. Phase 6
 remains open. AWS deployment, uploads and spending remain pending my approval of
 specific signed plans.
+
+## Local spark-submit PASS and EMR run configuration (2026-11-18)
+
+I accept BE-P6-10 attempt-4 at 148b4b9: sbt sparkSubmitLocal PASS on local[2] and
+local-cluster[2,1,1024], one published run a65f3f38..., 28 of 28 datasets logically
+equal, temporal changes 112 in both runs, scala-library 2.13.8 (distribution) and
+2.13.16 (runtime) confirmed. I accept SP-P6-08: partitions=2 for the EMR run; loadId
+and partManifestSha256 differences across topologies are intended (byte layout is
+not a reproducibility criterion) and the loader idempotency rule is carried to Phase 7.
+I accept IE-P6-04 and repair 01 following CR-P6-37 and CR-P6-38 (APPROVE): runtime and
+job jar digests from the attempt-4 inventory, my sha256 values for the two EMR scripts
+and the Spark distribution, and run-bounded-spark.sh now refuses in every mode when
+build.sbt, project, modules/core or modules/spark differ from code_version. I defer the
+CR-P6-37 nits and the CR-P6-38 unverified concerns (inherited GIT_* variables,
+case-only paths). This does not approve any apply, upload or spend.
