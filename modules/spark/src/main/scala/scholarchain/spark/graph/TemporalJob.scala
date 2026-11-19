@@ -18,7 +18,9 @@ final case class ResearcherWindowRecords(
 
 /**
  * The per-pair counts of the window comparisons (to the driver: at most three presence classes and
- * three edge classes per consecutive window pair).
+ * three edge classes per consecutive window pair). Built on the driver from distributed counts
+ * keyed by JVM-stable values only ([[TemporalJob.countsOf]]); the enum keys of `presence` exist
+ * only on the driver and never enter a shuffle.
  */
 final case class TemporalCounts(
     presence: Map[(Int, TemporalPresence), Long],
@@ -51,14 +53,56 @@ final case class TemporalCounts(
  * directions of every edge keyed by (pair, researcher, coauthor) with a window bit, `reduceByKey`
  * with bitwise or, then `reduceByKey` by (pair, researcher); community overlap: `reduceByKey` by
  * (pair, from community, to community) over the researchers in both windows and a `join` back; two
- * `leftOuterJoin`s and one `sortBy` (pair, researcher). Driver: the per-pair counts
+ * `leftOuterJoin`s and one `sortBy` (pair, researcher); the per-pair counts `reduceByKey` by (pair,
+ * presence tag) and (pair, edge class) ([[countsOf]]). Driver: the per-pair counts
  * ([[TemporalCounts]]), the per-window largest component size and convergence; nothing per
  * researcher.
+ *
+ * Shuffle keys hold only Int and String values (SP-P6-07). A Scala 3 enum case such as
+ * [[TemporalPresence]] does not override `hashCode`, so it hashes by object identity, which differs
+ * between JVMs: as part of a shuffle key, one presence class is routed to different reducers by map
+ * tasks on different executors, and the per-reducer partial counts of one key then reach the driver
+ * as several entries. Before SP-P6-07 the presence counts were `countByValue` over (pair,
+ * TemporalPresence) keys, whose `collect().toMap` kept only one of those entries, so on two
+ * executor JVMs the comparisons counted 55 researchers for 112 change records (BE-P6-10 attempt-3;
+ * one JVM, as in `local[N]`, hashes consistently and could not show it). Now the presence class is
+ * shuffled as its frozen tag and mapped back to the enum on the driver, and [[countsOf]] sums
+ * partial counts of one key on the driver instead of keeping one of them.
  */
 object TemporalJob {
 
   private def pr[K: ClassTag, V: ClassTag](r: RDD[(K, V)]): PairRDDFunctions[K, V] =
     RDD.rddToPairRDDFunctions(r)
+
+  /**
+   * The number of occurrences of every key of `keys` (to the driver: one entry per distinct key, so
+   * only for small key sets). One `reduceByKey` onto `HashPartitioner(partitions)`, then the
+   * reduced (key, count) pairs are summed per key on the driver. `K` must hash by value the same
+   * way in every JVM (Int, String and tuples or case classes of them; never an enum, see the object
+   * comment); the driver-side sum keeps the total exact even if a key reaches the driver from more
+   * than one reducer.
+   */
+  def countsOf[K: ClassTag](keys: RDD[K], partitions: Int): Map[K, Long] =
+    pr(keys.map(k => (k, 1L)))
+      .reduceByKey(new HashPartitioner(partitions), _ + _)
+      .collect()
+      .foldLeft(Map.empty[K, Long]) { case (m, (k, n)) => m.updated(k, m.getOrElse(k, 0L) + n) }
+
+  /** The presence class of a researcher with a from-side (`f`) and a to-side (`t`) state. */
+  def presenceOf(f: Boolean, t: Boolean): TemporalPresence =
+    if (f && t) TemporalPresence.InBoth
+    else if (f) TemporalPresence.OnlyFrom
+    else TemporalPresence.OnlyTo
+
+  /**
+   * The presence counts per (pair, presence) from the distributed counts per (pair, presence tag).
+   * An unknown tag cannot arise (the tags are the enum's own); it would be dropped here and then
+   * refused by the run's temporal check (changes against the comparisons' researcher counts).
+   */
+  def presenceCounts(byTag: Map[(Int, String), Long]): Map[(Int, TemporalPresence), Long] =
+    byTag.toVector.flatMap { case ((p, tag), n) =>
+      TemporalPresence.fromTag(tag).map(x => ((p, x), n))
+    }.toMap
 
   /**
    * The five records of every (window index, researcher) with a metrics record; Left when a
@@ -209,18 +253,14 @@ object TemporalJob {
       }
       .sortBy(_._1, ascending = true, partitions)
       .map(_._2)
-    val presence = grouped
-      .map { case ((p, _), (f, t)) =>
-        (
-          p,
-          if (f.isDefined && t.isDefined) TemporalPresence.InBoth
-          else if (f.isDefined) TemporalPresence.OnlyFrom
-          else TemporalPresence.OnlyTo
-        )
-      }
-      .countByValue()
-      .toMap
-    val edgeClasses = edgeBits.map { case ((p, _, _), m) => (p, m) }.countByValue().toMap
+    // Keys of Int and String only (SP-P6-07, see the object comment): never the enum itself.
+    val presence = presenceCounts(
+      countsOf(
+        grouped.map { case ((p, _), (f, t)) => (p, presenceOf(f.isDefined, t.isDefined).tag) },
+        partitions
+      )
+    )
+    val edgeClasses = countsOf(edgeBits.map { case ((p, _, _), m) => (p, m) }, partitions)
     (out, TemporalCounts(presence, edgeClasses))
   }
 

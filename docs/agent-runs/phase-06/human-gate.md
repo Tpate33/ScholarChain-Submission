@@ -154,3 +154,20 @@ sbt check at 609f27a with the repair in the work tree: exit 0, 1570 passed, 0 fa
 0 errored, 0 skipped (marker 2026-11-19T03:49:17.215033Z). I approve one sbt sparkSubmitLocal run by
 build-engineer at the commit containing this entry. Phase 6 remains open. AWS
 deployment, uploads and spending remain pending my approval of specific signed plans.
+
+## Temporal count determinism repair (2026-11-18)
+
+I accept SP-P6-07 following CR-P6-36 (APPROVE). Attempt-3 at 5242754 showed that
+CollaborationJob's temporal presence counts were nondeterministic across executor
+JVMs: run 1 (local[2]) passed, run 2 (local-cluster[2,1,1024]) refused with
+"temporal changes: 112 records, the comparisons count 55 researchers", and the same
+job jar had passed in attempt-2. Cause: a Scala 3 enum used in a shuffle key hashes
+by object identity, which differs between JVMs, and countByValue's toMap dropped
+partial counts. The fix shuffles only Int and String keys and sums duplicate keys on
+the driver; the consistency check is unchanged. I defer m1 (no single-JVM regression
+test for enum shuffle keys) and nits N1 and N2 to a later spark-engineer work order.
+My Terminal sbt check at 5242754 with the fix in the work tree: exit 0, 1574 passed,
+0 failed, 0 errored, 0 skipped (marker 2026-11-19T04:41:17.779442Z). I approve one sbt
+sparkSubmitLocal run by build-engineer at the commit containing this entry. Phase 6
+remains open. AWS deployment, uploads and spending remain pending my approval of
+specific signed plans.
