@@ -201,3 +201,20 @@ Two staging attempts failed on the first Spark distribution upload.
 I accept IE-P6-06 (stage smallest objects first) following CR-P6-39
 (APPROVE), and defer its nits. AWS spending on emr-run remains pending
 my approval of a signed plan.
+
+## EMR security-group fix after emr-run attempt 1 (2026-11-19)
+
+Staging succeeded on a different network. The emr-run apply at d856047
+failed with exit 5: the cluster ended TERMINATED_WITH_ERRORS because
+the service-access security group lacked the required ingress rule
+on port 9443 from the primary security group. No step was submitted.
+
+I accept IE-P6-07 with repair 01 following CR-P6-40 and CR-P6-41
+(APPROVE): eight group-to-group TCP 8443/9443 rules between the three
+EMR security groups in base/network.tf, with no CIDR or internet path
+and no security-group replacement. I defer the header-comment nit.
+
+This accepts the security change but does not approve an apply.
+I will clean up the failed emr-run, check for duplicate rules, and
+approve the base plan only if it adds 8 rules and changes or destroys
+nothing.
