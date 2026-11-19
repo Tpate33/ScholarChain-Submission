@@ -63,7 +63,10 @@ import sbt.librarymanagement.UpdateConfiguration
  *   7. PASS only when both runs exit 0, each publishes exactly one `run=<hex>` with `_SUCCESS` and
  *      one event log, both run names and `_run-manifest.json` bytes are equal, and the comparison
  *      entry point's nonce-bound result file shows all [[ExpectedDatasets]] datasets logically
- *      equal and the sparkIT baseline counts ([[verdict]]). Writes `result.txt`.
+ *      equal and the sparkIT baseline counts, and the build's own reading of both runs' load
+ *      manifests ([[readLoadManifests]]) gives the baseline rows and distinct roles per store, the
+ *      comparison's items and rows, and equal values between the runs ([[verdict]]). Writes
+ *      `result.txt`.
  */
 object SparkSubmitLocal {
 
@@ -130,11 +133,26 @@ object SparkSubmitLocal {
   val ExpectedDatasets = 28
   val ExpectedEdges = 259L
   val ExpectedMetrics = 176L
+
+  /**
+   * Per load manifest (comparison store tag): (sum of item rows, distinct `targetRole` values), the
+   * sparkIT run 08 baseline (sparkit-run-08.md: neptune 12 items 1258 rows, dynamodb 12/1302, s3
+   * 16/2809, s3-vectors 2/249). Run 08 wrote one part per dataset (`_parts.json` 29 files: 28
+   * datasets and the run manifest), so its item counts equal its distinct roles; attempt-2 at
+   * 609f27a printed the same roles 12/12/16/2 (`run-1-local/output.txt`, `roles=`).
+   *
+   * Item counts are NOT pinned (BE-P6-09 repair 03): a load item is one part file
+   * (`LoadManifests.build` lists every part a store's role accepts), so the item count follows the
+   * output partitioning, not the data. This task runs with [[Partitions]] = 2 and attempt-2 gave
+   * 24/21/29/4 items; some datasets still write one part, so items are not roles x partitions
+   * either. Items are instead required to be equal between the two runs (and equal to what the
+   * build reads from the manifests); see [[verdict]].
+   */
   val ExpectedLoads: Map[String, (Long, Long)] = Map(
-    "neptune" -> (12L, 1258L),
-    "dynamodb" -> (12L, 1302L),
-    "s3" -> (16L, 2809L),
-    "s3-vectors" -> (2L, 249L)
+    "neptune" -> (1258L, 12L),
+    "dynamodb" -> (1302L, 12L),
+    "s3" -> (2809L, 16L),
+    "s3-vectors" -> (249L, 2L)
   )
 
   /** Inherited variables removed from every child (by name prefix and by exact name). */
@@ -1261,12 +1279,147 @@ object SparkSubmitLocal {
     }
   }
 
-  /** The PASS rule over the comparison (see the object comment, step 7). */
+  // --- Load manifests as the build reads them (roles are not in the comparison result) --------
+
+  /**
+   * Comparison store tag -> core `TargetStore` tag, which names the manifest file
+   * `load=<run hex>/<tag>.json` (spark-engineer `LoadManifests.fileName`; the comparison's
+   * `storeTag` shortens only `neptune-bulk-load`).
+   */
+  val LoadManifestStores: Map[String, String] = Map(
+    "neptune" -> "neptune-bulk-load",
+    "dynamodb" -> "dynamodb",
+    "s3" -> "s3",
+    "s3-vectors" -> "s3-vectors"
+  )
+
+  /** The comparison's own metadata bound (PublishedRunComparisonMain.Limits.maxMetadataBytes). */
+  val MaxLoadManifestBytes: Long = 1024L * 1024L
+
+  /**
+   * One load manifest: its items, the sum of their `rowCount`, its distinct `targetRole` values.
+   */
+  final case class StoreFacts(items: Long, rows: Long, roles: Set[String])
+
+  private val NatText = "^(0|[1-9][0-9]{0,17})$".r
+
+  /**
+   * The facts of one `store-load-manifest.v1` row (core `StoreLoadManifest` / `LoadItem`: the role
+   * field is `targetRole`): `(targetStore, facts)`. Parsed with sbt's own JSON parser (the
+   * meta-build has no uPickle); only `targetStore`, `items[].targetRole` and `items[].rowCount` are
+   * read. The full contract is checked by the comparison entry point (`LoadManifests.verify`)
+   * before the build reads the file; [[verdict]] requires the build's items and rows to equal the
+   * comparison's for every store, which binds this reading to that verified decode.
+   */
+  def parseLoadManifest(text: String): Either[String, (String, StoreFacts)] = {
+    import sjsonnew.shaded.scalajson.ast.unsafe.{JArray, JNumber, JObject, JString, JValue}
+    def fields(v: JValue, what: String): Either[String, Map[String, JValue]] = v match {
+      case JObject(fs) =>
+        val names = fs.toSeq.map(_.field)
+        if (names.distinct.size != names.size) Left(s"$what repeats a key")
+        else Right(fs.toSeq.map(f => f.field -> f.value).toMap)
+      case _ => Left(s"$what is not a JSON object")
+    }
+    if (!text.endsWith("\n") || text.dropRight(1).contains('\n')) Left("not one LF-terminated row")
+    else
+      sjsonnew.support.scalajson.unsafe.Parser.parseFromString(text.dropRight(1)) match {
+        case Failure(e) => Left(s"not JSON (${e.getClass.getSimpleName})")
+        case Success(v) =>
+          for {
+            top <- fields(v, "the manifest")
+            store <- top.get("targetStore") match {
+              case Some(JString(s)) if s.nonEmpty => Right(s)
+              case _ => Left("targetStore is missing or not a non-empty string")
+            }
+            items <- top.get("items") match {
+              case Some(JArray(a)) if a.nonEmpty => Right(a.toSeq)
+              case _ => Left("items is missing, empty or not an array")
+            }
+            parsed <- items.zipWithIndex.foldLeft(
+              Right(Vector.empty): Either[String, Vector[(String, Long)]]
+            ) { case (acc, (it, i)) =>
+              acc.flatMap(done =>
+                fields(it, s"items[$i]").flatMap { f =>
+                  (f.get("targetRole"), f.get("rowCount")) match {
+                    case (Some(JString(r)), Some(JNumber(n)))
+                        if r.nonEmpty && NatText.pattern.matcher(n).matches =>
+                      Right(done :+ (r -> n.toLong))
+                    case _ =>
+                      Left(
+                        s"items[$i] lacks a non-empty string targetRole or a non-negative integer rowCount"
+                      )
+                  }
+                }
+              )
+            }
+          } yield store -> StoreFacts(
+            parsed.size.toLong,
+            parsed.map(_._2).sum,
+            parsed.map(_._1).toSet
+          )
+      }
+  }
+
+  /**
+   * The four load manifests of one run under `out/load=<run hex>/` (a real directory holding
+   * exactly the four `<TargetStore tag>.json` regular files, each at most [[MaxLoadManifestBytes]],
+   * each for its own store), keyed by comparison store tag.
+   */
+  def readLoadManifests(out: Path, runName: String): Either[String, Map[String, StoreFacts]] =
+    if (!RunDir.pattern.matcher(runName).matches) Left(s"$runName is not run=<64 hex>")
+    else {
+      val dirName = "load=" + runName.stripPrefix("run=")
+      val dir = out.resolve(dirName)
+      val expected = LoadManifestStores.values.map(_ + ".json").toList.sorted
+      if (Files.isSymbolicLink(dir) || !Files.isDirectory(dir, LinkOption.NOFOLLOW_LINKS))
+        Left(s"out/$dirName is not a real directory")
+      else if (list(dir) != expected)
+        Left(
+          s"out/$dirName holds ${list(dir).mkString(", ")}; expected exactly ${expected.mkString(", ")}"
+        )
+      else {
+        val read = LoadManifestStores.toSeq.sorted.map { case (tag, store) =>
+          val f = dir.resolve(s"$store.json")
+          val r =
+            if (!Files.isRegularFile(f, LinkOption.NOFOLLOW_LINKS)) Left("not a regular file")
+            else if (Files.size(f) > MaxLoadManifestBytes)
+              Left(s"larger than $MaxLoadManifestBytes bytes")
+            else
+              parseLoadManifest(new String(Files.readAllBytes(f), StandardCharsets.UTF_8))
+                .flatMap { case (s, facts) =>
+                  if (s == store) Right(facts) else Left(s"holds the $s manifest")
+                }
+          r.left.map(m => s"out/$dirName/$store.json: $m").map(tag -> _)
+        }
+        val bad = read.collect { case Left(m) => m }
+        if (bad.nonEmpty) Left(bad.mkString("; "))
+        else Right(read.collect { case Right(x) => x }.toMap)
+      }
+    }
+
+  private def showLoads(m: Map[String, (Long, Long)]): String =
+    m.toSeq.sorted.map { case (k, (a, b)) => s"$k:$a/$b" }.mkString(",")
+
+  /** `store:items/rows/roles`, sorted by store. */
+  def showFacts(m: Map[String, StoreFacts]): String =
+    m.toSeq
+      .sortBy(_._1)
+      .map { case (k, f) => s"$k:${f.items}/${f.rows}/${f.roles.size}" }
+      .mkString(",")
+
+  /**
+   * The PASS rule over the comparison and the build's reading of both runs' load manifests (see the
+   * object comment, step 7). Per run: the published run, edges, metrics, the four stores, and per
+   * store the item rows and distinct roles of [[ExpectedLoads]]; the build's items and rows equal
+   * the comparison's. Between the runs: every load-manifest value (items and rows) and every
+   * store's role set equal. Item counts have no baseline (see [[ExpectedLoads]]).
+   */
   def verdict(
       exit: Option[Int],
       result: Either[String, String],
       nonce: String,
-      runName: String
+      runName: String,
+      manifests: Either[String, (Map[String, StoreFacts], Map[String, StoreFacts])]
   ): Either[String, Comparison] =
     exit match {
       case None => Left(s"the comparison exceeded its ${CompareTimeoutSeconds}s bound; NOT a pass")
@@ -1277,16 +1430,50 @@ object SparkSubmitLocal {
         parsed match {
           case Left(m) => p += m
           case Right(c) =>
-            Seq(c.left, c.right).zip(Seq("left (local[2])", "right (local-cluster)")).foreach {
-              case (s, label) =>
-                if (s.run != runName) p += s"$label compared ${s.run}, not the published $runName"
-                if (s.counts.get("edges") != Some(ExpectedEdges))
-                  p += s"$label edges ${s.counts.getOrElse("edges", "missing")}, baseline $ExpectedEdges"
-                if (s.counts.get("metrics") != Some(ExpectedMetrics))
-                  p += s"$label metrics ${s.counts.getOrElse("metrics", "missing")}, baseline $ExpectedMetrics"
-                if (s.loads != ExpectedLoads)
-                  p += s"$label load manifests ${s.loads.toSeq.sorted.map { case (k, (a, b)) => s"$k:$a/$b" }.mkString(",")}, " +
-                    s"baseline ${ExpectedLoads.toSeq.sorted.map { case (k, (a, b)) => s"$k:$a/$b" }.mkString(",")}"
+            val read = manifests match {
+              case Left(m) => p += s"load manifests: $m"; None
+              case Right(x) => Some(x)
+            }
+            Seq(
+              (c.left, read.map(_._1), "left (local[2])"),
+              (c.right, read.map(_._2), "right (local-cluster)")
+            ).foreach { case (s, facts, label) =>
+              if (s.run != runName) p += s"$label compared ${s.run}, not the published $runName"
+              if (s.counts.get("edges") != Some(ExpectedEdges))
+                p += s"$label edges ${s.counts.getOrElse("edges", "missing")}, baseline $ExpectedEdges"
+              if (s.counts.get("metrics") != Some(ExpectedMetrics))
+                p += s"$label metrics ${s.counts.getOrElse("metrics", "missing")}, baseline $ExpectedMetrics"
+              if (s.loads.keySet != ExpectedLoads.keySet)
+                p += s"$label load manifests for stores ${s.loads.keys.toSeq.sorted.mkString(",")}, " +
+                  s"baseline ${ExpectedLoads.keys.toSeq.sorted.mkString(",")}"
+              ExpectedLoads.toSeq.sorted.foreach { case (store, (rows, roles)) =>
+                s.loads.get(store).foreach { case (_, got) =>
+                  if (got != rows) p += s"$label $store rows $got, baseline $rows"
+                }
+                facts.foreach { fm =>
+                  fm.get(store) match {
+                    case None => p += s"$label $store: the build read no load manifest"
+                    case Some(f) =>
+                      if (f.roles.size.toLong != roles)
+                        p += s"$label $store distinct roles ${f.roles.size}, baseline $roles"
+                      if (s.loads.get(store) != Some((f.items, f.rows)))
+                        p += s"$label $store: the build read ${f.items} items/${f.rows} rows, the " +
+                          s"comparison reported ${s.loads.get(store).fold("none") { case (a, b) =>
+                              s"$a/$b"
+                            }}"
+                  }
+                }
+              }
+            }
+            if (c.left.loads != c.right.loads)
+              p += s"the runs' load manifests differ (items/rows): left ${showLoads(c.left.loads)}, " +
+                s"right ${showLoads(c.right.loads)}"
+            read.foreach { case (l, r) =>
+              val differ = (l.keySet ++ r.keySet).toSeq.sorted.filter(k =>
+                l.get(k).map(_.roles) != r.get(k).map(_.roles)
+              )
+              if (differ.nonEmpty)
+                p += s"the runs' load manifests name different roles for ${differ.mkString(",")}"
             }
             if (c.datasets.size != ExpectedDatasets)
               p += s"${c.datasets.size} datasets compared, baseline $ExpectedDatasets"
@@ -1590,11 +1777,25 @@ object SparkSubmitLocal {
       else if (Files.size(resultFile) > 1024L * 1024L)
         Left("the comparison result is larger than 1 MiB")
       else Right(new String(Files.readAllBytes(resultFile), StandardCharsets.UTF_8))
-    val v = verdict(exit, read, nonce, a.runName)
+    val manifests = for {
+      l <- readLoadManifests(published(0)._1.resolve("out"), a.runName).left
+        .map(m => s"left (local[2]) $m")
+      r <- readLoadManifests(published(1)._1.resolve("out"), b.runName).left
+        .map(m => s"right (local-cluster) $m")
+    } yield (l, r)
+    manifests.foreach { case (l, r) =>
+      Seq(("run 1 (local[2])", l), ("run 2 (local-cluster)", r)).foreach { case (label, m) =>
+        log.info(
+          s"$Task: $label load manifests as read by the build (store:items/rows/roles): ${showFacts(m)}"
+        )
+      }
+    }
+    val v = verdict(exit, read, nonce, a.runName, manifests)
+    val loadsLine = manifests.toOption.fold("") { case (l, _) => s"loads=${showFacts(l)}\n" }
     val summary = v.fold(
       m => s"status=fail\nreason=$m\n",
       c =>
-        s"status=pass\nrun=${a.runName}\ndatasets=${c.datasets.size}\nedges=$ExpectedEdges\nmetrics=$ExpectedMetrics\n"
+        s"status=pass\nrun=${a.runName}\ndatasets=${c.datasets.size}\nedges=$ExpectedEdges\nmetrics=$ExpectedMetrics\n$loadsLine"
     ) + s"codeVersion=${pre.head}\njobJarSha256=${report.sha256}\nmasters=${Masters.mkString(",")}\n"
     Files.write(
       attempt.resolve("result.txt"),
@@ -1607,8 +1808,9 @@ object SparkSubmitLocal {
           s"$Task: PASS: spark-submit of ${jobJar.getFileName} (sha256 ${report.sha256}) on ${pins.file} " +
             s"exited 0 at ${Masters.mkString(" and ")}; both published ${a.runName} with _SUCCESS and " +
             s"byte-equal _run-manifest.json; ${c.datasets.size} datasets logically equal; edges " +
-            s"$ExpectedEdges, metrics $ExpectedMetrics and the four load manifests equal the sparkIT " +
-            s"run 08 baseline; evidence $attemptRel/ (result.txt, inventory.txt, submit-commands.txt, " +
+            s"$ExpectedEdges, metrics $ExpectedMetrics and the rows and distinct roles of the four " +
+            "load manifests equal the sparkIT run 08 baseline; load-manifest items and rows equal " +
+            s"between the runs; evidence $attemptRel/ (result.txt, inventory.txt, submit-commands.txt, " +
             "run-*/output.txt, run-*/events/, compare/comparison.txt); copy it into the phase evidence"
         )
       case Left(m) => fail(s"$m; attempt $attemptRel kept")
@@ -2335,88 +2537,252 @@ object SparkSubmitLocal {
       refusedWith("in-progress event log", publishedProblems(run2), "event log")
     } finally deleteTree(tmp)
 
-    // Comparison verdict.
+    // Load-manifest reading (BE-P6-09 repair 03).
+    def manifestJson(store: String, items: Seq[(String, Long)]): String =
+      s"""{"schemaVersion":"scholarchain.store-load-manifest.v1","targetStore":"$store","items":[""" +
+        items.zipWithIndex
+          .map { case ((role, rows), i) =>
+            s"""{"path":"$role/part-0000$i.parquet","rowCount":$rows,"targetRole":"$role"}"""
+          }
+          .mkString(",") + "]}\n"
+    // The shape of attempt-2's s3-vectors.json: 4 items (2 parts each of 2 roles), 249 rows.
+    val vectorsItems = Seq(
+      "entity-summary-inputs" -> 7L,
+      "entity-summary-inputs" -> 6L,
+      "summary-inputs" -> 130L,
+      "summary-inputs" -> 106L
+    )
+    val pv = parseLoadManifest(manifestJson("s3-vectors", vectorsItems))
+    expect(
+      "attempt-2 s3-vectors manifest shape: 4 items, 249 rows, 2 distinct targetRole values",
+      pv == Right(
+        "s3-vectors" -> StoreFacts(4L, 249L, Set("entity-summary-inputs", "summary-inputs"))
+      ),
+      pv.toString
+    )
+    val oneItem = manifestJson("s3", Seq("r" -> 1L))
+    refusedWith(
+      "manifest without targetRole",
+      parseLoadManifest(oneItem.replace("\"targetRole\":\"r\"", "\"role\":\"r\"")),
+      "targetRole"
+    )
+    refusedWith(
+      "manifest with an empty targetRole",
+      parseLoadManifest(oneItem.replace("\"targetRole\":\"r\"", "\"targetRole\":\"\"")),
+      "targetRole"
+    )
+    refusedWith(
+      "manifest with a negative rowCount",
+      parseLoadManifest(oneItem.replace("\"rowCount\":1", "\"rowCount\":-1")),
+      "rowCount"
+    )
+    refusedWith(
+      "manifest with a fractional rowCount",
+      parseLoadManifest(oneItem.replace("\"rowCount\":1", "\"rowCount\":1.5")),
+      "rowCount"
+    )
+    refusedWith(
+      "manifest with a repeated key",
+      parseLoadManifest(
+        oneItem.replace("{\"schemaVersion\"", "{\"targetStore\":\"s3\",\"schemaVersion\"")
+      ),
+      ""
+    )
+    refusedWith("manifest without final LF", parseLoadManifest(oneItem.dropRight(1)), "LF")
+    refusedWith("manifest that is not JSON", parseLoadManifest("{x\n"), "not JSON")
+    refusedWith(
+      "manifest with no items",
+      parseLoadManifest(manifestJson("s3", Nil)),
+      "items is missing, empty"
+    )
+    val lt = Files.createTempDirectory("scholarchain-sparksubmit-loads-")
+    try {
+      val hexA = "a" * 64
+      def loadDir(name: String): Path = {
+        val out = Files.createDirectory(lt.resolve(name))
+        val d = Files.createDirectory(out.resolve(s"load=$hexA"))
+        LoadManifestStores.values.foreach(s =>
+          Files.write(
+            d.resolve(s"$s.json"),
+            manifestJson(s, Seq(s"$s-role" -> 3L)).getBytes("UTF-8")
+          )
+        )
+        out
+      }
+      val okRead = readLoadManifests(loadDir("ok"), s"run=$hexA")
+      expect(
+        "four load manifests read, keyed by comparison store tag (neptune-bulk-load.json -> neptune)",
+        okRead == Right(
+          LoadManifestStores.map { case (tag, s) => tag -> StoreFacts(1L, 3L, Set(s"$s-role")) }
+        ),
+        okRead.toString
+      )
+      val extra = loadDir("extra")
+      Files.write(extra.resolve(s"load=$hexA").resolve("other.json"), Array[Byte](1))
+      refusedWith(
+        "load directory with an extra file",
+        readLoadManifests(extra, s"run=$hexA"),
+        "expected exactly"
+      )
+      val swapped = loadDir("swapped")
+      Files.write(
+        swapped.resolve(s"load=$hexA").resolve("s3.json"),
+        manifestJson("dynamodb", Seq("x" -> 1L)).getBytes("UTF-8")
+      )
+      refusedWith(
+        "s3.json holding the dynamodb manifest",
+        readLoadManifests(swapped, s"run=$hexA"),
+        "holds the dynamodb manifest"
+      )
+      refusedWith(
+        "no load directory for the run",
+        readLoadManifests(loadDir("other-run"), s"run=${"b" * 64}"),
+        "not a real directory"
+      )
+    } finally deleteTree(lt)
+
+    // Comparison verdict. BE-P6-09 repair 03: per store the rows and distinct roles of the run 08
+    // baseline; items only equal between the runs (and to the build's reading), never pinned.
     val nonce = "9" * 64
     val runName = s"run=${"a" * 64}"
+    // Attempt-2 at 609f27a (attempt-2/compare/comparison.txt, run-1-local/output.txt): items
+    // 24/21/29/4 at Partitions = 2; rows and roles at the baseline; both runs equal.
+    val attempt2Items =
+      Map("neptune" -> 24L, "dynamodb" -> 21L, "s3" -> 29L, "s3-vectors" -> 4L)
+    def facts(
+        items: Map[String, Long] = attempt2Items,
+        extraRows: Map[String, Long] = Map.empty,
+        roleCount: Map[String, Long] = Map.empty,
+        rolePrefix: Map[String, String] = Map.empty
+    ): Map[String, StoreFacts] =
+      ExpectedLoads.map { case (k, (rows, roles)) =>
+        val n = roleCount.getOrElse(k, roles)
+        val prefix = rolePrefix.getOrElse(k, s"$k-role")
+        k -> StoreFacts(
+          items(k),
+          rows + extraRows.getOrElse(k, 0L),
+          (1L to n).map(i => s"$prefix-$i").toSet
+        )
+      }
     def resultText(
         nonceTop: String = nonce,
         datasets: Int = ExpectedDatasets,
         edges: Long = ExpectedEdges,
         rightRun: String = runName,
         differ: Boolean = false,
-        declared: Option[Int] = None
+        declared: Option[Int] = None,
+        left: Map[String, StoreFacts] = facts(),
+        right: Map[String, StoreFacts] = facts()
     ): String = {
-      val sides = Seq("left", "right")
+      val sides = Seq("left" -> left, "right" -> right)
       (Seq(
         s"format=$ComparisonFormat",
         s"nonce=$nonceTop",
         s"run\tleft\t$runName",
         s"run\tright\t$rightRun"
       ) ++
-        sides.flatMap(s =>
+        sides.flatMap { case (s, _) =>
           Seq(s"count\t$s\tedges\t$edges", s"count\t$s\tmetrics\t$ExpectedMetrics")
-        ) ++
-        sides.flatMap(s =>
-          ExpectedLoads.toSeq.sorted.map { case (k, (a, b)) => s"load\t$s\t$k\t$a\t$b" }
-        ) ++
+        } ++
+        sides.flatMap { case (s, m) =>
+          m.toSeq.sortBy(_._1).map { case (k, f) => s"load\t$s\t$k\t${f.items}\t${f.rows}" }
+        } ++
         (1 to datasets).map(i =>
           s"dataset\td$i\t5\t5\t${if (differ && i == 3) "different" else "equal"}"
         ) ++
         Seq(s"datasets=${declared.getOrElse(datasets)}", s"complete=$nonce"))
         .mkString("", "\n", "\n")
     }
-    val pass = verdict(Some(0), Right(resultText()), nonce, runName)
-    expect("complete comparison passes", pass.isRight, pass.fold(identity, _.toString))
-    refusedWith("exit 1", verdict(Some(1), Right(resultText()), nonce, runName), "exit 1")
-    refusedWith("timeout", verdict(None, Right(resultText()), nonce, runName), "bound")
+    def judge(
+        text: String,
+        exit: Option[Int] = Some(0),
+        read: Either[String, (Map[String, StoreFacts], Map[String, StoreFacts])] = Right(
+          (facts(), facts())
+        )
+    ): Either[String, Comparison] = verdict(exit, Right(text), nonce, runName, read)
+    val pass = judge(resultText())
+    expect(
+      "attempt-2 values pass: items 24/21/29/4, rows and roles at the run 08 baseline, runs equal",
+      pass.isRight,
+      pass.fold(identity, _.toString)
+    )
+    val onePart = Map("neptune" -> 12L, "dynamodb" -> 12L, "s3" -> 16L, "s3-vectors" -> 2L)
+    val passOnePart = judge(
+      resultText(left = facts(onePart), right = facts(onePart)),
+      read = Right((facts(onePart), facts(onePart)))
+    )
+    expect(
+      "one part per role (run 08 shape, items = roles) passes",
+      passOnePart.isRight,
+      passOnePart.fold(identity, _.toString)
+    )
+    val moreRows = facts(extraRows = Map("neptune" -> 1L))
+    refusedWith(
+      "rows off the baseline in both runs",
+      judge(resultText(left = moreRows, right = moreRows), read = Right((moreRows, moreRows))),
+      "neptune rows 1259, baseline 1258"
+    )
+    val fewerRoles = facts(roleCount = Map("dynamodb" -> 11L))
+    refusedWith(
+      "distinct roles off the baseline in both runs",
+      judge(resultText(), read = Right((fewerRoles, fewerRoles))),
+      "dynamodb distinct roles 11, baseline 12"
+    )
+    val moreItems = facts(items = attempt2Items.updated("neptune", 25L))
+    refusedWith(
+      "runs that disagree on items",
+      judge(resultText(right = moreItems), read = Right((facts(), moreItems))),
+      "the runs' load manifests differ (items/rows)"
+    )
+    refusedWith(
+      "build reading differs from the comparison's items",
+      judge(resultText(), read = Right((facts(), moreItems))),
+      "neptune: the build read 25 items/1258 rows, the comparison reported 24/1258"
+    )
+    val otherRoles = facts(rolePrefix = Map("s3-vectors" -> "other"))
+    refusedWith(
+      "runs that name different roles (same count)",
+      judge(resultText(), read = Right((facts(), otherRoles))),
+      "different roles for s3-vectors"
+    )
+    refusedWith(
+      "load manifests not readable by the build",
+      judge(resultText(), read = Left("left (local[2]) out/load=x is not a real directory")),
+      "load manifests: left"
+    )
+    val noVectors = facts() - "s3-vectors"
+    refusedWith(
+      "a store missing from the comparison",
+      judge(resultText(left = noVectors, right = noVectors)),
+      "load manifests for stores dynamodb,neptune,s3,"
+    )
+    refusedWith("exit 1", judge(resultText(), exit = Some(1)), "exit 1")
+    refusedWith("timeout", judge(resultText(), exit = None), "bound")
     refusedWith(
       "no result",
-      verdict(Some(0), Left("the comparison wrote no regular result file"), nonce, runName),
-      "no regular result"
-    )
-    refusedWith(
-      "wrong nonce",
-      verdict(Some(0), Right(resultText(nonceTop = "8" * 64)), nonce, runName),
-      "nonce"
-    )
-    refusedWith(
-      "27 datasets",
-      verdict(Some(0), Right(resultText(datasets = 27)), nonce, runName),
-      "27 datasets"
-    )
-    refusedWith(
-      "a different dataset",
-      verdict(Some(0), Right(resultText(differ = true)), nonce, runName),
-      "dataset d3 differs"
-    )
-    refusedWith(
-      "edge count off baseline",
-      verdict(Some(0), Right(resultText(edges = 258)), nonce, runName),
-      "edges 258"
-    )
-    refusedWith(
-      "other run compared",
-      verdict(Some(0), Right(resultText(rightRun = s"run=${"b" * 64}")), nonce, runName),
-      "not the published"
-    )
-    refusedWith(
-      "datasets= mismatch",
-      verdict(Some(0), Right(resultText(declared = Some(3))), nonce, runName),
-      "datasets= line"
-    )
-    refusedWith(
-      "truncated result",
-      verdict(Some(0), Right(resultText().dropRight(1)), nonce, runName),
-      "incomplete"
-    )
-    refusedWith(
-      "unknown line",
       verdict(
         Some(0),
-        Right(resultText().replace(s"run\tleft", "extra\tline\nrun\tleft")),
+        Left("the comparison wrote no regular result file"),
         nonce,
-        runName
+        runName,
+        Right((facts(), facts()))
       ),
+      "no regular result"
+    )
+    refusedWith("wrong nonce", judge(resultText(nonceTop = "8" * 64)), "nonce")
+    refusedWith("27 datasets", judge(resultText(datasets = 27)), "27 datasets")
+    refusedWith("a different dataset", judge(resultText(differ = true)), "dataset d3 differs")
+    refusedWith("edge count off baseline", judge(resultText(edges = 258)), "edges 258")
+    refusedWith(
+      "other run compared",
+      judge(resultText(rightRun = s"run=${"b" * 64}")),
+      "not the published"
+    )
+    refusedWith("datasets= mismatch", judge(resultText(declared = Some(3))), "datasets= line")
+    refusedWith("truncated result", judge(resultText().dropRight(1)), "incomplete")
+    refusedWith(
+      "unknown line",
+      judge(resultText().replace(s"run\tleft", "extra\tline\nrun\tleft")),
       "malformed"
     )
 

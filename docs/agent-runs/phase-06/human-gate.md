@@ -139,3 +139,18 @@ the last audited Bash call because the harness moved sbt check to the background
 0 skipped (marker 2026-11-19T02:45:52Z). I approve one sbt sparkSubmitLocal run by
 build-engineer at the commit containing this entry. Phase 6 remains open. AWS
 deployment, uploads and spending remain pending my approval of specific signed plans.
+
+## sparkSubmitLocal verdict repair (2026-11-18)
+
+I accept BE-P6-09 repair 03 following CR-P6-35 (APPROVE) and defer nits n1, n2 and n4
+to build-engineer and n3 (sbt's bundled JSON parser in project/ code) to a later
+factory-engineer clarification. Attempt-2 at 609f27a ran both spark-submit modes
+(local[2], local-cluster[2,1,1024]) with exit 0, one identical published run and
+28 of 28 datasets equal, and confirmed scala-library 2.13.8 in the distribution and
+2.13.16 at runtime; its verdict failed only because load-manifest item counts depend
+on the partition count. The verdict now pins rows and distinct roles per store to the
+sparkIT run 08 baseline and requires items to match between the runs. My Terminal
+sbt check at 609f27a with the repair in the work tree: exit 0, 1570 passed, 0 failed,
+0 errored, 0 skipped (marker 2026-11-19T03:49:17.215033Z). I approve one sbt sparkSubmitLocal run by
+build-engineer at the commit containing this entry. Phase 6 remains open. AWS
+deployment, uploads and spending remain pending my approval of specific signed plans.
