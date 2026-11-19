@@ -356,7 +356,12 @@ STEPS_JSON=$(jq -cn --arg n "scholarchain-$ARG_ENV-spark-$SUBMISSION_ID" --argjs
 EXPECTED_BOOTSTRAP_ARGS=$(jq -cn --arg b "$DATA_BUCKET" --arg r "$REGION" --arg s5 "$C_spark_dist_sha512" \
   --arg sc "$C_scala_library_sha256" --arg ha "$C_hadoop_aws_sha256" --arg h1 "$C_hadoop_aws_sha1" \
   --arg sd "$C_sdk_bundle_sha256" --arg su "$SUBMIT_SHA256" '[$b, $r, $s5, $sc, $ha, $h1, $sd, $su]')
-STAGE_LIST="$K_SPARK $K_SCALA $K_HAWS $K_SDK $K_INSTALL $K_SUBMIT $K_JAR $K_ANALYSIS $K_PAIRS $K_TREE"
+# --stage order (IE-P6-06, diagnosability): smallest objects first, then the input tree, then the two
+# large artifacts, and the tree manifest last, so a size-dependent failure (network or large body) is
+# told apart from a request-level refusal (authorization) by which object fails first.
+STAGE_LIST_BEFORE_INPUT="$K_INSTALL $K_SUBMIT $K_ANALYSIS $K_PAIRS $K_HAWS $K_SCALA $K_JAR"
+STAGE_LIST_AFTER_INPUT="$K_SDK $K_SPARK $K_TREE"
+STAGE_LIST="$STAGE_LIST_BEFORE_INPUT $STAGE_LIST_AFTER_INPUT"
 
 print_plan() {
   local n=0 k
@@ -365,12 +370,16 @@ print_plan() {
     printf '[%s] PLAN-AWS-CALL %s %02d %s: %s\n' "$SCRIPT_NAME" "$1" "$n" "$2" "${AWS_BASE[*]} $3"
   }
   p stage read "sts get-caller-identity"
-  for k in $STAGE_LIST; do
+  for k in $STAGE_LIST_BEFORE_INPUT; do
     p stage read "s3api head-object --bucket $DATA_BUCKET --key $k --checksum-mode ENABLED"
     p stage write "s3api put-object --bucket $DATA_BUCKET --key $k --body <local> --checksum-sha256 <b64> --if-none-match *   (only if absent)"
   done
   p stage read "s3api head-object --bucket $DATA_BUCKET --key $K_INPUT/<each file> --checksum-mode ENABLED   (<= $HC_MAX_INPUT_OBJECTS files)"
   p stage write "s3api put-object --bucket $DATA_BUCKET --key $K_INPUT/<each file> --checksum-sha256 <b64> --if-none-match *   (only if absent)"
+  for k in $STAGE_LIST_AFTER_INPUT; do
+    p stage read "s3api head-object --bucket $DATA_BUCKET --key $k --checksum-mode ENABLED"
+    p stage write "s3api put-object --bucket $DATA_BUCKET --key $k --body <local> --checksum-sha256 <b64> --if-none-match *   (only if absent)"
+  done
   n=0
   p execute read "sts get-caller-identity   (Arn must be assumed-role/scholarchain-$ARG_ENV-operator)"
   p execute read "emr list-clusters --active   (exactly one named $CLUSTER_NAME, state WAITING)"
@@ -466,31 +475,38 @@ ok "operator role in account $ACCOUNT"
 # ==== --stage =======================================================================================
 if [[ $MODE == stage ]]; then
   stage_object() { # stage_object <local file> <key> <sha256 hex>
-    local b64
+    local b64 bytes t0
     b64=$(hex_to_b64 "$3")
     if s3_head "$DATA_BUCKET" "$2"; then
       [[ $(head_checksum) == "$b64" ]] || die "$EX_REFUSED" "s3://$DATA_BUCKET/$2 exists with a different or no SHA-256 checksum"
       ok "already staged $2"
       return 0
     fi
+    bytes=$(file_bytes "$1")
+    t0=$SECONDS
+    # The AWS CLI's stderr is not redirected: S3's error code and message (for example AccessDenied,
+    # PreconditionFailed, or a connection error) print above the FAIL line as the CLI reports them.
     aws_write s3api put-object --bucket "$DATA_BUCKET" --key "$2" --body "$1" --checksum-sha256 "$b64" \
-      --if-none-match "*" >/dev/null || die "$EX_AWS" "put-object $2 failed (nothing is overwritten)"
-    ok "staged $2"
+      --if-none-match "*" >/dev/null ||
+      die "$EX_AWS" "put-object $2 failed after $((SECONDS - t0))s, bytes=$bytes (AWS CLI error above; nothing is overwritten)"
+    ok "staged $2 bytes=$bytes seconds=$((SECONDS - t0))"
   }
-  step "stage artifacts"
-  stage_object "$(local_path "$C_spark_dist_local_path")" "$K_SPARK" "$C_spark_dist_sha256"
-  stage_object "$(local_path "$C_scala_library_local_path")" "$K_SCALA" "$C_scala_library_sha256"
-  stage_object "$(local_path "$C_hadoop_aws_local_path")" "$K_HAWS" "$C_hadoop_aws_sha256"
-  stage_object "$(local_path "$C_sdk_bundle_local_path")" "$K_SDK" "$C_sdk_bundle_sha256"
+  step "stage artifacts (smallest first)"
   stage_object "$INSTALL_SCRIPT" "$K_INSTALL" "$INSTALL_SHA256"
   stage_object "$SUBMIT_SCRIPT" "$K_SUBMIT" "$SUBMIT_SHA256"
-  stage_object "$(local_path "$C_job_jar_local_path")" "$K_JAR" "$C_job_jar_sha256"
   stage_object "$C_analysis_config_path" "$K_ANALYSIS" "$ANALYSIS_SHA256"
   stage_object "$C_benchmark_pairs_path" "$K_PAIRS" "$PAIRS_SHA256"
+  stage_object "$(local_path "$C_hadoop_aws_local_path")" "$K_HAWS" "$C_hadoop_aws_sha256"
+  stage_object "$(local_path "$C_scala_library_local_path")" "$K_SCALA" "$C_scala_library_sha256"
+  stage_object "$(local_path "$C_job_jar_local_path")" "$K_JAR" "$C_job_jar_sha256"
   step "stage input tree"
   while IFS=$'\t' read -r rel _ sum; do
     stage_object "$ARCHIVE_ROOT/$rel" "$K_INPUT/$rel" "$sum"
   done <"$TMP/input-tree.tsv"
+  step "stage large artifacts"
+  stage_object "$(local_path "$C_sdk_bundle_local_path")" "$K_SDK" "$C_sdk_bundle_sha256"
+  stage_object "$(local_path "$C_spark_dist_local_path")" "$K_SPARK" "$C_spark_dist_sha256"
+  step "stage input tree manifest (last)"
   stage_object "$TMP/input-tree.tsv" "$K_TREE" "$C_input_tree_sha256"
   say "RESULT STAGED submission_id=$SUBMISSION_ID at=$(now_utc)"
   exit 0

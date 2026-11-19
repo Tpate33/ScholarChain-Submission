@@ -186,3 +186,18 @@ and the Spark distribution, and run-bounded-spark.sh now refuses in every mode w
 build.sbt, project, modules/core or modules/spark differ from code_version. I defer the
 CR-P6-37 nits and the CR-P6-38 unverified concerns (inherited GIT_* variables,
 case-only paths). This does not approve any apply, upload or spend.
+
+## Bootstrap and base applied; staging diagnosis (2026-11-19)
+
+I signed and applied the bootstrap and base plans at commit
+b6934a0120900538f72cbb3179758d03b3244cdc after deploy-engineer reviews.
+Bootstrap added 7 resources and base added 40, with RESULT APPLIED for both.
+Bootstrap state was archived outside the repository; signatures are also
+stored outside the repository. For base, I accepted the operator role's
+create-once staging writes and read of data/logs objects, and the S3
+gateway endpoint's default policy. All three AWS profiles work.
+
+Two staging attempts failed on the first Spark distribution upload.
+I accept IE-P6-06 (stage smallest objects first) following CR-P6-39
+(APPROVE), and defer its nits. AWS spending on emr-run remains pending
+my approval of a signed plan.
