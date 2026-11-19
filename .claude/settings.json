@@ -82,6 +82,8 @@
       "Read(**/credentials.json)",
       "Read(**/*.tfstate)",
       "Read(**/*.tfstate.*)",
+      "Read(**/tfplan)",
+      "Read(**/*.tfplan)",
       "Read(**/.netrc)",
       "Read(~/.aws/credentials)",
       "Read(~/.aws/sso/cache/**)",

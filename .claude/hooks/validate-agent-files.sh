@@ -132,7 +132,7 @@ for a in .claude/agents/*.md; do
   for ro in $READ_ONLY_AGENTS; do
     if [ "$n" = "$ro" ]; then
       for ft in $FORBIDDEN_REVIEWER_TOOLS; do
-        if printf ', %s,' "$t" | grep -qE "[ ,]$ft[ ,]"; then fail "$a: read-only agent has forbidden tool $ft"; fi
+        if printf ', %s,' "$t" | grep -qE "[ ,]${ft}[ ,]"; then fail "$a: read-only agent has forbidden tool $ft"; fi
       done
       pass "$a: reviewer fence checked (no $FORBIDDEN_REVIEWER_TOOLS)"
     fi
@@ -325,7 +325,7 @@ if [ "${1:-}" = "--probes" ]; then
   done < .claude/hooks/probes.tsv
   echo "NOTE  $n table probes run"
 
-  section "Fixture probes (C4 hash audit, C5 formatter, provenance, test marker, D10(ii) held-out run protection)"
+  section "Fixture probes (C4 hash audit, C5 formatter, provenance, test marker, D10(ii) held-out run protection, FE-P6-06 scripts and plan files)"
   pn=0
   G="$F/repo"; mkdir -p "$G/.claude/hooks" "$G/modules/services" "$G/tests/x" "$G/scripts" "$G/datasets/scripts"
   cp .claude/hooks/*.sh .claude/hooks/*.tsv "$G/.claude/hooks/"
@@ -419,6 +419,38 @@ if [ "${1:-}" = "--probes" ]; then
   if [ "$fxok" = 1 ] && mkdir -p "$G/$HO" && [ -d "$G/$HO" ] && [ ! -L "$G/$HO" ] && [ "$(cd "$G/$HO" && pwd -P)" = "$(cd "$G" && pwd -P)/$HO" ]; then
     pv "D10(ii) service-engineer sbt clean check, held-out output present" service-engineer "sbt clean check" BLOCK "heldout-run-protected"
   else pn=$((pn + 1)); fail "probe D10(ii) held-out output present: fixture setup failed (cannot create a real directory $G/$HO)"; fi
+  # FE-P6-06 (CR-P6-30 m2, n2): rows that execute a repository script, checked against committed stubs in the fixture, never the
+  # real scripts/ tree. The stubs are never executed: the guard only checks provenance and returns a decision. Restore the real
+  # scripts directory first (the provenance probes above replaced it by a symlink). Setup failure = one FAIL per skipped probe.
+  RC="infra/terraform/environments/dev/runs/spark-dev-run-01.conf"
+  if [ "$fxok" = 1 ] && ( cd "$G" && rm scripts && mv scripts.real scripts && mkdir -p scripts/emr infra/terraform/environments/dev/runs \
+       && printf '#!/bin/sh\nexit 0\n' > scripts/plan.sh && printf '#!/bin/sh\nexit 0\n' > scripts/run-bounded-spark.sh \
+       && printf '#!/bin/sh\nexit 0\n' > scripts/emr/check-submit-args.sh && chmod +x scripts/plan.sh scripts/run-bounded-spark.sh scripts/emr/check-submit-args.sh \
+       && printf 'run_id = fixture\n' > "$RC" && git add scripts "$RC" && git -c user.email=p@x -c user.name=p commit -q -m fe-p6-06 ) \
+       && [ ! -L "$G/scripts" ] && [ -x "$G/scripts/plan.sh" ]; then
+    pv "FE-P6-06 plan.sh dev bootstrap (committed) -> ask" infra-engineer "scripts/plan.sh dev bootstrap" ASK "scripts/plan.sh <ENVNP> <STACK>"
+    pv "FE-P6-06 plan.sh dev base (committed) -> ask" infra-engineer "scripts/plan.sh dev base" ASK "scripts/plan.sh <ENVNP> <STACK>"
+    pv "FE-P6-06 plan.sh dev emr-run (committed) -> ask" infra-engineer "scripts/plan.sh dev emr-run" ASK "scripts/plan.sh <ENVNP> <STACK>"
+    pv "FE-P6-06 run-bounded-spark.sh --dry-run, committed config" infra-engineer "scripts/run-bounded-spark.sh --dry-run dev $RC" ALLOW
+    pv "FE-P6-06 check-submit-args.sh (committed, +x)" infra-engineer "scripts/emr/check-submit-args.sh" ALLOW
+    printf 'max_core_nodes = 99\n' >> "$G/$RC"
+    pv "FE-P6-06 --dry-run with a modified run config" infra-engineer "scripts/run-bounded-spark.sh --dry-run dev $RC" BLOCK "script-provenance"
+    ( cd "$G" && git checkout -q -- "$RC" ); printf '# tampered\n' >> "$G/scripts/plan.sh"
+    pv "FE-P6-06 plan.sh modified relative to HEAD" infra-engineer "scripts/plan.sh dev base" BLOCK "scripts/plan.sh is modified relative to HEAD"
+    ( cd "$G" && git checkout -q -- scripts/plan.sh ); chmod -x "$G/scripts/emr/check-submit-args.sh"
+    pv "FE-P6-06 check-submit-args.sh executable bit removed" infra-engineer "scripts/emr/check-submit-args.sh" BLOCK "executable bit differs from HEAD"
+    chmod +x "$G/scripts/emr/check-submit-args.sh"
+    pv "FE-P6-06 plan.sh clean again after restore" infra-engineer "scripts/plan.sh dev emr-run" ASK
+  else pn=$((pn + 9)); fail "probe FE-P6-06 script provenance (9 probes): fixture setup failed (scripts restore, stubs or fixture commit)"; fi
+  # n2 symlinked TFPLAN (path-escape check) and m1 (a regular plan file stays reachable by the Bash rows, never by Read)
+  if mkdir -p "$G/infra/terraform/bootstrap" "$G/infra/terraform/environments/dev/base" && ln -s "$F/fix/home/.ssh/id_rsa" "$G/infra/terraform/bootstrap/tfplan" \
+       && printf 'FAKE PLAN\n' > "$G/infra/terraform/environments/dev/base/tfplan" && ln -s infra/terraform/environments/dev/base/tfplan "$G/plan-notes.txt"; then
+    pv "FE-P6-06 n2 shasum of a symlinked TFPLAN leaving the repository" deploy-engineer "shasum -a 256 infra/terraform/bootstrap/tfplan" BLOCK "path-escape-or-secret"
+    pv "FE-P6-06 m1 shasum of a regular plan file (Bash row unaffected by the Read fence)" deploy-engineer "shasum -a 256 infra/terraform/environments/dev/base/tfplan" ALLOW
+    pv "FE-P6-06 m1 terraform show of a regular plan file" deploy-engineer "terraform -chdir=infra/terraform/environments/dev/base show -no-color tfplan" ALLOW
+    verdict "$GH" guard-dangerous.sh "$G" "{\"tool_name\":\"Read\",\"agent_type\":\"deploy-engineer\",\"tool_input\":{\"file_path\":\"$G/plan-notes.txt\"}}"
+    probe "FE-P6-06 m1 Read of an innocent name that resolves to a plan file" BLOCK "$got" "Terraform plan file" "$msg"
+  else pn=$((pn + 4)); fail "probe FE-P6-06 TFPLAN symlink and plan-file fence (4 probes): fixture setup failed"; fi
   echo "NOTE  $pn fixture probes run"
   case "$F" in "${TMPDIR:-/tmp}"/scholarchain-probes.*) rm -r "$F"; [ ! -e "$F" ] || fail "probe fixture $F was not removed (the human removes it)" ;; esac
 fi

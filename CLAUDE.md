@@ -62,7 +62,7 @@ tests (cross-module, adversarial) -> any module, test scope only
 
 ## Security invariants
 
-- **Secrets** come only from AWS Secrets Manager (referenced by ARN or name, KMS-encrypted) or from approved local placeholders. Approved placeholder files are those ratified in `docs/agents.md`. Agents may never read `.env*` files, secret directories, private keys, credential files, or Terraform state.
+- **Secrets** come only from AWS Secrets Manager (referenced by ARN or name, KMS-encrypted) or from approved local placeholders. Approved placeholder files are those ratified in `docs/agents.md`. Agents may never read `.env*` files, secret directories, private keys, credential files, or Terraform state. Terraform state and saved plan files (`tfplan`) are never read directly by any agent tool; state is accessed only through `scripts/plan.sh` as allowlisted for `infra-engineer`, and a saved plan only through `deploy-engineer`'s allowlisted `shasum -a 256` and `terraform show -no-color` rows (amendment FE-P6-06, CR-P6-30 m1; see `docs/agents.md`, Enforcement layers).
 - **All AWS infrastructure is defined in Terraform** under `infra/terraform/**` and changed only through a reviewed plan. `terraform apply` and `terraform destroy` are never run from an agent tool call. Apply happens only through the human-approved `scripts/deploy.sh` path.
 - **Direct cloud-console mutation is forbidden as an implementation path.** The console and ad-hoc CLI writes must not become a side door where the real architecture lives. Read-only inspection is allowed. Any emergency manual change must be recorded as an incident and back-ported to Terraform.
 - MCP servers are least-privilege and read-only by default (see `docs/agents.md`, MCP servers).

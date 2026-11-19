@@ -105,3 +105,24 @@ I accept the security design for planning only: the proposed IAM roles, tag-scop
 I ratify FE-P6-06 with D1 and CR-P6-30 amendments m1 (state access only through scripts/plan.sh; tfplan Read denies and secret-path term), m2 (fixture probes reviewed in the applied diff), n1 and n2, for application by factory-engineer and review before the constitutional commit. Deferred nits: CR-P6-29 n4 residuals; CR-P6-30 n3; CR-P6-32 m2, n1 and n2. CR-P6-31 n1 is fixed.
 
 Phase 5 remains accepted. Phase 6 remains open. AWS deployment, uploads and spending remain pending my approval of specific signed plans.
+
+## Phase 6 FE-P6-06 application acceptance (2026-11-18)
+
+I accept the applied FE-P6-06 changes under D1 following CR-P6-33 (APPROVE), as documented in fe-p6-06-application-report.md.
+
+I acknowledge deviation (a): the tfplan fence is a separate PLAN_FILE check on Read, Grep and Glob, not a SECRET_PATH term, so the approved deploy-engineer shasum and terraform show rows remain usable. I accept deviations (b)–(e) as reviewed in CR-P6-33.
+
+I ran .claude/hooks/validate-agent-files.sh --probes in my Terminal:
+NOTE 888 table probes run
+NOTE 51 fixture probes run
+RESULT: FAIL (5 failures)
+
+The only FAIL lines were ShellCheck findings in unchanged hooks:
+audit-bash-writes.sh, enforce-ownership.sh, lib-baseline.sh,
+post-write.sh and verify-tests-ran.sh.
+These match the existing failures identified by CR-P6-33 m1.
+I defer those findings and CR-P6-33 N1–N4 to a later factory-engineer work order. This records the observed failure result, not an overall validator pass.
+
+Effective EC2 quota L-1216C47A in us-east-1 is verified at 16.0 vCPUs. The planned cluster remains one primary and one core m5.xlarge.
+
+The constitutional changes are accepted for commit and activation after a session restart. Phase 5 remains accepted. Phase 6 remains open. AWS deployment, uploads and spending remain pending my approval of specific signed plans.

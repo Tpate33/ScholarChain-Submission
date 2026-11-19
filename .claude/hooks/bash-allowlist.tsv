@@ -19,13 +19,14 @@
 #                        --x  exact | --x=<C>  joined value | --x:<C>  separate value | --x:<C>+  1..n values
 #                        a leading ! makes the option required
 #   Classes: PATH[:prefix] REV REVX(REV or REV:PATH) INT SHA40 SHA256 REGION AWSID IMGID OUT RO
-#            SBT:<project> SBTTEST DSSCRIPT ENV ENVNP TFCHDIR TFPLAN (definitions in guard-dangerous.sh)
+#            SBT:<project> SBTTEST DSSCRIPT ENV ENVNP TFCHDIR TFPLAN STACK EC2FILTER S3PREFIX
+#            (definitions in guard-dangerous.sh; REGION is pinned to us-east-1, amendment FE-P6-06)
 #
 # Directives: @projects = sbt project ids (spec Phase 2 list); @env / @env-nonprod = ratified environment
-# names. Both environment lists are EMPTY until Phase 12 ratifies them, so ENV-based rows cannot match.
+# names. Both environment lists hold dev (amendment FE-P6-06); inactive rows still never match.
 @projects	core hadoop entityResolution sparkAnalytics storage rag services
-@env
-@env-nonprod
+@env	dev
+@env-nonprod	dev
 #
 # ------------------------------------------------------------------ shared groups ----------------------
 @GIT	active	allow	-	git status {--porcelain;--short;--branch}	read-only git
@@ -53,6 +54,16 @@
 @AWS-RO	active	allow	-	aws emr list-steps {!--profile:<RO>;--region:<REGION>;--output:<OUT>;!--cluster-id:<AWSID>}	EMR status (read-only)
 @AWS-RO	inactive:MED-5-queue-url-not-expressible	allow	-	aws sqs get-queue-attributes {!--profile:<RO>;--region:<REGION>;--output:<OUT>;!--queue-url:<AWSID>;--attribute-names:<AWSID>+}	queue depth check; INACTIVE: a queue URL always contains // and https:, which AWSID rejects (MED-5); use mcp__aws-api. No URL class is added
 @AWS-RO	active	allow	-	aws elbv2 describe-target-health {!--profile:<RO>;--region:<REGION>;--output:<OUT>;!--target-group-arn:<AWSID>}	service health check
+@AWS-RO	active	allow	-	aws emr list-clusters {!--profile:<RO>;--region:<REGION>;--output:<OUT>;--active}	EMR status (read-only; FE-P6-06)
+@AWS-RO	active	allow	-	aws emr list-bootstrap-actions {!--profile:<RO>;--region:<REGION>;--output:<OUT>;!--cluster-id:<AWSID>}	EMR status (read-only; FE-P6-06)
+@AWS-RO	active	allow	-	aws emr list-instance-groups {!--profile:<RO>;--region:<REGION>;--output:<OUT>;!--cluster-id:<AWSID>}	EMR capacity check (read-only; FE-P6-06)
+@AWS-RO	active	allow	-	aws emr get-auto-termination-policy {!--profile:<RO>;--region:<REGION>;--output:<OUT>;!--cluster-id:<AWSID>}	EMR idle-termination check (read-only; FE-P6-06)
+@AWS-RO	active	allow	-	aws emr describe-step {!--profile:<RO>;--region:<REGION>;--output:<OUT>;!--cluster-id:<AWSID>;!--step-id:<AWSID>}	EMR step status (read-only; FE-P6-06)
+@AWS-RO	active	allow	-	aws emr describe-release-label {!--profile:<RO>;--region:<REGION>;--output:<OUT>;!--release-label:<AWSID>}	EMR release check (read-only; FE-P6-06)
+@AWS-RO	active	allow	-	aws service-quotas get-service-quota {!--profile:<RO>;--region:<REGION>;--output:<OUT>;!--service-code:<AWSID>;!--quota-code:<AWSID>}	vCPU quota check (read-only; FE-P6-06)
+@AWS-RO	active	allow	-	aws ec2 describe-instance-type-offerings {!--profile:<RO>;--region:<REGION>;--output:<OUT>;--location-type:<AWSID>;!--filters:<EC2FILTER>}	instance offering check, one instance-type filter (read-only; FE-P6-06)
+@AWS-RO	active	allow	-	aws ec2 get-ebs-encryption-by-default {!--profile:<RO>;--region:<REGION>;--output:<OUT>}	EBS default-encryption check (read-only; FE-P6-06)
+@AWS-RO	active	allow	-	aws s3api list-objects-v2 {!--profile:<RO>;--region:<REGION>;--output:<OUT>;!--bucket:<AWSID>;--prefix:<S3PREFIX>;!--max-items:<INT>}	staged-object listing, bounded by --max-items; no get-object, delimiter or starting-token (read-only; FE-P6-06)
 #
 # ------------------------------------------------------------------ orchestrator ------------------------
 ORCHESTRATOR	active	allow	-	@GIT	/deploy gate 4
@@ -85,6 +96,7 @@ build-engineer	active	allow	-	sbt packageJobs	Phase 2 packaging (build-engineer'
 build-engineer	active	ask	-	sbt dockerLocal	E7 local image build
 build-engineer	active	allow	-	sbt reload	build maintenance
 build-engineer	active	allow	-	sbt sbtVersion	versions evidence
+build-engineer	active	ask	-	sbt sparkSubmitLocal	Phase 6 local spark-submit compatibility gate (amendment FE-P6-06; BE-P6-09; Option A local runtime validation): root task, no arguments; refuses unless the code scope build.sbt project modules/core modules/spark is committed and byte-identical to HEAD; on a cache miss one HTTPS GET of the sha512-pinned Spark distribution into target/spark-dist/ (that invocation stops, never a pass) plus Coursier jar resolution; two client-mode runs (local[2], local-cluster[2,1,1024]) on loopback in a create-once target/spark-submit-local/attempt-<n>/; child environment strips AWS_*, SCHOLARCHAIN_*, GIT_*, SPARK_*, HADOOP_* and JVM-option variables; no AWS call; writes no test marker; never part of check; child code opaque
 #
 # ------------------------------------------------------------------ module engineers --------------------
 domain-engineer	active	allow	-	@GIT	matrix row
@@ -103,6 +115,7 @@ spark-engineer	active	allow	-	@GIT	matrix row
 spark-engineer	active	allow	-	@SBT-ALL	sbt check
 spark-engineer	active	allow	-	sbt <SBT:sparkAnalytics> <SBT:sparkAnalytics>? <SBT:sparkAnalytics>? <SBT:sparkAnalytics>?	own-module tasks (E2)
 spark-engineer	active	allow	-	sbt sparkIT	Phase 6 opt-in local Spark integration task (amendments FE-P6-04, FE-P6-05; build BE-P6-03 and BE-P6-03 repair 01 committed in e8c6ecc; reviewed CR-P6-16, CR-P6-17 APPROVE; row reviewed CR-P6-18 APPROVE): root task, no arguments, over the verified dev archive at <user.home>/<archive.root.home-relative> from project/spark-it.properties holding exactly the three pinned run directories (curated, decisions, assignments); NOFOLLOW layout check and bounded NOFOLLOW tree walk; refuses held-out, gold/, target/streams/ and target/local-runs/heldout segments and any inherited SCHOLARCHAIN_CFG_*; one forked JVM, working directory the attempt, with inherited AWS_*, SCHOLARCHAIN_*, GIT_* and MUNIT_* removed; 120 s bound; the task's own files only under modules/spark/target/spark-it/ (created if absent), in one create-once attempt-<n>/ (run-config.properties, runner/, tmp/ as java.io.tmpdir, out/, junit-result.txt, result.txt), never reused or deleted by the task, removed by sbt clean; sbt also writes its usual build output (meta-build under project/target/, core and sparkAnalytics Compile, Test and SparkIT classes under modules/core/target/ and modules/spark/target/) and task logs under target/streams/, which carry the child's output; code in the fork (tests, Spark, Hadoop) is opaque and can write wherever the OS user can; never part of check; writes no test marker; PASS only from the runner's nonce-bound per-class result file
+spark-engineer	active	ask	-	sbt sparkSubmitLocal	Phase 6 local spark-submit compatibility gate (amendment FE-P6-06; BE-P6-09; Option A local runtime validation): root task, no arguments; refuses unless the code scope build.sbt project modules/core modules/spark is committed and byte-identical to HEAD; on a cache miss one HTTPS GET of the sha512-pinned Spark distribution into target/spark-dist/ (that invocation stops, never a pass) plus Coursier jar resolution; two client-mode runs (local[2], local-cluster[2,1,1024]) on loopback in a create-once target/spark-submit-local/attempt-<n>/; child environment strips AWS_*, SCHOLARCHAIN_*, GIT_*, SPARK_*, HADOOP_* and JVM-option variables; no AWS call; writes no test marker; never part of check; child code opaque
 storage-engineer	active	allow	-	@GIT	matrix row
 storage-engineer	active	allow	-	@SBT-ALL	sbt check
 storage-engineer	active	allow	-	sbt <SBT:storage> <SBT:storage>? <SBT:storage>? <SBT:storage>?	own-module tasks (E2)
@@ -129,13 +142,15 @@ test-engineer	inactive:G7-tests-project-pending	allow	-	sbt tests/Test/scalafmt	
 # ------------------------------------------------------------------ infra -------------------------------
 infra-engineer	active	allow	-	@GIT	matrix row
 infra-engineer	active	allow	-	terraform -chdir=infra/terraform fmt -check -recursive	Terraform format check
-infra-engineer	inactive:B6+ENV-unratified	ask	-	terraform <TFCHDIR> init -input=false	E3; .gitignore must cover .terraform/ (B6)
-infra-engineer	inactive:ENV-unratified	allow	-	terraform <TFCHDIR> validate	Phase 12
-infra-engineer	inactive:B6+ENV-unratified	ask	-	terraform <TFCHDIR> plan -input=false -out=tfplan	E4; fixed -out; no -target/-var/-var-file/-destroy/-refresh-only
+infra-engineer	active	ask	-	terraform <TFCHDIR> init -input=false -backend=false	FE-P6-06 (B6 closed: .gitignore covers .terraform/ and tfplan): provider download from the Terraform Registry; no backend, no state; writes <stack>/.terraform/ (ignored) and <stack>/.terraform.lock.hcl (infra territory; the human commits it); -upgrade, -from-module, -plugin-dir and -backend-config excluded by construction
+infra-engineer	active	allow	-	terraform <TFCHDIR> validate ?-no-color	FE-P6-06: offline validation of one stack after init; no credentials; writes nothing
+infra-engineer	inactive:superseded-by-plan-sh	ask	-	terraform <TFCHDIR> plan -input=false -out=tfplan	E4; superseded by scripts/plan.sh (profile selection, clean tree, plan meta); never activated
 infra-engineer	active	allow	-	bash -n <PATH:scripts/>	shell syntax check of own scripts
 infra-engineer	active	allow	-	shellcheck <PATH:scripts/>+	shell lint of own scripts
 infra-engineer	active	allow	git	scripts/check.sh	approved check script (committed, unmodified)
-infra-engineer	inactive:ENV-unratified	ask	git	scripts/plan.sh <ENVNP>	Phase 12 plan script
+infra-engineer	active	ask	git	scripts/plan.sh <ENVNP> <STACK>	FE-P6-06 (replaces the Phase 12 placeholder): plan of one stack, never apply; read-only profile from the committed env.conf (the deploy-profile first-plan exception refuses inside Claude Code and without a TTY); terraform init with the real backend and -lockfile=readonly, validate, plan -lock=false -out=tfplan; writes only <stack>/tfplan and <stack>/.terraform/ (ignored); AWS read calls only; the only path by which an agent reaches Terraform state (CR-P6-30 m1); inert until base creates the read-only role
+infra-engineer	active	allow	git+args	scripts/run-bounded-spark.sh --dry-run <ENVNP> <PATH:infra/terraform/environments/>	FE-P6-06: dry run only (no AWS call, no repository write; temporary directory under TMPDIR removed on exit); run config committed and unmodified; hashes local artifacts and the input archive under the home directory; prints planned calls, bounds and the two confirmation tokens; --stage and --execute are human-Terminal only
+infra-engineer	active	allow	git	scripts/emr/check-submit-args.sh	FE-P6-06: local self-check of the EMR step wrapper's argument construction (CR-P6-27 M1); no AWS, HDFS or network call; writes nothing; needs the committed executable bit
 infra-engineer	inactive:B3	ask	git	scripts/package.sh	B3 unresolved
 infra-engineer	inactive:B3	ask	git	scripts/smoke-test.sh <ENVNP>	B3 unresolved
 infra-engineer	active	allow	-	@AWS-RO	read-only verification
@@ -143,20 +158,20 @@ infra-engineer	active	allow	-	@AWS-RO	read-only verification
 #
 # ------------------------------------------------------------------ operators ---------------------------
 deploy-engineer	active	allow	-	@GIT	matrix row
-deploy-engineer	inactive:ENV-unratified	ask	git	scripts/deploy.sh <ENV> <SHA40> <SHA256>	/deploy
-deploy-engineer	inactive:ENV-unratified	ask	git	scripts/smoke-test.sh <ENV>	/deploy
-deploy-engineer	inactive:ENV-unratified	ask	git	scripts/rollback.sh <ENV> <REV>	failed in-flight deploy
+deploy-engineer	inactive:G6-phase6-human-terminal	ask	git	scripts/deploy.sh <ENV> <SHA40> <SHA256>	/deploy; Phase 6 (FE-P6-06, decision D1): the human runs deploy.sh in a Terminal with the admin aws login session; activation is a later amendment
+deploy-engineer	inactive:script-absent	ask	git	scripts/smoke-test.sh <ENV>	/deploy
+deploy-engineer	inactive:script-absent	ask	git	scripts/rollback.sh <ENV> <REV>	failed in-flight deploy
 deploy-engineer	inactive:B2+G6	ask	git+args	scripts/run-bounded-pipeline.sh <ENV> <PATH:datasets/> <PATH>	/run-pipeline (operator pending G6)
 deploy-engineer	inactive:B4	ask	git	scripts/archive-evidence.sh <ENV> <SHA40>	evidence path and owner pending
-deploy-engineer	inactive:ENV-unratified	allow	-	shasum -a 256 <TFPLAN>	plan checksum gate
-deploy-engineer	inactive:ENV-unratified	allow	-	terraform <TFCHDIR> show -no-color tfplan	plan review; -json excluded (prints sensitive values)
+deploy-engineer	active	allow	-	shasum -a 256 <TFPLAN>	plan checksum gate (FE-P6-06): bootstrap, base and emr-run plan files
+deploy-engineer	active	allow	-	terraform <TFCHDIR> show -no-color tfplan	plan review (FE-P6-06); -json excluded (prints sensitive values)
 deploy-engineer	active	allow	-	@AWS-RO	read-only verification
 experiment-engineer	active	allow	-	@GIT	matrix row
 experiment-engineer	active	allow	-	@SBT-ALL	sbt check
-experiment-engineer	inactive:ENV-unratified	ask	git+args	scripts/run-experiment.sh <PATH:experiments/> <ENV>	/experiment; manifest must be committed and unmodified
+experiment-engineer	inactive:script-absent	ask	git+args	scripts/run-experiment.sh <PATH:experiments/> <ENV>	/experiment; manifest must be committed and unmodified
 incident-responder	active	allow	-	@GIT	matrix row
-incident-responder	inactive:ENV-unratified	ask	git	scripts/rollback.sh <ENV> <REV>	/rollback
-incident-responder	inactive:ENV-unratified	ask	git	scripts/smoke-test.sh <ENV>	/incident, /rollback
+incident-responder	inactive:script-absent	ask	git	scripts/rollback.sh <ENV> <REV>	/rollback
+incident-responder	inactive:script-absent	ask	git	scripts/smoke-test.sh <ENV>	/incident, /rollback
 incident-responder	active	allow	-	@AWS-RO	read-only diagnosis
 #
 # ------------------------------------------------------------------ docs, dependencies ------------------

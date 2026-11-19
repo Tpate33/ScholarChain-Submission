@@ -18,6 +18,9 @@
 # held-out gold-label fence (G9-c, FE-P5-03): no Read of gold/**/heldout*/er-gold-labels*, no Grep under
 # gold/, no repository-wide Grep whose glob names gold/heldout/label. Read/Grep: the held-out evaluation
 # output sbt may keep under target/ is fenced (R6, rule heldout-eval-output-read, FE-P5-04).
+# Read/Grep/Glob: Terraform plan files (tfplan, *.tfplan) are refused as secret material (FE-P6-06, CR-P6-30 m1); Bash reaches
+# them only through the allowlisted plan.sh, shasum and terraform show rows. Bash: cleanup.sh may be named only by the static
+# checks 'bash -n scripts/cleanup.sh' and option-free 'shellcheck' (FE-P6-06); every other form stays cleanup-human-only.
 # Bash: git diff/show may not name a gold/ path other than the exact non-label files, and a content-printing
 # git diff/show whose scope includes gold/ is refused when git lists a held-out label file in that scope.
 # Bash: sbt goldSetEvalHeldout (D15(c), FE-P5-04) and sbt localPipelineHeldout (decisions-21, FE-P5-07) are human-only:
@@ -57,6 +60,11 @@ SECRET_TEXT = re.compile(r'(^|[ /=<>(:@])\.env([._-][a-z0-9_.-]*|rc)?' + END + r
 SECRET_PATH = re.compile(r'(^|/)(\.env([._-][^/]*|rc)?|\.ssh|\.gnupg|\.secrets?|secrets?|\.netrc|credentials(\.json)?'
     r'|id_(rsa|ed25519|ecdsa|dsa)[^/]*|[^/]*\.(pem|key|p12|pfx|jks|keystore)|[^/]*\.tfstate[^/]*)(/|$)'
     r'|(^|/)\.aws/(credentials|config|sso|cli)(/|$)|(^|/)\.docker/config\.json$', re.I)
+# FE-P6-06 (CR-P6-30 m1): a saved Terraform plan holds prior state and sensitive values. This term extends the secret-path
+# rule for Read/Grep/Glob ONLY (read_check). It is deliberately not part of secretish(): the Bash rows
+# 'shasum -a 256 <TFPLAN>' and 'terraform <TFCHDIR> show -no-color tfplan' name plan files, and secretish() feeds the Bash
+# token tripwire and the path-escape check, which would refuse them.
+PLAN_FILE = re.compile(r'(^|/)([^/]*[._-])?tfplan([._-][^/]*)?(/|$)', re.I)
 SEG_BAD = re.compile(r'(^|/)(\.\.|\.git)(/|$)', re.I)
 # G9-c (FE-P5-03): held-out human gold labels reach no agent tool; only the held-out evaluation, which the
 # human runs in a Terminal (sbt goldSetEvalHeldout, D15(c)), reads them. Patterns apply to lower-cased repo-relative paths.
@@ -86,9 +94,13 @@ SECRET_OPS = {'get-secret-value', 'get-login-password', 'get-login', 'export-cre
               'get-role-credentials', 'get-credentials-for-identity', 'generate-data-key'}
 DANGER = set('rm rmdir dd shred wipefs diskutil find xargs chmod chown mv cp ln tee truncate sudo su env printenv eval exec '
              'curl wget nc scp rsync ssh perl ruby node osascript'.split())
-RX = {'INT': r'[0-9]{1,4}', 'SHA40': r'[0-9a-f]{40}', 'SHA256': r'[0-9a-f]{64}', 'REGION': r'[a-z]{2}-[a-z]+-[0-9]',
+# FE-P6-06: REGION is pinned to the ratified Region; STACK names one Terraform root of layout L2; EC2FILTER is exactly one
+# instance-type filter (no ':', so no file:// or JSON); S3PREFIX has no ':' and no '//' and cannot start with '/' or '-'.
+RX = {'INT': r'[0-9]{1,4}', 'SHA40': r'[0-9a-f]{40}', 'SHA256': r'[0-9a-f]{64}', 'REGION': r'us-east-1',
       'AWSID': r'[A-Za-z0-9][A-Za-z0-9:/._-]{0,255}', 'IMGID': r'image(Tag|Digest)=[A-Za-z0-9:._-]{1,128}',
-      'OUT': r'json|text', 'RO': r'scholarchain-readonly'}
+      'OUT': r'json|text', 'RO': r'scholarchain-readonly', 'STACK': r'bootstrap|base|emr-run',
+      'EC2FILTER': r'Name=instance-type,Values=[a-z][a-z0-9-]*\.[a-z0-9]+',
+      'S3PREFIX': r'(?!.*//)[A-Za-z0-9][A-Za-z0-9._=/-]{0,255}'}
 CLASSES = set(RX) | {'PATH', 'REV', 'REVX', 'SBT', 'SBTTEST', 'DSSCRIPT', 'ENV', 'ENVNP', 'TFCHDIR', 'TFPLAN'}
 PATHLIKE = ('PATH', 'DSSCRIPT', 'TFPLAN')
 SBT_TASKS = ('compile', 'Test/compile', 'test', 'scalafmt', 'Test/scalafmt', 'scalafmtCheck')
@@ -170,11 +182,13 @@ def cls_ok(c, arg, t):
     if c in ('ENV', 'ENVNP'):
         return t in DIRS.get('@env' if c == 'ENV' else '@env-nonprod', ())
     env = DIRS.get('@env', ())
+    def stack(d):    # FE-P6-06: one Terraform root of layout L2; nothing matches while @env is empty
+        m = re.fullmatch(r'infra/terraform/(bootstrap|environments/([a-z0-9-]+)/(base|emr-run))', d)
+        return bool(env) and m is not None and (m.group(2) is None or m.group(2) in env)
     if c == 'TFCHDIR':
-        return t.startswith('-chdir=infra/terraform/environments/') and t.split('/')[-1] in env and t.count('/') == 3
+        return t.startswith('-chdir=') and stack(t[len('-chdir='):])
     if c == 'TFPLAN':
-        m = re.fullmatch(r'infra/terraform/environments/([a-z0-9-]+)/tfplan', t)
-        return m is not None and m.group(1) in env
+        return t.endswith('/tfplan') and stack(t[:-len('/tfplan')])
     raise ValueError('unknown class ' + c)
 
 def parse_spec(spec):
@@ -294,6 +308,13 @@ def heldout_human_only_bash(toks):
                 '(decisions-21), so no agent and not the orchestrator runs it; no identity has an allowlist row for it.', HP_DO)
     return None
 
+def cleanup_static_check(low):
+    # FE-P6-06: bash -n and shellcheck read scripts/cleanup.sh without executing it; the matched allowlist row
+    # already fixed the argument classes. Anything else naming cleanup.sh stays refused (cleanup-human-only).
+    if low[0] == 'bash':
+        return low[1:] == ['-n', 'scripts/cleanup.sh']
+    return low[0] == 'shellcheck' and len(low) > 1 and not any(t.startswith('-') for t in low[1:])
+
 def tripwire(toks):
     low = [t.lower() for t in toks]
     s, prog = set(low), os.path.basename(low[0])
@@ -306,7 +327,7 @@ def tripwire(toks):
         return 'terraform-state-mutation', 'state mutation bypasses plan review', 'Describe the change in a BLOCKED-ON report; the human performs it.'
     if 'push' in s or any(t.startswith('--force') or t in ('-f', '--mirror', '--delete') for t in low):
         return 'git-force-push', 'agents never push; force pushes are never permitted', 'The human commits and pushes each ratified phase.'
-    if any('cleanup.sh' in t for t in low):
+    if any('cleanup.sh' in t for t in low) and not cleanup_static_check(low):
         return 'cleanup-human-only', 'scripts/cleanup.sh deletes cloud resources', 'Report the cleanup need; the human runs it after review.'
     if any('marktestrun' in t or 'last-test-run' in t for t in low):
         return 'test-marker-forgery', 'only sbt check may refresh .claude/.last-test-run, after tests pass', "Run 'sbt check'."
@@ -544,6 +565,16 @@ def bash_check(cmd):
         if kind == 'ask':
             ask(val)
 
+PLAN_DO = ("A Terraform plan file is reached only through the allowlisted rows (decision FE-P6-06): infra-engineer runs "
+           "'scripts/plan.sh <env> <stack>', deploy-engineer runs 'shasum -a 256 <stack>/tfplan' and "
+           "'terraform -chdir=<stack> show -no-color tfplan'. Read the .tf sources instead, or return STATUS: BLOCKED-ON human.")
+
+def plan_file_check(tool, k, v, shown):
+    # Grep's 'pattern' is a content regex, not a path, so a search FOR the word tfplan stays allowed.
+    if k != 'pattern' or tool == 'Glob':
+        if PLAN_FILE.search(v):
+            deny('secret-read', '%s %s=%r names a Terraform plan file (tfplan), which holds prior state and sensitive values (CR-P6-30 m1).' % (tool, k, shown), PLAN_DO)
+
 def read_check(tool, ti):
     keys = ('file_path',) if tool == 'Read' else ('path', 'pattern', 'glob')
     for k in keys:
@@ -551,6 +582,8 @@ def read_check(tool, ti):
         if isinstance(v, str) and v and secretish(v):
             deny('secret-read', '%s %s=%r references a secret location (.env*, secrets/, ~/.ssh, ~/.gnupg, ~/.aws, keys, credentials, tfstate).' % (tool, k, v),
                  'Use Secrets Manager references (ARNs) or ratified placeholder names. Never read, print, or copy secret material.')
+        if isinstance(v, str) and v:
+            plan_file_check(tool, k, v, v)
     home = os.path.realpath(os.environ.get('HOME', '/nonexistent'))
     for k in ('file_path', 'path'):
         v = ti.get(k)
@@ -561,6 +594,8 @@ def read_check(tool, ti):
         rp = os.path.realpath(ab)
         if secretish(rp) or secretish(os.path.normpath(ab)):
             deny('secret-read', '%s resolves to secret material (%s), e.g. through a symlink.' % (v, rp), 'Name the exact non-secret file you need.')
+        plan_file_check(tool, k, rp, '%s (resolves to %s)' % (v, rp))
+        plan_file_check(tool, k, os.path.normpath(ab), v)
         if tool != 'Read' and rp in ('/', '/Users', '/home', '/root', '/private', '/var', '/private/var', home, os.path.dirname(home)):
             deny('secret-read', '%s on %s would search a home or system root that contains keys and credentials.' % (tool, rp), 'Search inside the repository or a named non-secret directory.')
     gold_check(tool, ti)
