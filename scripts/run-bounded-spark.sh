@@ -72,7 +72,8 @@ readonly HC_MAX_INPUT_BYTES=268435456
 readonly HC_MAX_OUTPUT_PREFIXES=1000
 #
 # MARKERS  [run-bounded-spark] STEP / CHECK ok / NOTE / BOUND / PLAN-AWS-CALL / AWS-CALL (stderr) /
-#          CONFIRM / CONFIRMATION-TOKEN <mode> / SUMMARY-BEGIN / SUMMARY-END / RESULT / FAIL (stderr)
+#          CONFIRM / CONFIRMATION-TOKEN <mode> / STEPS-JSON (dry run) / SUMMARY-BEGIN / SUMMARY-END /
+#          RESULT / FAIL (stderr)
 # EXIT     0 ok, 2 usage, 3 refused, 4 AWS precondition, 5 step failed/cancelled/timed out, 6 verify
 # =====================================================================================================
 set -euo pipefail
@@ -353,8 +354,24 @@ step_args_json() { # the wrapper invocation under the cluster-side timeout, one 
       "--max-metadata-bytes", $mb, "--step-timeout-seconds", $st, "--kill-after-seconds", $ka]'
 }
 STEP_ARGS_JSON=$(step_args_json)
+# --steps file in the shape of the aws-cli `emr add-steps` customization (IE-P6-10), NOT the
+# AddJobFlowSteps API shape: aws-cli/2.34.61 refused the API key HadoopJarStep client-side
+# ("ParamValidation ... Unknown parameter in [0]: "HadoopJarStep", must be one of: Type, Name,
+# ActionOnFailure, Jar, Args, MainClass, Properties, LogUri, EncryptionKeyArn"; nothing was sent). For
+# Type CUSTOM_JAR (also the CLI default when Type is absent; stated explicitly here) the CLI requires Jar
+# and builds the API step {Name, ActionOnFailure, HadoopJarStep: {Jar, Args}} from the flat keys. Args
+# are the same array as before, element for element. describe-step echoes the API shape
+# (.Step.Config.Jar/.Args, .Step.ActionOnFailure), which the post-submit check below reads.
 STEPS_JSON=$(jq -cn --arg n "scholarchain-$ARG_ENV-spark-$SUBMISSION_ID" --argjson a "$STEP_ARGS_JSON" \
-  '[{Name: $n, ActionOnFailure: "TERMINATE_CLUSTER", HadoopJarStep: {Jar: "command-runner.jar", Args: $a}}]')
+  '[{Type: "CUSTOM_JAR", Name: $n, ActionOnFailure: "TERMINATE_CLUSTER", Jar: "command-runner.jar", Args: $a}]')
+# Local shape guard, every mode: one step, only keys the CLI accepts (the set from the observed error),
+# Args exactly STEP_ARGS_JSON (strings only) and starting with the cluster-side timeout prefix.
+printf '%s' "$STEPS_JSON" | jq -e --argjson a "$STEP_ARGS_JSON" --argjson pre "$STEP_TIMEOUT_PREFIX_JSON" '
+  length == 1 and (.[0] | type) == "object"
+  and ((.[0] | keys) - ["Type", "Name", "ActionOnFailure", "Jar", "Args", "MainClass", "Properties", "LogUri", "EncryptionKeyArn"]) == []
+  and .[0].Type == "CUSTOM_JAR" and .[0].Jar == "command-runner.jar" and .[0].ActionOnFailure == "TERMINATE_CLUSTER"
+  and .[0].Args == $a and all(.[0].Args[]; type == "string") and .[0].Args[0:4] == $pre' >/dev/null ||
+  die "$EX_USAGE" "internal: steps.json is not in the aws-cli emr add-steps shape"
 EXPECTED_BOOTSTRAP_ARGS=$(jq -cn --arg b "$DATA_BUCKET" --arg r "$REGION" --arg s5 "$C_spark_dist_sha512" \
   --arg sc "$C_scala_library_sha256" --arg ha "$C_hadoop_aws_sha256" --arg h1 "$C_hadoop_aws_sha1" \
   --arg sd "$C_sdk_bundle_sha256" --arg su "$SUBMIT_SHA256" '[$b, $r, $s5, $sc, $ha, $h1, $sd, $su]')
@@ -418,6 +435,10 @@ if [[ $MODE == dry-run ]]; then
   step "planned AWS calls (none executed)"
   print_plan
   confirm_block
+  # The exact --steps file content --execute would send, alone on one greppable line, so the human can
+  # extract it (sed -n 's/^\[run-bounded-spark\] STEPS-JSON //p') and check it against the installed
+  # CLI's client-side validation without adding a step (IE-P6-10). The dry run itself writes no file.
+  say "STEPS-JSON $STEPS_JSON"
   ((LOCAL_MISSING == 0)) || note "$LOCAL_MISSING local artifact(s) missing: --stage would refuse"
   say "CONFIRMATION-TOKEN stage $(token_for stage)"
   say "CONFIRMATION-TOKEN execute $(token_for execute)"
@@ -644,9 +665,21 @@ cancel_own_step() {
     return 0
   fi
   say "STEP cancel own step $STEP_ID ($1)"
-  aws_write emr cancel-steps --cluster-id "$CLUSTER_ID" --step-ids "$STEP_ID" --step-cancellation-option SEND_INTERRUPT >/dev/null ||
-    printf '[%s] FAIL cancel-steps %s failed; the cluster-side bound still holds: the step ends by /usr/bin/timeout within %ss of its start (ActionOnFailure TERMINATE_CLUSTER), then idle auto-termination ends a cluster left idle\n' \
-      "$SCRIPT_NAME" "$STEP_ID" "$((STEP_TIMEOUT_SECONDS + HC_KILL_AFTER_SECONDS))" >&2
+  # CancelSteps answers 200 with a per-step CancelStepsInfoList[].Status (SUBMITTED or FAILED, with a
+  # Reason); a 200 alone does not mean the cancellation was accepted (IE-P6-10 audit).
+  local out="" st="" why=""
+  if out=$(aws_write emr cancel-steps --cluster-id "$CLUSTER_ID" --step-ids "$STEP_ID" --step-cancellation-option SEND_INTERRUPT); then
+    # shellcheck disable=SC2016 # $s is a jq variable, bound by --arg
+    st=$(printf '%s' "$out" | jq -r --arg s "$STEP_ID" '[.CancelStepsInfoList[]? | select(.StepId == $s) | .Status] | first // ""') || st=""
+    # shellcheck disable=SC2016
+    why=$(printf '%s' "$out" | jq -r --arg s "$STEP_ID" '[.CancelStepsInfoList[]? | select(.StepId == $s) | .Reason // ""] | first // ""') || why=""
+    if [[ $st == SUBMITTED ]]; then
+      ok "cancel-steps accepted for $STEP_ID (Status SUBMITTED)"
+      return 0
+    fi
+  fi
+  printf '[%s] FAIL cancel-steps %s not accepted (status %s%s); the cluster-side bound still holds: the step ends by /usr/bin/timeout within %ss of its start (ActionOnFailure TERMINATE_CLUSTER), then idle auto-termination ends a cluster left idle\n' \
+    "$SCRIPT_NAME" "$STEP_ID" "${st:-none}" "${why:+, reason: $why}" "$((STEP_TIMEOUT_SECONDS + HC_KILL_AFTER_SECONDS))" >&2
 }
 # shellcheck disable=SC2329 # invoked by the INT/TERM/HUP trap below
 on_interrupt() {
@@ -674,7 +707,9 @@ ok "step $STEP_ID submitted to $CLUSTER_ID"
 
 # The step as EMR recorded it must carry the cluster-side bound; otherwise cancel it at once.
 # EMR may echo the legacy name TERMINATE_JOB_FLOW for TERMINATE_CLUSTER (equivalent values,
-# repair 02 item 2); any other value, or none, cancels.
+# repair 02 item 2); any other value, or none, cancels. describe-step has no aws-cli customization: its
+# output is the DescribeStep API shape, .Step.ActionOnFailure, .Step.Config.{Jar,Args},
+# .Step.Status.{State,FailureDetails} (IE-P6-10 audit), unlike the flat add-steps input above.
 SJ0=$(aws_read emr describe-step --cluster-id "$CLUSTER_ID" --step-id "$STEP_ID") || SJ0='{}'
 RECORDED_AOF=$(printf '%s' "$SJ0" | jq -r '.Step.ActionOnFailure // ""') || RECORDED_AOF=""
 case $RECORDED_AOF in
