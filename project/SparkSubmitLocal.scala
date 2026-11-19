@@ -728,14 +728,33 @@ object SparkSubmitLocal {
 
   // --- Distribution layout ------------------------------------------------------------------
 
-  /** The extracted `<top>/`: spark-submit executable; jars/ matching the ledger. */
+  /** Launcher scripts the runs execute: each an executable regular file (no symbolic link). */
+  val ExecutableScripts: Seq[String] = Seq("bin/spark-submit", "bin/spark-class")
+
+  /**
+   * Sourced, never executed (`bin/spark-class` runs `. "${SPARK_HOME}"/bin/load-spark-env.sh`): a
+   * readable regular file (no symbolic link); no execute bit (the pinned tarball ships it 0644).
+   */
+  val SourcedScripts: Seq[String] = Seq("bin/load-spark-env.sh")
+
+  /**
+   * The extracted `<top>/`: spark-submit and spark-class executable, load-spark-env.sh readable;
+   * jars/ matching the ledger.
+   */
   def distributionProblems(home: Path, pins: Pins): Seq[String] = {
     val p = ListBuffer.empty[String]
-    Seq("bin/spark-submit", "bin/spark-class", "bin/load-spark-env.sh").foreach { r =>
+    def script(r: String, executable: Boolean): Unit = {
       val f = home.resolve(r)
-      if (!Files.isRegularFile(f, LinkOption.NOFOLLOW_LINKS) || !Files.isExecutable(f))
-        p += s"$r is not an executable regular file"
+      if (Files.isSymbolicLink(f)) p += s"$r is a symbolic link"
+      else if (!Files.exists(f, LinkOption.NOFOLLOW_LINKS)) p += s"$r is missing"
+      else if (!Files.isRegularFile(f, LinkOption.NOFOLLOW_LINKS)) p += s"$r is not a regular file"
+      else if (executable) {
+        if (!Files.isExecutable(f)) p += s"$r is not executable"
+      } else if (!Files.isReadable(f))
+        p += s"$r is not readable (it is sourced by bin/spark-class, never executed)"
     }
+    ExecutableScripts.foreach(script(_, executable = true))
+    SourcedScripts.foreach(script(_, executable = false))
     val jars = home.resolve("jars")
     val names =
       if (!Files.isDirectory(jars, LinkOption.NOFOLLOW_LINKS)) {
@@ -2002,6 +2021,108 @@ object SparkSubmitLocal {
         extract(tarBytes(good), Tar.copy(maxFileBytes = 10))._2,
         "larger than"
       )
+
+      // Distribution layout (BE-P6-09 repair 02): trees extracted by the build's own tar reader,
+      // with the pinned tarball's modes (load-spark-env.sh 0644, spark-submit and spark-class 0755).
+      // Each refusal must be the only problem, so a failed extraction cannot pass a refusal case.
+      pins.foreach { p =>
+        val jarNames = Seq(
+          s"scala-library-${p.distScalaLibrary}.jar",
+          s"hadoop-client-api-${p.distHadoopClient}.jar",
+          s"hadoop-client-runtime-${p.distHadoopClient}.jar",
+          s"spark-core_2.13-${p.spark}.jar",
+          s"spark-sql_2.13-${p.spark}.jar"
+        )
+        val pinnedModes =
+          Map("spark-submit" -> 493, "spark-class" -> 493, "load-spark-env.sh" -> 420)
+        def dist(bin: Map[String, Int], extra: Seq[TestEntry] = Nil): Path = {
+          val es = Seq(TestEntry(s"$top/", '5', Array.emptyByteArray, 493)) ++
+            bin.toSeq.sorted.map { case (n, m) => TestEntry(s"$top/bin/$n", '0', f1, m) } ++
+            jarNames.map(j => TestEntry(s"$top/jars/$j", '0', f1, 420)) ++ extra
+          extract(tarBytes(es))._1.resolve(top)
+        }
+        def layout(name: String, home: Path, refusal: Option[String]): Unit = {
+          val ps = distributionProblems(home, p)
+          refusal match {
+            case None => expect(name, ps.isEmpty, ps.mkString("; "))
+            case Some(sub) =>
+              expect(
+                s"$name (refused)",
+                ps.size == 1 && ps.head.contains(sub),
+                if (ps.isEmpty) "ALLOW" else ps.mkString("; ")
+              )
+          }
+        }
+        val env = "load-spark-env.sh"
+        layout(
+          "pinned tarball modes: non-executable regular load-spark-env.sh accepted",
+          dist(pinnedModes),
+          None
+        )
+        layout(
+          "executable load-spark-env.sh accepted",
+          dist(pinnedModes.updated(env, 493)),
+          None
+        )
+        layout(
+          "missing load-spark-env.sh",
+          dist(pinnedModes - env),
+          Some("bin/load-spark-env.sh is missing")
+        )
+        val linked = dist(pinnedModes - env)
+        Files.createSymbolicLink(
+          linked.resolve("bin").resolve(env),
+          new File("spark-class").toPath
+        )
+        layout(
+          "load-spark-env.sh as a symbolic link to a regular file",
+          linked,
+          Some("bin/load-spark-env.sh is a symbolic link")
+        )
+        layout(
+          "load-spark-env.sh as a directory",
+          dist(
+            pinnedModes - env,
+            Seq(TestEntry(s"$top/bin/$env/", '5', Array.emptyByteArray, 493))
+          ),
+          Some("bin/load-spark-env.sh is not a regular file")
+        )
+        val unreadable = dist(pinnedModes)
+        Files.setPosixFilePermissions(
+          unreadable.resolve("bin").resolve(env),
+          PosixFilePermissions.fromString("-w-------")
+        )
+        layout(
+          "unreadable load-spark-env.sh",
+          unreadable,
+          Some("bin/load-spark-env.sh is not readable")
+        )
+        layout(
+          "non-executable spark-submit",
+          dist(pinnedModes.updated("spark-submit", 420)),
+          Some("bin/spark-submit is not executable")
+        )
+        layout(
+          "non-executable spark-class",
+          dist(pinnedModes.updated("spark-class", 420)),
+          Some("bin/spark-class is not executable")
+        )
+        layout(
+          "missing spark-submit",
+          dist(pinnedModes - "spark-submit"),
+          Some("bin/spark-submit is missing")
+        )
+        val linkedSubmit = dist(pinnedModes - "spark-submit")
+        Files.createSymbolicLink(
+          linkedSubmit.resolve("bin").resolve("spark-submit"),
+          new File("spark-class").toPath
+        )
+        layout(
+          "spark-submit as a symbolic link to an executable",
+          linkedSubmit,
+          Some("bin/spark-submit is a symbolic link")
+        )
+      }
 
       // Distribution cache.
       pins.foreach { p0 =>

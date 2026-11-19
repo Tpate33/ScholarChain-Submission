@@ -126,3 +126,16 @@ I defer those findings and CR-P6-33 N1–N4 to a later factory-engineer work ord
 Effective EC2 quota L-1216C47A in us-east-1 is verified at 16.0 vCPUs. The planned cluster remains one primary and one core m5.xlarge.
 
 The constitutional changes are accepted for commit and activation after a session restart. Phase 5 remains accepted. Phase 6 remains open. AWS deployment, uploads and spending remain pending my approval of specific signed plans.
+
+## sparkSubmitLocal layout repair (2026-11-18)
+
+I accept BE-P6-09 repair 02 following CR-P6-34 (APPROVE) and defer its two nits.
+BE-P6-10 attempt-1 downloaded and verified the pinned Spark distribution, then refused
+because bin/load-spark-env.sh ships 0644 upstream (my tar listing); bin/spark-class
+only sources it. The agent sbt check passed (1570/0/0/0) but its marker landed after
+the last audited Bash call because the harness moved sbt check to the background after
+180 s; I reviewed that marker and the baseline was reset. My Terminal sbt check at
+103d05d with the repair in the work tree: exit 0, 1570 passed, 0 failed, 0 errored,
+0 skipped (marker 2026-11-19T02:45:52Z). I approve one sbt sparkSubmitLocal run by
+build-engineer at the commit containing this entry. Phase 6 remains open. AWS
+deployment, uploads and spending remain pending my approval of specific signed plans.
