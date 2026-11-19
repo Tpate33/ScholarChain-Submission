@@ -27,7 +27,8 @@
 #              the run refuses. Never deletes or overwrites.
 #   --execute  (SCHOLARCHAIN_CONFIRM_SPARK_RUN = the execute token) verifies the cluster (state, release,
 #              Hadoop only, step concurrency 1, instance count and types, no scaling, idle timeout,
-#              bootstrap action path and digests, S3A marker and YARN AM-attempt configuration, tags),
+#              bootstrap action path and digests, S3A marker and YARN AM-attempt configuration, tags
+#              including for-use-with-amazon-emr-managed-policies=true),
 #              the staged objects, writes the run record create-once, submits ONE step, checks the step
 #              as EMR recorded it (ActionOnFailure, timeout prefix), polls with a deadline, cancels only
 #              its own step on deadline or interrupt (INT, TERM, HUP), verifies the published run and
@@ -536,6 +537,9 @@ for t in course project environment owner expiration; do
   [[ -n $(cj --arg k "$t" '[.Cluster.Tags[]? | select(.Key == $k) | .Value] | first // ""') ]] || die "$EX_AWS" "cluster lacks tag $t"
 done
 [[ $(cj '[.Cluster.Tags[]? | select(.Key == "environment") | .Value] | first') == "$ARG_ENV" ]] || die "$EX_AWS" "environment tag differs"
+# AmazonEMRServicePolicy_v2 launches nodes only with this tag on the request (IE-P6-08; emr-run main.tf).
+[[ $(cj '[.Cluster.Tags[]? | select(.Key == "for-use-with-amazon-emr-managed-policies") | .Value] | first // ""') == true ]] ||
+  die "$EX_AWS" "cluster lacks tag for-use-with-amazon-emr-managed-policies=true"
 IG=$(aws_read emr list-instance-groups --cluster-id "$CLUSTER_ID") || die "$EX_AWS" "list-instance-groups failed"
 INSTANCES=$(printf '%s' "$IG" | jq '[.InstanceGroups[] | ([.RequestedInstanceCount, .RunningInstanceCount] | max)] | add')
 ((INSTANCES <= C_max_instances)) || die "$EX_AWS" "cluster has $INSTANCES instances > $C_max_instances"

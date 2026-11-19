@@ -218,3 +218,20 @@ This accepts the security change but does not approve an apply.
 I will clean up the failed emr-run, check for duplicate rules, and
 approve the base plan only if it adds 8 rules and changes or destroys
 nothing.
+
+## EMR managed-policy tag fix after launch attempt 2 (2026-11-19)
+
+The reviewed base security-group fix was applied and its eight rules
+verified. Launch attempt 2 failed with insufficient EC2 permissions.
+No instance or step ran. Phase A cleanup removed the three remaining
+endpoint resources.
+
+CloudTrail showed RunInstances and CreateNetworkInterface denials for
+the EMR service role. Live network resources carry the managed-policy
+tag, and the service role has the expected policies and no boundary.
+
+I accept IE-P6-08 following CR-P6-42 (APPROVE): add
+for-use-with-amazon-emr-managed-policies=true to the cluster and make
+--execute refuse a cluster without it. No IAM or base change.
+This does not approve an apply. I will sign the new emr-run plan only
+after review confirms four creates with that tag on the cluster.

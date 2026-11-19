@@ -60,6 +60,11 @@ locals {
   install_key   = "artifacts/emr-scripts/${var.install_script_sha256}/install-spark-dist.sh"
   cluster_name  = "${var.project}-${var.environment}-spark-run"
   ebs_per_group = { size = var.data_volume_gib, type = "gp3", volumes_per_instance = 1 }
+  # AmazonEMRServicePolicy_v2 creates the private-subnet ENI, instances and volumes only with
+  # aws:RequestTag/for-use-with-amazon-emr-managed-policies = "true"; EMR propagates the cluster's tag to
+  # them (IE-P6-08). Same key and value as local.emr_managed_tag in ../base/versions.tf. Cluster only:
+  # not in default_tags, so the KMS endpoint and its security group stay untagged with it.
+  emr_managed_tag = { "for-use-with-amazon-emr-managed-policies" = "true" }
 }
 
 # KMS interface endpoint (CR-P6-27 6b). The security configuration's LocalDiskEncryption uses the
@@ -182,9 +187,9 @@ resource "aws_emr_cluster" "run" {
     }
   ])
 
-  tags = {
+  tags = merge(local.emr_managed_tag, {
     Name = local.cluster_name
-  }
+  })
 }
 
 output "cluster_id" {
