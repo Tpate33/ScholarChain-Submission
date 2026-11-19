@@ -85,6 +85,7 @@ readonly SUMMARY_SCHEMA=scholarchain.bounded-spark-summary.v1
 readonly INSTALL_SCRIPT=scripts/emr/install-spark-dist.sh
 readonly SUBMIT_SCRIPT=scripts/emr/submit-collaboration-job.sh
 readonly WRAPPER=/opt/scholarchain/bin/submit-collaboration-job.sh
+readonly BOOTSTRAP_NAME=install-scholarchain-spark # bootstrap_action.name in emr-run main.tf
 readonly JOB_JAR_NAME=scholarchain-spark-jobs-0.1.0.jar
 readonly CONFIG_KEYS="config_version environment attempt emr_release_label instance_type max_instances \
 max_idle_timeout_seconds step_timeout_minutes poll_interval_seconds instance_hour_price_usd max_cost_usd \
@@ -384,11 +385,9 @@ print_plan() {
   n=0
   p execute read "sts get-caller-identity   (Arn must be assumed-role/scholarchain-$ARG_ENV-operator)"
   p execute read "emr list-clusters --active   (exactly one named $CLUSTER_NAME, state WAITING)"
-  p execute read "emr describe-cluster --cluster-id <id>"
-  p execute read "emr list-instance-groups --cluster-id <id>"
+  p execute read "emr describe-cluster --cluster-id <id>   (also .Cluster.InstanceGroups and .Cluster.BootstrapActions: exactly one, name $BOOTSTRAP_NAME, path s3://$DATA_BUCKET/$K_INSTALL, args $EXPECTED_BOOTSTRAP_ARGS)"
   p execute read "emr get-managed-scaling-policy --cluster-id <id>"
   p execute read "emr get-auto-termination-policy --cluster-id <id>"
-  p execute read "emr list-bootstrap-actions --cluster-id <id>   (path s3://$DATA_BUCKET/$K_INSTALL, args $EXPECTED_BOOTSTRAP_ARGS)"
   p execute read "emr list-steps --cluster-id <id> --step-states PENDING CANCEL_PENDING RUNNING"
   p execute read "s3api head-object --checksum-mode ENABLED x10: $STAGE_LIST"
   p execute read "s3api get-object --bucket $DATA_BUCKET --key $K_TREE <tmp>"
@@ -438,8 +437,11 @@ mkdir "$LOCK_DIR" 2>/dev/null || die "$EX_REFUSED" "another bounded run holds $L
 HAVE_LOCK=yes
 STARTED_AT=$(now_utc)
 
-READ_VERBS="sts:get-caller-identity emr:list-clusters emr:describe-cluster emr:list-instance-groups \
-emr:get-managed-scaling-policy emr:get-auto-termination-policy emr:list-bootstrap-actions emr:list-steps \
+# aws-cli/2.34.61 rejects `aws emr list-instance-groups` and `aws emr list-bootstrap-actions` ("Found
+# invalid choice", observed in the human Terminal, IE-P6-09); its describe-cluster output carries
+# .Cluster.InstanceGroups and .Cluster.BootstrapActions, which the checks below read instead.
+READ_VERBS="sts:get-caller-identity emr:list-clusters emr:describe-cluster \
+emr:get-managed-scaling-policy emr:get-auto-termination-policy emr:list-steps \
 emr:describe-step s3api:head-object s3api:get-object s3api:list-objects-v2"
 WRITE_VERBS="s3api:put-object emr:add-steps emr:cancel-steps"
 aws_read() {
@@ -540,8 +542,18 @@ done
 # AmazonEMRServicePolicy_v2 launches nodes only with this tag on the request (IE-P6-08; emr-run main.tf).
 [[ $(cj '[.Cluster.Tags[]? | select(.Key == "for-use-with-amazon-emr-managed-policies") | .Value] | first // ""') == true ]] ||
   die "$EX_AWS" "cluster lacks tag for-use-with-amazon-emr-managed-policies=true"
-IG=$(aws_read emr list-instance-groups --cluster-id "$CLUSTER_ID") || die "$EX_AWS" "list-instance-groups failed"
-INSTANCES=$(printf '%s' "$IG" | jq '[.InstanceGroups[] | ([.RequestedInstanceCount, .RunningInstanceCount] | max)] | add')
+[[ $(cj .Cluster.InstanceCollectionType) == INSTANCE_GROUP ]] || die "$EX_AWS" "cluster does not use instance groups"
+[[ $(cj '.Cluster.InstanceGroups | type') == array && $(cj '.Cluster.InstanceGroups | length') -ge 1 ]] ||
+  die "$EX_AWS" "describe-cluster returned no .Cluster.InstanceGroups"
+IG=$(printf '%s' "$CJ" | jq -c '{InstanceGroups: .Cluster.InstanceGroups}')
+# Every group must carry a whole-number count (CR-P6-43 nit 2): a group lacking both counts would make
+# `max` null, which `add` silently drops (or, alone, yields "null" and aborts the arithmetic, no FAIL line).
+printf '%s' "$IG" | jq -e 'all(.InstanceGroups[]; ([.RequestedInstanceCount, .RunningInstanceCount]
+  | map(select(type == "number" and . >= 0 and . == floor)) | length) >= 1)' >/dev/null ||
+  die "$EX_AWS" "an instance group in .Cluster.InstanceGroups lacks a whole-number RequestedInstanceCount or RunningInstanceCount"
+INSTANCES=$(printf '%s' "$IG" | jq '[.InstanceGroups[] | ([.RequestedInstanceCount, .RunningInstanceCount] | map(select(type == "number")) | max)] | add') ||
+  die "$EX_AWS" "cannot sum the instance counts of .Cluster.InstanceGroups"
+is_uint "$INSTANCES" || die "$EX_AWS" "instance count '$INSTANCES' is not a whole number"
 ((INSTANCES <= C_max_instances)) || die "$EX_AWS" "cluster has $INSTANCES instances > $C_max_instances"
 [[ $(printf '%s' "$IG" | jq -r '[.InstanceGroups[].InstanceType] | unique | join(" ")') == "$C_instance_type" ]] || die "$EX_AWS" "instance types differ from $C_instance_type"
 [[ $(printf '%s' "$IG" | jq '[.InstanceGroups[] | select(.AutoScalingPolicy != null)] | length') == 0 ]] || die "$EX_AWS" "an instance group has an AutoScalingPolicy"
@@ -551,10 +563,12 @@ AT=$(aws_read emr get-auto-termination-policy --cluster-id "$CLUSTER_ID") || die
 IDLE=$(printf '%s' "$AT" | jq -r '.AutoTerminationPolicy.IdleTimeout // empty')
 is_uint "${IDLE:-x}" || die "$EX_AWS" "cluster has no auto-termination policy"
 ((IDLE <= C_max_idle_timeout_seconds)) || die "$EX_AWS" "idle timeout ${IDLE}s > $C_max_idle_timeout_seconds"
-BA=$(aws_read emr list-bootstrap-actions --cluster-id "$CLUSTER_ID") || die "$EX_AWS" "list-bootstrap-actions failed"
-[[ $(printf '%s' "$BA" | jq '.BootstrapActions | length') == 1 ]] || die "$EX_AWS" "expected exactly one bootstrap action"
-[[ $(printf '%s' "$BA" | jq -r '.BootstrapActions[0].ScriptPath') == "s3://$DATA_BUCKET/$K_INSTALL" ]] || die "$EX_AWS" "bootstrap script path differs from the committed install script"
-[[ $(printf '%s' "$BA" | jq -c '.BootstrapActions[0].Args') == "$EXPECTED_BOOTSTRAP_ARGS" ]] || die "$EX_AWS" "bootstrap arguments differ from the run config pins"
+# Bootstrap action from the describe-cluster result above (no separate call; see READ_VERBS).
+[[ $(cj '.Cluster.BootstrapActions | type') == array ]] || die "$EX_AWS" "describe-cluster returned no .Cluster.BootstrapActions"
+[[ $(cj '.Cluster.BootstrapActions | length') == 1 ]] || die "$EX_AWS" "expected exactly one bootstrap action"
+[[ $(cj '.Cluster.BootstrapActions[0].Name') == "$BOOTSTRAP_NAME" ]] || die "$EX_AWS" "bootstrap action name differs from $BOOTSTRAP_NAME"
+[[ $(cj '.Cluster.BootstrapActions[0].ScriptPath') == "s3://$DATA_BUCKET/$K_INSTALL" ]] || die "$EX_AWS" "bootstrap script path differs from the committed install script"
+[[ $(printf '%s' "$CJ" | jq -c '.Cluster.BootstrapActions[0].Args') == "$EXPECTED_BOOTSTRAP_ARGS" ]] || die "$EX_AWS" "bootstrap arguments differ from the run config pins"
 ACTIVE=$(aws_read emr list-steps --cluster-id "$CLUSTER_ID" --step-states PENDING CANCEL_PENDING RUNNING | jq '.Steps | length') || die "$EX_AWS" "list-steps failed"
 [[ $ACTIVE == 0 ]] || die "$EX_AWS" "cluster has $ACTIVE active steps"
 ok "cluster $CLUSTER_ID WAITING, $INSTANCES x $C_instance_type, idle ${IDLE}s, pinned bootstrap, no active step"

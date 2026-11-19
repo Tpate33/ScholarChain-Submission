@@ -153,7 +153,8 @@ resource "aws_emr_cluster" "run" {
   }
 
   # Arguments are positional; scripts/emr/install-spark-dist.sh and scripts/run-bounded-spark.sh
-  # (list-bootstrap-actions check) rely on this exact order.
+  # (describe-cluster .Cluster.BootstrapActions check of name, path and args; IE-P6-09) rely on this
+  # exact name and order.
   bootstrap_action {
     name = "install-scholarchain-spark"
     path = "s3://${local.base.data_bucket}/${local.install_key}"
