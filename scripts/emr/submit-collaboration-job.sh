@@ -11,7 +11,8 @@
 #   --partitions --checkpoint-interval --max-tree-entries --max-tree-depth
 #   --max-driver-validation-rows --max-driver-validation-bytes --max-metadata-bytes
 #   --step-timeout-seconds --kill-after-seconds
-#         submit-collaboration-job.sh --self-check <sample fs.defaultFS>
+#         submit-collaboration-job.sh --self-check <sample fs.defaultFS> <canonical stub JVM root>
+#         submit-collaboration-job.sh --check-java <canonical JVM root> [<java -version bound 1..10 s>]
 #
 # The EMR step runs this wrapper under `/usr/bin/timeout -k <kill> <step timeout>` (cluster-side wall
 # bound of the whole step, CR-P6-27 M2); the step's ActionOnFailure is TERMINATE_CLUSTER, so a failed
@@ -26,8 +27,26 @@
 # [A-Za-z0-9._=-] only, never empty, "." or ".." (so no comma, glob character, space or percent).
 #
 # --self-check runs exactly the argument construction and checks with sample option values and the
-# given fs.defaultFS, prints the spark-submit argv (ARGV lines) and exits 0, or refuses with exit 3.
-# It makes no AWS, HDFS or network call and writes nothing. scripts/emr/check-submit-args.sh drives it.
+# given fs.defaultFS, runs select_java17 on the given stub JVM root and passes its JAVA_HOME_DIR to
+# build_submit_argv as the real run does, prints the spark-submit argv (ARGV lines) and exits 0, or
+# refuses with exit 3 (location) or 4 (no Java 17). It makes no AWS, HDFS or network call and writes
+# nothing. scripts/emr/check-submit-args.sh drives it.
+#
+# Java 17 (IE-P6-12; run attempt 2 exited 4 in 6 s): the step environment from command-runner has
+# JAVA_HOME=/etc/alternatives/jre and /usr/bin/java first on PATH, both Corretto 8 on the EMR 7.14.0
+# primary, while EMR itself runs on /usr/lib/jvm/jre-17. The wrapper therefore ignores the inherited
+# JAVA_HOME and PATH and selects Java 17 deterministically (select_java17): the first of the fixed
+# candidates <JVM root>/jre-17/bin/java, <JVM root>/java-17-amazon-corretto.x86_64/bin/java (JVM root
+# /usr/lib/jvm) that exists, resolves (readlink -f) to <JVM root>/.../bin/java, is an executable
+# regular file and whose `java -version` (bounded, 10 s; a timeout is that candidate's failure)
+# reports `version "17.`. Its home (the resolved path minus
+# /bin/java) is passed as JAVA_HOME to spark-submit (client mode, primary) and pinned for the YARN
+# ApplicationMaster and executors (spark.yarn.appMasterEnv.JAVA_HOME, spark.executorEnv.JAVA_HOME), so
+# no process relies on the node's default Java; the same path must exist on the core node (same EMR
+# release image). No candidate passes: refuse with exit 4, never fall back to another Java.
+# --check-java runs ONLY select_java17 against the given canonical JVM root (stub JVMs in a temporary
+# directory), with an optional lower java -version bound (1..10 s, default 10), prints RESULT JAVA-SELECT-OK java_home=<dir> and exits 0, or refuses with exit 4. No AWS,
+# HDFS or network call; writes nothing. scripts/emr/check-submit-args.sh drives it.
 #
 # HDFS (CR-P6-27 6d): /scholarchain is created by the HDFS superuser (`sudo -n -u hdfs`), owned by the
 # step user, mode 0750; spark-events/, checkpoints/ and staging/ (spark.yarn.stagingDir) below it.
@@ -35,7 +54,8 @@
 # copy failed; 2 usage; 3 refused; 4 node or HDFS precondition.
 # After a successful spark-submit and event-log copy, the wrapper removes only this submission's
 # checkpoint directory (hdfs dfs -rm -r -skipTrash, bounded); a failure there is logged, not fatal.
-# MARKERS  [submit-collaboration-job] STEP / CHECK ok / NOTE / ARGV / RESULT spark_exit=<n> / FAIL exit=<n>
+# MARKERS  [submit-collaboration-job] STEP / CHECK ok / NOTE / ARGV / RESULT spark_exit=<n> /
+#          RESULT SELF-CHECK-OK / RESULT JAVA-SELECT-OK / FAIL exit=<n>
 # =====================================================================================================
 set -euo pipefail
 readonly SCRIPT_NAME=submit-collaboration-job
@@ -109,12 +129,100 @@ validate_default_fs() { # validate_default_fs <fs.defaultFS value>: sets HDFS_AU
   HDFS_AUTHORITY=$rest
 }
 
+# ---- Java 17 selection (IE-P6-12) ---------------------------------------------------------------------
+readonly JVM_ROOT=/usr/lib/jvm
+readonly JAVA17_CANDIDATES="jre-17 java-17-amazon-corretto.x86_64" # names under the JVM root, in order
+JAVA_BIN=""
+JAVA_HOME_DIR=""
+# Bound of each candidate's `java -version` (CR-P6-49 m1). 10 s on the node; --check-java may lower it
+# (1..10) so the self-check's hanging stub ends fast. Two candidates: at most ~21 s of the 60 s
+# preparation allowance. The bound is a polling watchdog in bash itself (kill -0 every 0.1 s, then
+# kill -KILL), not /usr/bin/timeout, so the same code runs on the node and in the macOS self-check
+# (GNU timeout is absent there). Residual: a candidate that forks a descendant which keeps stdout open
+# would hold the capture until that descendant exits; a JVM's -version does not, and the step timeout
+# still bounds the whole step.
+JAVA_VERSION_TIMEOUT_SECONDS=10
+java_version_bounded() { # java_version_bounded <bin>: prints `<bin> -version` output; 124 if not done in the bound
+  local pid n=0 limit=$((JAVA_VERSION_TIMEOUT_SECONDS * 10)) rc=0
+  "$1" -version </dev/null 2>&1 &
+  pid=$!
+  while kill -0 "$pid" 2>/dev/null; do
+    if ((n >= limit)); then
+      kill -KILL "$pid" 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+      return 124
+    fi
+    sleep 0.1
+    n=$((n + 1))
+  done
+  wait "$pid" || rc=$?
+  return "$rc"
+}
+select_java17() { # select_java17 <canonical JVM root>: sets JAVA_BIN and JAVA_HOME_DIR, or die 4
+  local root=$1 c cand bin ver first rc tried=""
+  for c in $JAVA17_CANDIDATES; do
+    cand=$root/$c/bin/java
+    if [[ ! -e $cand ]]; then
+      tried="$tried $cand: absent;"
+      continue
+    fi
+    if ! bin=$(readlink -f "$cand") || [[ -z $bin ]]; then
+      tried="$tried $cand: does not resolve;"
+      continue
+    fi
+    if [[ $bin != "$root"/*/bin/java ]]; then
+      tried="$tried $cand: resolves to $bin, outside $root;"
+      continue
+    fi
+    if [[ ! -f $bin || ! -x $bin ]]; then
+      tried="$tried $cand: $bin is not an executable file;"
+      continue
+    fi
+    rc=0
+    ver=$(java_version_bounded "$bin") || rc=$?
+    if ((rc == 124)); then
+      tried="$tried $cand: java -version timed out after ${JAVA_VERSION_TIMEOUT_SECONDS}s ($bin);"
+      continue
+    fi
+    if ((rc != 0)); then
+      tried="$tried $cand: java -version failed with exit $rc ($bin);"
+      continue
+    fi
+    if [[ $ver != *'version "17.'* ]]; then
+      first=${ver%%$'\n'*}
+      tried="$tried $cand: $bin reports '$first';"
+      continue
+    fi
+    JAVA_BIN=$bin
+    JAVA_HOME_DIR=${bin%/bin/java}
+    say "CHECK ok java 17 $JAVA_BIN (candidate $cand; inherited JAVA_HOME and PATH java not used)"
+    return 0
+  done
+  die 4 "java on the primary node is not 17 (no Java 17 candidate under $root:$tried)"
+}
+need_jvm_root() { # need_jvm_root <mode> <path>
+  [[ $2 == /* && $2 != */ && -d $2 ]] || die 2 "$1: '$2' is not an absolute directory path without a trailing /"
+}
+if [[ ${1:-} == --check-java ]]; then
+  (($# == 2 || $# == 3)) || die 2 "usage: submit-collaboration-job.sh --check-java <canonical JVM root> [<java -version bound 1..10 s>]"
+  need_jvm_root --check-java "$2"
+  if (($# == 3)); then
+    [[ $3 =~ ^([1-9]|10)$ ]] || die 2 "--check-java: bound '$3' is not an integer in 1..10"
+    JAVA_VERSION_TIMEOUT_SECONDS=$3
+  fi
+  select_java17 "$2"
+  say "RESULT JAVA-SELECT-OK java_bin=$JAVA_BIN java_home=$JAVA_HOME_DIR"
+  exit 0
+fi
+
 # ---- arguments ----------------------------------------------------------------------------------------
 SELF_CHECK=no
 if [[ ${1:-} == --self-check ]]; then
-  (($# == 2)) || die 2 "usage: submit-collaboration-job.sh --self-check <sample fs.defaultFS>"
+  (($# == 3)) || die 2 "usage: submit-collaboration-job.sh --self-check <sample fs.defaultFS> <canonical stub JVM root>"
+  need_jvm_root --self-check "$3"
   SELF_CHECK=yes
   SAMPLE_DEFAULT_FS=$2
+  SAMPLE_JVM_ROOT=$3
   # Sample values only (no real account): the shapes run-bounded-spark.sh builds.
   O_data_bucket=scholarchain-dev-data-000000000000-us-east-1
   O_logs_bucket=scholarchain-dev-logs-000000000000-us-east-1
@@ -248,8 +356,11 @@ spark_timeout_now() { # remaining step budget minus the post-spark reserve, refu
 }
 
 if [[ $SELF_CHECK == yes ]]; then
+  # Same two calls as the real run below (select_java17, then build_submit_argv with its JAVA_HOME_DIR),
+  # on the stub root, so the selected home -> JAVA_HOME= / AM / executor pins link is tested (CR-P6-49 m2).
+  select_java17 "$SAMPLE_JVM_ROOT"
   SPARK_TIMEOUT=$(spark_timeout_now)
-  build_submit_argv "$SPARK_TIMEOUT" /usr/lib/jvm/java-17-amazon-corretto.x86_64
+  build_submit_argv "$SPARK_TIMEOUT" "$JAVA_HOME_DIR"
   i=0
   for a in "${SUBMIT_ARGV[@]}"; do
     printf '[%s] ARGV %03d %s\n' "$SCRIPT_NAME" "$i" "$a"
@@ -274,10 +385,7 @@ fetch_verified "$O_job_jar_key" "$O_job_jar_sha256" job.jar
 fetch_verified "$O_config_key" "$O_config_sha256" analysis.conf
 fetch_verified "$O_pairs_key" "$O_pairs_sha256" benchmark-pairs.json
 
-JAVA_BIN=$(readlink -f "$(command -v java)")
-JAVA_HOME_DIR=${JAVA_BIN%/bin/java}
-JAVA_VERSION=$("$JAVA_BIN" -version 2>&1) || die 4 "java -version failed ($JAVA_BIN)"
-[[ $JAVA_VERSION == *'version "17.'* ]] || die 4 "java on the primary node is not 17 ($JAVA_BIN)"
+select_java17 "$JVM_ROOT" # never the inherited JAVA_HOME or PATH java (IE-P6-12)
 
 say "STEP hdfs directories under $HDFS_ROOT"
 STEP_USER=$(id -un)
