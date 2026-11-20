@@ -235,3 +235,44 @@ for-use-with-amazon-emr-managed-policies=true to the cluster and make
 --execute refuse a cluster without it. No IAM or base change.
 This does not approve an apply. I will sign the new emr-run plan only
 after review confirms four creates with that tag on the cluster.
+
+## Phase 6 close: local results accepted, bounded EMR run not achieved (2026-11-19)
+
+I accept the verified local Phase 6 results for continuing development:
+- sparkSubmitLocal attempt 4 passed.
+- sparkIT runs 07 and 08 passed.
+- 259 edges, 176 metric rows, 112 temporal changes, and 28 matching datasets.
+
+The bounded EMR run remains NOT achieved and is an outstanding deliverable.
+This acceptance does not constitute instructor approval of a substitution.
+
+The reviewed changes include IE-P6-09 bootstrap validation, IE-P6-10 step
+submission format, IE-P6-11 read-only permissions, and IE-P6-12 Java 17
+selection. Their reviews and deployment history are recorded in the
+Phase 6 status documentation.
+
+Run a3 was the final agreed cloud attempt. Spark/YARN started on Java 17.
+The first textFile input read failed with:
+"java.lang.RuntimeException: Error in configuring object".
+No output was published. A missing EMR codec class is a suspected cause,
+not a confirmed diagnosis. No further EMR launches are authorized.
+
+Phase A cleanup succeeded: 0 added, 0 changed, 3 destroyed;
+RESULT DESTROYED at 2026-11-19T23:50:01Z.
+The base stack, S3 data, staged artifacts, records, and logs are retained.
+Phase B cleanup was not performed.
+
+Archive verification recorded in
+~/ScholarChain-archive/phase-06/handoff/archive-verification.txt:
+- local-evidence: CHECKSUMS PASS, 2079 files verified.
+- attempt-a3: CHECKSUMS PASS, 33 files verified.
+
+A stray untracked repository-root SHA256SUMS.txt was moved outside the
+repository and excluded from this commit.
+
+Accepted code/infrastructure commit:
+f40677bb10ee33266d4ddf4c35811f43ca3b36db.
+This documentation commit records the closeout on top of that state.
+
+Proceed to Phase 7 using verified local outputs. Required cloud
+deliverables remain outstanding unless completed or instructor-approved.
