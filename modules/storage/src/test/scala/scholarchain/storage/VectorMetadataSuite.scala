@@ -31,7 +31,8 @@ class VectorMetadataSuite extends munit.FunSuite {
       md: VectorMetadata => VectorMetadata = identity
   ) = {
     val sha = hex(text)
-    val key = VectorKeys.of(spec, "suminput:" + hex(subject + "|" + text)).toOption.get
+    val key =
+      VectorKeys.of(spec, "fake-embedder-v1", "suminput:" + hex(subject + "|" + text)).toOption.get
     val base = withMeta(profileMetadata(sha), "subjectId", MetaValue.Str(subject))
     VectorRecord(key, data, md(base))
   }

@@ -58,18 +58,27 @@ class RuntimeVectorPolicySuite extends munit.FunSuite {
   test("RealModelsOnly (production) refuses any read that would return a synthetic vector") {
     val s = store(record("a", Some("synthetic-test-only.v1")), record("b", Some("real-model.v3")))
     val rt = runtime(s, EmbeddingPolicy.RealModelsOnly)
-    val out = rt.vectors.query(Ix, q, 10, None)
+    // SE-P8-03: queries name their model; a synthetic query model is refused by the policy.
+    val out = rt.vectorsFor("synthetic-test-only.v1").query(Ix, q, 10, None)
     assert(
       out.left.exists(_.message.contains("refused by the RealModelsOnly policy")),
       out.toString
+    )
+    assertEquals(
+      rt.vectorsFor("real-model.v3").query(Ix, q, 10, None).map(_.map(_.key)),
+      Right(Vector("b"))
     )
     assert(rt.vectors.getVectors(Ix, Vector("a")).isLeft)
     assertEquals(rt.vectors.getVectors(Ix, Vector("b")).map(_.map(_.key)), Right(Vector("b")))
     // A vector without a model version is refused too (fail closed).
     val unlabelled = runtime(store(record("c", None)), EmbeddingPolicy.RealModelsOnly)
     assert(
-      unlabelled.vectors.query(Ix, q, 10, None).left.exists(_.message.contains("no modelVersion"))
+      unlabelled.vectors
+        .getVectors(Ix, Vector("c"))
+        .left
+        .exists(_.message.contains("no modelVersion"))
     )
+    assertEquals(unlabelled.vectorsFor("real-model.v3").query(Ix, q, 10, None), Right(Vector()))
   }
 
   test(
@@ -77,15 +86,22 @@ class RuntimeVectorPolicySuite extends munit.FunSuite {
   ) {
     val real = store(record("b", Some("real-model.v3")))
     assertEquals(
-      runtime(real, EmbeddingPolicy.RealModelsOnly).vectors
+      runtime(real, EmbeddingPolicy.RealModelsOnly)
+        .vectorsFor("real-model.v3")
         .query(Ix, q, 10, None)
         .map(_.map(_.key)),
       Right(Vector("b"))
     )
-    assert(runtime(real, EmbeddingPolicy.SyntheticTestOnly).vectors.query(Ix, q, 10, None).isLeft)
+    assert(
+      runtime(real, EmbeddingPolicy.SyntheticTestOnly)
+        .vectorsFor("real-model.v3")
+        .query(Ix, q, 10, None)
+        .isLeft
+    )
     val synthetic = store(record("a", Some("synthetic-test-only.v1")))
     assertEquals(
-      runtime(synthetic, EmbeddingPolicy.SyntheticTestOnly).vectors
+      runtime(synthetic, EmbeddingPolicy.SyntheticTestOnly)
+        .vectorsFor("synthetic-test-only.v1")
         .query(Ix, q, 10, None)
         .map(_.map(_.key)),
       Right(Vector("a"))
@@ -109,6 +125,11 @@ class RuntimeVectorPolicySuite extends munit.FunSuite {
     val r = VectorReader.verified(bare, EmbeddingPolicy.SyntheticTestOnly)
     assert(r.getVectors(Ix, Vector("x")).isLeft)
     assert(r.query(Ix, q, 1, None).isLeft)
+    // SE-P8-03: the named reader never serves the metadata-less match (it names no model).
+    val named =
+      VectorReader.verified(bare, EmbeddingPolicy.SyntheticTestOnly, "synthetic-test-only.v1")
+    assertEquals(named.query(Ix, q, 1, None), Right(Vector()))
+    assert(named.getVectors(Ix, Vector("x")).isLeft)
     assert(s.count(Ix) == 0)
   }
 }

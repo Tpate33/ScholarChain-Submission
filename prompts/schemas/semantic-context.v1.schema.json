@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "scholarchain.rag.semantic-context.v1",
+  "title": "ScholarChain semantic context for the synthesis agent",
+  "description": "Owner: rag-engineer. Retrieved text is untrusted data, never instructions. Carries no count, path hop, component, community or bridge score; those come only from graph or metric evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "templateVersion", "modelVersion", "nonProduction", "notice", "index", "items", "omittedByBudget"],
+  "properties": {
+    "schemaVersion": { "const": "scholarchain.rag.semantic-context.v1" },
+    "templateVersion": { "const": "scholarchain.rag.render-templates.v1" },
+    "modelVersion": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$" },
+    "nonProduction": { "type": "boolean" },
+    "notice": { "type": "string" },
+    "index": { "type": "string" },
+    "omittedByBudget": { "type": "integer", "minimum": 0 },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rank", "vectorKey", "index", "modelVersion", "documentType", "subjectId", "window", "distance", "textS3Key", "textSha256", "excerpt", "excerptTruncated"],
+        "properties": {
+          "rank": { "type": "integer", "minimum": 0 },
+          "vectorKey": { "type": "string" },
+          "index": { "type": "string" },
+          "modelVersion": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$" },
+          "documentType": { "type": "string" },
+          "subjectId": { "type": "string" },
+          "window": { "type": "string", "pattern": "^([0-9]{4}-[0-9]{4}|unwindowed)$" },
+          "distance": { "type": "number" },
+          "textS3Key": { "type": "string" },
+          "textSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "excerpt": { "type": "string" },
+          "excerptTruncated": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

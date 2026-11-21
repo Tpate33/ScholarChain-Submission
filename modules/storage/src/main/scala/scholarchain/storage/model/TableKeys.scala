@@ -17,36 +17,69 @@ object TableKeys {
     def publication(runId: String): Either[StoreError, PrimaryKey] =
       partition(runId).map(PrimaryKey(_, "publication"))
 
-    def load(runId: String, loadId: String): Either[StoreError, PrimaryKey] =
+    /**
+     * `#model#<mv>` or `""` (SE-P8-01): the ledger scope of a vector load under one embedding model
+     * version. Each scope has its own load row and its own write generations, so its rejected
+     * records and rejection sets get their own keys.
+     */
+    private def scope(embeddingModel: Option[String]): Either[StoreError, String] =
+      embeddingModel match {
+        case None => Right("")
+        case Some(m) => EmbeddingModelVersion.check(m).map(v => s"#model#$v")
+      }
+
+    /**
+     * RL-3: `load#<loadId>`, or SE-P8-01 for a vector load under one embedding model version
+     * `load#<loadId>#model#<modelVersion>` (one row per model, so a new model is new work).
+     */
+    def load(
+        runId: String,
+        loadId: String,
+        embeddingModel: Option[String] = None
+    ): Either[StoreError, PrimaryKey] =
       for {
         p <- partition(runId)
         l <- id(IdKind.StoreLoad, loadId, "loadId")
-      } yield PrimaryKey(p, s"load#$l")
+        s <- scope(embeddingModel)
+      } yield PrimaryKey(p, s"load#$l$s")
 
     val LoadPrefix = "load#"
 
+    /** RL-4: every rejected-record row of a load (every scope and generation). */
     def rejectPrefix(loadId: String): Either[StoreError, String] =
       id(IdKind.StoreLoad, loadId, "loadId").map(l => s"reject#$l#")
 
-    /** CR-P7-11 m1: the rejected-record rows of one write generation of a load. */
-    def rejectGenerationPrefix(loadId: String, generation: Long): Either[StoreError, String] =
+    /**
+     * CR-P7-11 m1 (RL-7): the rejected-record rows of one write generation of a load (SE-P8-01: of
+     * one scope), `reject#<loadId>[#model#<mv>]#<generation:10>#`.
+     */
+    def rejectGenerationPrefix(
+        loadId: String,
+        generation: Long,
+        embeddingModel: Option[String] = None
+    ): Either[StoreError, String] =
       if (generation < 1 || generation > RejectedRecord.MaxGeneration)
         Left(
           StoreError.Refused(
             s"generation: $generation is outside 1..${RejectedRecord.MaxGeneration}"
           )
         )
-      else rejectPrefix(loadId).map(p => f"$p$generation%010d#")
+      else
+        for {
+          l <- id(IdKind.StoreLoad, loadId, "loadId")
+          s <- scope(embeddingModel)
+        } yield f"reject#$l$s#$generation%010d#"
 
     def reject(
         runId: String,
         loadId: String,
         generation: Long,
-        recordKey: String
+        recordKey: String,
+        embeddingModel: Option[String] = None
     ): Either[StoreError, PrimaryKey] =
       for {
         p <- partition(runId)
-        r <- rejectGenerationPrefix(loadId, generation)
+        r <- rejectGenerationPrefix(loadId, generation, embeddingModel)
         k <- RejectedRecord.recordKeyProblem(recordKey) match {
           case None => Right(recordKey)
           case Some(why) => Left(StoreError.Refused(s"recordKey: $why"))
@@ -55,16 +88,24 @@ object TableKeys {
 
     /**
      * SE-P7-11 (CR-P7-12 F2): the rejection-set summary rows of a load, `rejectset#<loadId>#`
-     * (never a prefix of `reject#`, so RL-4 never returns them).
+     * (never a prefix of `reject#`, so RL-4 never returns them); SE-P8-01: of one scope,
+     * `rejectset#<loadId>#model#<mv>#`.
      */
-    def rejectionSetPrefix(loadId: String): Either[StoreError, String] =
-      id(IdKind.StoreLoad, loadId, "loadId").map(l => s"rejectset#$l#")
+    def rejectionSetPrefix(
+        loadId: String,
+        embeddingModel: Option[String] = None
+    ): Either[StoreError, String] =
+      for {
+        l <- id(IdKind.StoreLoad, loadId, "loadId")
+        s <- scope(embeddingModel)
+      } yield s"rejectset#$l$s#"
 
     /** The summary row of one write generation's complete rejection set. */
     def rejectionSet(
         runId: String,
         loadId: String,
-        generation: Long
+        generation: Long,
+        embeddingModel: Option[String] = None
     ): Either[StoreError, PrimaryKey] =
       if (generation < 1 || generation > RejectedRecord.MaxGeneration)
         Left(
@@ -75,7 +116,7 @@ object TableKeys {
       else
         for {
           p <- partition(runId)
-          r <- rejectionSetPrefix(loadId)
+          r <- rejectionSetPrefix(loadId, embeddingModel)
         } yield PrimaryKey(p, f"$r$generation%010d")
 
     def byLoad(loadId: String): Either[StoreError, String] =

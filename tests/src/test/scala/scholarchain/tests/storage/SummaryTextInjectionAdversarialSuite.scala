@@ -13,6 +13,7 @@ import scholarchain.core.{
 }
 import scholarchain.storage.{Fixtures, OpeningFixture, RunSettingsFixture}
 import scholarchain.storage.OpeningFixture.{Dimension, World}
+import scholarchain.storage.fake.SyntheticTestEmbedding
 import scholarchain.storage.load.{ContextText, OpeningLoadResult, ParquetRecords}
 import scholarchain.storage.model.*
 
@@ -162,7 +163,11 @@ class SummaryTextInjectionAdversarialSuite extends munit.FunSuite {
     assertEquals(inputs.size, 249)
     inputs.foreach { case (it, inputId, docType, subject, window, ident, facts) =>
       val index = VectorIndexes.forDocumentType(docType)
-      val key = s"${index.name}/$inputId"
+      // TE-P8-01 (SE-P8-01 item 1): keys are <index>/<modelVersion>/<inputId>.
+      val key = VectorKeys
+        .of(index, SyntheticTestEmbedding.ModelVersion, inputId)
+        .fold(e => fail(s"$inputId: no vector key: $e"), identity)
+      assertEquals(key, s"${index.name}/${SyntheticTestEmbedding.ModelVersion}/$inputId")
       val rec = w.vectorStore
         .getVectors(index.name, Vector(key))
         .fold(e => fail(e.toString), identity)
@@ -184,6 +189,11 @@ class SummaryTextInjectionAdversarialSuite extends munit.FunSuite {
       assertEquals(md.string(MetadataField.InputId), Some(inputId), key)
       assertEquals(md.string(MetadataField.SubjectId), Some(subject), key)
       assertEquals(md.string(MetadataField.DocumentTypeField), Some(docType.tag), key)
+      assertEquals(
+        md.string(MetadataField.ModelVersion),
+        Some(SyntheticTestEmbedding.ModelVersion),
+        key
+      )
       assert(md.values.keySet.subsetOf(index.allowed.map(_.key)), s"$key: ${md.values.keySet}")
       // No metadata value is free text from a fact: any fact value that is not a stable ID and is
       // longer than a tag never appears in metadata.
@@ -200,6 +210,8 @@ class SummaryTextInjectionAdversarialSuite extends munit.FunSuite {
   test("injection-shaped filter values are data: exact-match semantics, no error, no match") {
     val (_, res) = first
     val rt = res.runtime.getOrElse(fail("no runtime view"))
+    // TE-P8-03 (SE-P8-03, CR-P8-02 m-B): queries name their model through vectorsFor.
+    val named = rt.vectorsFor(SyntheticTestEmbedding.ModelVersion)
     val q = Vector.fill(Dimension)(0.5f)
     VectorIndexes.all.foreach { ix =>
       Injections.foreach { p =>
@@ -214,9 +226,21 @@ class SummaryTextInjectionAdversarialSuite extends munit.FunSuite {
           )
         ).foreach { f =>
           assertEquals(
-            rt.vectors.query(ix.name, q, 5, Some(f)),
+            named.query(ix.name, q, 5, Some(f)),
             Right(Vector.empty),
             s"${ix.name} $f"
+          )
+          // TE-P8-03: the unnamed runtime reader refuses the same query, even with no match, so
+          // an injection-shaped filter can never reach results through a model-less reader.
+          val unnamed = rt.vectors.query(ix.name, q, 5, Some(f))
+          assert(
+            unnamed.left.exists {
+              case StoreError.Refused(d) =>
+                d.startsWith(s"runtime vector query of ${ix.name} refused") &&
+                d.contains("no query model version")
+              case _ => false
+            },
+            s"${ix.name} $f unnamed: $unnamed"
           )
         }
       }

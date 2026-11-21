@@ -83,7 +83,9 @@ object EvidenceBundleWriter {
  * store passed in cannot be cast back to its write side. The vector reader
  * ([[VectorReader.verified]]) also checks every returned vector's stored floats against its own
  * `dataSha256` (SE-P7-11; a mismatch is `Corrupt` and nothing is served) and its model version
- * against the explicit vector policy (CR-P7-11 m2).
+ * against the explicit vector policy (CR-P7-11 m2). SE-P8-03 (CR-P8-02 m-B): [[vectors]] names no
+ * query model, so it serves `getVectors` only and REFUSES every `query`; queries go through
+ * [[vectorsFor]] with the query embedder's model version.
  */
 final class RuntimeStores private (
     val objects: ObjectReader,
@@ -93,8 +95,18 @@ final class RuntimeStores private (
     val vectorIndexes: IndexInspector,
     val querySessions: QuerySessionWriter,
     val entityLinks: EntityLinkCacheWriter,
-    val evidenceBundles: EvidenceBundleWriter
-)
+    val evidenceBundles: EvidenceBundleWriter,
+    vectorsOf: String => VectorReader
+) {
+
+  /**
+   * CR-P8-01 M2: the vector reader for queries embedded with `modelVersion` (the query embedder's
+   * canonical model version): [[VectorReader.verified]] with that model, which excludes other
+   * models' matches, so no result mixes embedding spaces and a query never returns another model's
+   * vectors. This is the ONLY query path: the unnamed [[vectors]] refuses every query (SE-P8-03).
+   */
+  def vectorsFor(modelVersion: String): VectorReader = vectorsOf(modelVersion)
+}
 
 object RuntimeStores {
 
@@ -116,7 +128,8 @@ object RuntimeStores {
       vectors: VectorReader,
       vectorIndexes: IndexInspector,
       vectorPolicy: EmbeddingPolicy
-  ): RuntimeStores =
+  ): RuntimeStores = {
+    require(vectors != null && vectorPolicy != null, "reader and policy are required")
     new RuntimeStores(
       ObjectReader.readOnly(objects),
       KeyValueReader.readOnly(keyValues),
@@ -125,8 +138,10 @@ object RuntimeStores {
       IndexInspector.readOnly(vectorIndexes),
       QuerySessionWriter(runtimeTableWriter),
       EntityLinkCacheWriter(runtimeTableWriter),
-      EvidenceBundleWriter(runtimeTableWriter)
+      EvidenceBundleWriter(runtimeTableWriter),
+      model => VectorReader.verified(vectors, vectorPolicy, model)
     )
+  }
 
   private def readOnlyGraph(g: GraphReader): GraphReader = new GraphReader {
     def run(query: scholarchain.storage.model.BoundQuery) = g.run(query)

@@ -115,9 +115,33 @@ object ItemCodecs {
           check(a.targetStore != null && a.state != null, "targetStore and state are required"),
           check(a.version >= 1, s"version ${a.version} is below 1"),
           check(a.itemCount >= 1, "itemCount is below 1"),
-          check(a.written >= 0 && a.alreadyPresent >= 0 && a.rejected >= 0, "negative count")
+          check(a.written >= 0 && a.alreadyPresent >= 0 && a.rejected >= 0, "negative count"),
+          check(
+            a.embeddingModel != null && a.embedding != null,
+            "embeddingModel and embedding must be absent or present"
+          ),
+          check(
+            Option(a.embedding).flatten.forall(_ => Option(a.embeddingModel).flatten.isDefined),
+            "embedding totals belong to a model-scoped vector load row"
+          ),
+          check(
+            Option(a.embedding).flatten.forall(EmbeddingTotals.problems(_).isEmpty),
+            Option(a.embedding).flatten.toVector.flatMap(EmbeddingTotals.problems).mkString("; ")
+          ),
+          // CR-P8-01 M1: the failure of the last failed call, only on a failed or writing row.
+          check(a.failure != null, "failure must be absent or present"),
+          check(
+            Option(a.failure).flatten.forall(_ =>
+              a.state == LoadState.Failed || a.state == LoadState.Writing
+            ),
+            "a failure belongs to a failed or writing row"
+          ),
+          check(
+            Option(a.failure).flatten.forall(LoadFailure.problems(_).isEmpty),
+            Option(a.failure).flatten.toVector.flatMap(LoadFailure.problems).mkString("; ")
+          )
         )
-      def key(a: LoadEntry) = K.RunLedger.load(a.runId, a.loadId)
+      def key(a: LoadEntry) = K.RunLedger.load(a.runId, a.loadId, a.embeddingModel)
       override protected def indexKeys(a: LoadEntry) =
         for {
           p <- K.RunLedger.byLoad(a.loadId)
@@ -145,7 +169,7 @@ object ItemCodecs {
         check(p.isEmpty, p.mkString("; "))
       }
       def key(a: RejectedRecord) =
-        K.RunLedger.reject(a.runId, a.loadId, a.generation, a.recordKey)
+        K.RunLedger.reject(a.runId, a.loadId, a.generation, a.recordKey, a.embeddingModel)
     }
 
   /** SE-P7-11 (CR-P7-12 F2): the per-generation rejection-set summary (RL-8). */
@@ -156,7 +180,8 @@ object ItemCodecs {
         val p = RejectionSet.problems(a)
         check(p.isEmpty, p.mkString("; "))
       }
-      def key(a: RejectionSet) = K.RunLedger.rejectionSet(a.runId, a.loadId, a.generation)
+      def key(a: RejectionSet) =
+        K.RunLedger.rejectionSet(a.runId, a.loadId, a.generation, a.embeddingModel)
     }
 
   given ArtifactCodec: ItemCodec[ArtifactRecord] =

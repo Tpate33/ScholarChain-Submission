@@ -45,7 +45,27 @@ trait PartReader[A] {
 }
 
 /**
- * Embedding model port (Phase 8 provides the real model; Phase 7 tests use a deterministic fake).
+ * Embedding model port (SE-P8-01 item 5). Everything model-specific comes from the implementation
+ * and its configuration; storage names no real model. The production model is NOT decided (human
+ * decision pending); the only implementation in storage is the synthetic test embedder, which the
+ * production policy (`EmbeddingPolicy.RealModelsOnly`) refuses.
+ *
+ *   - `modelVersion`: the canonical storage label of the model and its settings
+ *     ([[scholarchain.storage.model.EmbeddingModelVersion]], `[a-z0-9][a-z0-9._-]{0,127}`); it is a
+ *     component of every vector key and recorded in every vector's metadata, so any change of
+ *     model, model revision or embedding settings must change it (new keys, never an overwrite);
+ *   - `dimension`: the vector length; must equal every index's configured dimension (the five index
+ *     names are fixed, so a model of another dimension needs other indexes: Terraform);
+ *   - `embed`: one batch (at most the loader's `batchSize` texts), one vector per text in order; a
+ *     `Transient` failure is retried by the loader with bounded backoff. CR-P8-01 M1: a `Permanent`
+ *     failure means "some text of this batch is refused": the loader splits the batch in halves
+ *     down to single texts (bounded) and records each text still refused alone as one
+ *     `embedding-failure` rejection (counted against `maxRejected`), so one bad text cannot stop
+ *     every rerun. Any other `Left` (`Transient` after every attempt, `Refused`, `Corrupt`) stops
+ *     the call; its rejections so far and the error are recorded in the RunLedger and a rerun
+ *     resumes, but a provider that returns such an error deterministically for one text stops every
+ *     rerun at that batch (an implementation must report a per-text refusal as `Permanent`).
+ *     Determinism is not required.
  */
 trait Embedder {
   def modelVersion: String

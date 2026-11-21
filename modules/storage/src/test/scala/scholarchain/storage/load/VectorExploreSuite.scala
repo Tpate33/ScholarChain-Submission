@@ -18,6 +18,7 @@ class VectorLoadSuite extends munit.FunSuite {
 
   private val V = TargetStore.S3Vectors
   private val Dim = OpeningFixture.Dimension
+  private val Model = Some(SyntheticTestEmbedding.ModelVersion)
 
   private lazy val production: VerificationReport = LoadVerifier.verify(
     source(runDir(run1Root)),
@@ -261,9 +262,12 @@ class VectorLoadSuite extends munit.FunSuite {
     // writing 3 for a first call).
     assertEquals(rows.map(_.generation).toSet, Set(3L))
     val ref = TestData.layout
-      .rejects(production.verified.get.load(V).get.loadId, rows.head.generation.toInt)
+      .rejects(production.verified.get.load(V).get.loadId, rows.head.generation.toInt, Model)
       .toOption
       .get
+    // SE-P8-01: the evidence is scoped by the embedding model version (rows, object, set).
+    assert(rows.forall(_.embeddingModel == Model), rows.head.toString)
+    assert(ref.key.contains("/rejects/model=synthetic-test-only.v1/part-"), ref.key)
     val body = w.objectStore.get(ref).toOption.flatten.getOrElse(fail("no rejects object"))._2
     val lines = body.utf8.split("\n").toVector
     assertEquals(lines.map(RejectedRecord.parseLine(_).map(_.recordKey)).toSet, bad.map(Right(_)))
@@ -407,7 +411,8 @@ class VectorLoadSuite extends munit.FunSuite {
         maxRejected,
         1024,
         512,
-        EmbeddingPolicy.SyntheticTestOnly
+        EmbeddingPolicy.SyntheticTestOnly,
+        100
       )
     assert(of().isRight)
     assert(of(ix = idx.tail).isLeft)
@@ -516,7 +521,8 @@ class VectorLoadSuite extends munit.FunSuite {
 
   private def rejectsObjects(w: World): Vector[(String, Vector[String])] = {
     val loadId = production.verified.get.load(V).get.loadId
-    val prefix = TestData.layout.rejects(loadId, 0).toOption.get.key.stripSuffix("part-00000.jsonl")
+    val prefix =
+      TestData.layout.rejects(loadId, 0, Model).toOption.get.key.stripSuffix("part-00000.jsonl")
     w.objectStore
       .list("test-data-bucket", prefix, 1000)
       .fold(e => fail(e.toString), identity)
@@ -658,7 +664,11 @@ class VectorLoadSuite extends munit.FunSuite {
     val w = new World
     val out1 = load(w, OpeningFixture.vectorConfig(limits = TestData.limits, maxRejected = 1))
     assert(out1.isLeft)
-    assertEquals((loadEntry(w).state, loadEntry(w).rejected), (LoadState.Failed, 2L))
+    // SE-P8-03 (CR-P8-02 m-A): the failed call's 2 rejections are recorded as an INCOMPLETE set,
+    // which is never current and does not set the ledger count.
+    assertEquals((loadEntry(w).state, loadEntry(w).rejected), (LoadState.Failed, 0L))
+    assertEquals(summaries(w).map(s => (s.count, s.complete)), Vector((2L, false)))
+    assertEquals(RejectionSet.current(summaries(w)), None)
     val second = someKeys(3).toSet
     val r = ok(
       load(
@@ -671,7 +681,8 @@ class VectorLoadSuite extends munit.FunSuite {
     // Not 2 + 3 = 5: the current set is generation 5's three records.
     assertEquals((loadEntry(w).state, loadEntry(w).rejected), (LoadState.Loaded, 3L))
     val current = summaries(w).last
-    assertEquals((current.generation, current.count), (5L, 3L))
+    assertEquals((current.generation, current.count, current.complete), (5L, 3L, true))
+    assertEquals(RejectionSet.current(summaries(w)), Some(current))
     assertEquals(
       ledgerRejects(w).filter(_.generation == current.generation).map(_.recordKey).toSet,
       second
@@ -740,7 +751,7 @@ class VectorLoadSuite extends munit.FunSuite {
     // Call 1 writes its 3 rejection rows, then the rejects object put fails: no summary.
     val loadId = production.verified.get.load(V).get.loadId
     val rejectsPrefix =
-      TestData.layout.rejects(loadId, 0).toOption.get.key.stripSuffix("part-00000.jsonl")
+      TestData.layout.rejects(loadId, 0, Model).toOption.get.key.stripSuffix("part-00000.jsonl")
     val brokenObjects = new scholarchain.storage.port.ObjectStore {
       private val u = w.objects
       def head(r: ObjectRef) = u.head(r)
@@ -913,7 +924,7 @@ class VectorLoadSuite extends munit.FunSuite {
     assertEquals(profiles.size, 176)
     val tally = profiles.map { x =>
       val identity = x.identity.getOrElse(fail(s"${x.inputId}: no identity in the input"))
-      val key = s"researcher-profile-v1/${x.inputId}"
+      val key = s"researcher-profile-v1/${SyntheticTestEmbedding.ModelVersion}/${x.inputId}"
       val v = w.vectorStore
         .getVectors("researcher-profile-v1", Vector(key))
         .fold(e => fail(e.toString), identity => identity)

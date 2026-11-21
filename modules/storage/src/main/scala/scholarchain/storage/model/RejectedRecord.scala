@@ -17,6 +17,12 @@ enum RejectReason(val tag: String) {
   case DimensionMismatch extends RejectReason("dimension-mismatch")
   case PermanentWriteFailure extends RejectReason("permanent-write-failure")
   case RetriesExhausted extends RejectReason("retries-exhausted")
+
+  /**
+   * CR-P8-01 M1: the embedder refused this one text permanently (a `Permanent` error for the item
+   * embedded alone, after its batch was split).
+   */
+  case EmbeddingFailure extends RejectReason("embedding-failure")
 }
 object RejectReason {
   def fromTag(tag: String): Option[RejectReason] = values.find(_.tag == tag)
@@ -32,16 +38,29 @@ object RejectReason {
  * CR-P7-11 m1 (v2): evidence is per write generation ([[scholarchain.storage.load.WriteAttempt]]),
  * so a rerun that rejects another set (a configuration change), or the same record with another
  * error detail, writes new keys and never collides with an earlier call's evidence. The CURRENT
- * evidence of a load is the highest generation that has a [[RejectionSet]] summary (SE-P7-11,
- * CR-P7-12 F2); earlier generations are history (for example a record rejected by a failed call and
- * stored by the rerun that loaded), and rows of a generation without a summary are incomplete.
+ * evidence of a load is the highest generation that has a COMPLETE [[RejectionSet]] summary
+ * (SE-P7-11, CR-P7-12 F2; SE-P8-03: `complete = true`); earlier generations are history (for
+ * example a record rejected by a failed call and stored by the rerun that loaded), rows of a
+ * generation without a summary are incomplete, and rows of a generation whose summary has
+ * `complete = false` (a failed call) are the partial evidence of that call, never current.
  *
  * @param recordKey
- *   the record's stable ID, or `row:<sourcePath>#<row index>` when it has none
+ *   the record's stable ID, or `row:<sourcePath>#<row index>` when it has none. SE-P8-01 item 4
+ *   (SE-P8-03 n-B wording): for a vector load this row is also the per-item failure evidence of one
+ *   work item of the call's work list (the stored [[EmbeddingWorkManifest]] is the evidence of that
+ *   list, not a queue the loader reads back): `attempts` is the number of attempts made for the
+ *   item (its retry count is `attempts - 1`), `detail` holds the final error and `reason` its class
+ *   (`retries-exhausted` after the last transient failure, `permanent-write-failure`,
+ *   `embedding-failure`, `dimension-mismatch`, ...).
+ *
  * @param attempts
  *   write attempts made (0 when refused before any write)
  * @param generation
  *   the write generation of the call that rejected it (>= 1)
+ * @param embeddingModel
+ *   SE-P8-01: the embedding model version of a vector load's ledger scope (its generations are that
+ *   scope's, key `reject#<loadId>#model#<mv>#<generation>#<recordKey>`); absent for other loads
+ *   (omitted from the JSON, so their rows are unchanged)
  */
 @allowUnknownKeys(false)
 final case class RejectedRecord(
@@ -55,7 +74,8 @@ final case class RejectedRecord(
     reason: RejectReason,
     detail: String,
     attempts: Int,
-    generation: Long
+    generation: Long,
+    embeddingModel: Option[String] = None
 ) derives ReadWriter
 
 object RejectedRecord {
@@ -95,7 +115,8 @@ object RejectedRecord {
         Option.when(r.attempts < 0)("attempts: negative"),
         Option.when(r.generation < 1 || r.generation > MaxGeneration)(
           s"generation: outside 1..$MaxGeneration"
-        )
+        ),
+        Option(r.embeddingModel).getOrElse(Some(null)).flatMap(EmbeddingModelVersion.problem)
       ).flatten
 
   /** The compact JSON line of the rejects object (no trailing newline). */
@@ -113,17 +134,28 @@ object RejectedRecord {
 }
 
 /**
- * SE-P7-11 (CR-P7-12 F2): the summary and commit marker of ONE write generation's complete
- * rejection set (RunLedger key `rejectset#<loadId>#<generation, 10 digits>`, access pattern RL-8).
- * It is written create-once AFTER that generation's rejected-record rows and its rejects object
- * (possibly empty), so its presence means the set is complete. The CURRENT rejection evidence of a
- * load is the summary with the highest generation; rows of a generation without a summary are an
- * incomplete set (the call stopped before finishing it) and are never current.
+ * SE-P7-11 (CR-P7-12 F2): the summary and commit marker of ONE write generation's rejection set
+ * (RunLedger key `rejectset#<loadId>#<generation, 10 digits>`, access pattern RL-8). It is written
+ * create-once AFTER that generation's rejected-record rows and its rejects object (possibly empty),
+ * so its presence means the rows and the object of that generation are all written.
+ *
+ * SE-P8-03 (CR-P8-02 m-A): `complete` says whether the generation's call FINISHED its pass (it
+ * ended `loaded` or `documents-staged`), so the set holds every rejection of the items that call
+ * handled. A call that stopped with an error (CR-P8-01 M1: a put `Conflict`, a fatal put or
+ * embedding error, more than `maxRejected` rejections, a failed text or manifest write) records the
+ * rejections it reached with `complete = false`: evidence of that failed call only. The CURRENT
+ * rejection evidence of a load is the summary with the highest generation among the COMPLETE ones
+ * ([[RejectionSet.current]]); an incomplete summary, and rows of a generation without a summary,
+ * are never current, and the ledger row's `rejected` count is set only from a complete set.
  *
  * @param count
  *   the number of rejected records of that generation (rows and object lines)
  * @param rejectsObjectSha256
  *   SHA-256 of that generation's rejects object bytes
+ * @param complete
+ *   SE-P8-03: true when the generation's call finished its pass; false for the partial set of a
+ *   failed call. Default true, omitted from the JSON when true, so every existing (complete) row
+ *   keeps its bytes
  */
 @allowUnknownKeys(false)
 final case class RejectionSet(
@@ -134,11 +166,24 @@ final case class RejectionSet(
     generation: Long,
     count: Long,
     rejectsObjectKey: String,
-    rejectsObjectSha256: String
+    rejectsObjectSha256: String,
+    embeddingModel: Option[String] = None,
+    complete: Boolean = true
 ) derives ReadWriter
 
 object RejectionSet {
   val SchemaVersion = "scholarchain.storage.rejection-set.v1"
+
+  /**
+   * SE-P8-03: the CURRENT rejection set among the summaries of one load scope: the complete one
+   * with the highest generation (None when no complete set exists). Incomplete sets (failed calls)
+   * are never current.
+   */
+  def current(sets: Vector[RejectionSet]): Option[RejectionSet] =
+    Option(sets)
+      .getOrElse(Vector.empty)
+      .filter(s => s != null && s.complete)
+      .maxByOption(_.generation)
 
   def problems(s: RejectionSet): Vector[String] =
     if (s == null) Vector("rejection set: missing")
@@ -158,6 +203,7 @@ object RejectionSet {
         )("rejectsObjectKey: missing or has whitespace"),
         Option.when(!scholarchain.core.Canonical.isHex64(s.rejectsObjectSha256))(
           "rejectsObjectSha256: expected 64 lowercase hex characters"
-        )
+        ),
+        Option(s.embeddingModel).getOrElse(Some(null)).flatMap(EmbeddingModelVersion.problem)
       ).flatten
 }

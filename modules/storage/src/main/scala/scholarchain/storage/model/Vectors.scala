@@ -336,27 +336,71 @@ object VectorIndexes {
 }
 
 /**
+ * SE-P8-01 item 1: the canonical embedding model version, the label an
+ * [[scholarchain.storage.port .Embedder]] declares and every vector records (`modelVersion`), and a
+ * component of every vector key. It is a storage label taken from configuration, NOT a provider
+ * model ID (a provider ID such as one with `:` is mapped to a label by configuration; no real model
+ * is decided or named here).
+ *
+ * Canonical form (frozen): `[a-z0-9][a-z0-9._-]{0,127}`: lowercase ASCII letters, digits, `.`, `_`
+ * and `-`, starting with a letter or digit, at most 128 characters. Nothing is normalised: a
+ * version that is not canonical is refused, so two spellings can never name one key, and the
+ * synthetic prefix check ([[EmbeddingPolicy.isSynthetic]]) can no longer be bypassed by case
+ * (CR-P7-20 n4).
+ */
+object EmbeddingModelVersion {
+  private val Canonical = "^[a-z0-9][a-z0-9._-]{0,127}$".r
+
+  /** Why `v` is not a canonical model version, or None. */
+  def problem(v: String): Option[String] =
+    if (v == null) Some("modelVersion: missing")
+    else if (!Canonical.matches(v))
+      Some(s"modelVersion: '$v' is not canonical ([a-z0-9][a-z0-9._-]{0,127})")
+    else None
+
+  def check(v: String): Either[StoreError, String] =
+    problem(v).map(StoreError.Refused(_)).toLeft(v)
+}
+
+/**
  * Vector keys and text chunk IDs (SE-P7-01 law 1; SE-P7-09 V2): a key never silently refers to
  * different text.
  */
 object VectorKeys {
 
   /**
-   * The stable vector key (SE-P7-09, V2): `<index name>/<inputId>`, the index version and the core
-   * stable ID of the source summary input (`suminput:`, which already binds document type, subject,
-   * window and graph policy). It does not depend on the text, so the store's GetVectors-compare put
-   * refuses other text under the key (`Conflict`; the metadata carries `textSha256`) and equal text
-   * is `AlreadyPresent`. It carries no run ID: one analysis run per store instance (human decision
-   * 2026-11-20).
+   * The stable vector key (SE-P8-01 item 1; format frozen):
+   *
+   * `<index name>/<modelVersion>/<inputId>`
+   *
+   * the index version, the canonical embedding model version ([[EmbeddingModelVersion]]) and the
+   * core stable ID of the source summary input (`suminput:`, which already binds document type,
+   * subject, window and graph policy). Consequences:
+   *
+   *   - a new model version writes NEW keys and never overwrites or conflicts with the vectors of
+   *     an earlier model (Phase 7 keys had no model component, so a new model under the same key
+   *     was a `Conflict`);
+   *   - the key does not depend on the text, so under one key (one model) other text is always a
+   *     `Conflict` (the metadata carries `textSha256`; the store's GetVectors-compare put and the
+   *     loader's pre-write probe both refuse it) and equal intact content is skipped as unchanged;
+   *     the same vector key never silently refers to different text.
+   *
+   * It carries no run ID: one analysis run per store instance (human decision 2026-11-20).
    */
-  def of(index: VectorIndexSpec, inputId: String): Either[StoreError, String] =
+  def of(
+      index: VectorIndexSpec,
+      modelVersion: String,
+      inputId: String
+  ): Either[StoreError, String] =
     if (index == null) Left(StoreError.Refused("index: missing"))
     else
-      StableId
-        .validate(IdKind.SummaryInput, inputId, "inputId")
-        .left
-        .map(e => StoreError.Refused(e.message))
-        .map(id => s"${index.name}/$id")
+      for {
+        m <- EmbeddingModelVersion.check(modelVersion)
+        id <- StableId
+          .validate(IdKind.SummaryInput, inputId, "inputId")
+          .left
+          .map(e => StoreError.Refused(e.message))
+      } yield s"${index.name}/$m/$id"
 
   /**
    * The text chunk ID of a context document: `core` [[ChunkId.ofTextHash]](subjectId, index name,

@@ -220,10 +220,13 @@ class VectorIntegritySuite extends munit.FunSuite {
     assertEquals(rt.vectors.getVectors(Ix, Vector(good)).map(_.map(_.key)), Right(Vector(good)))
     def subject(k: String) = get(loaded, k).metadata.string(MetadataField.SubjectId).get
     val q = Vector.fill(Dimension)(0.5f)
+    // SE-P8-03: queries name their model (the unnamed reader refuses every query).
+    val mv = SyntheticTestEmbedding.ModelVersion
     def bySubject(k: String) =
-      rt.vectors.query(Ix, q, 5, Some(VectorFilter.Eq(MetadataField.SubjectId, subject(k))))
+      rt.vectorsFor(mv)
+        .query(Ix, q, 5, Some(VectorFilter.Eq(MetadataField.SubjectId, subject(k))))
     corrupt(bySubject(bad), "query matching the bad key")
-    corrupt(rt.vectors.query(Ix, q, 2, None), "query whose top 2 include the bad key")
+    corrupt(rt.vectorsFor(mv).query(Ix, q, 2, None), "query whose top 2 include the bad key")
     assert(bySubject(good).exists(_.map(_.key).contains(good)), bySubject(good).toString)
     // Intact data through the plain runtime view of the loaded stores.
     val plain = RuntimeStores(
@@ -235,7 +238,10 @@ class VectorIntegritySuite extends munit.FunSuite {
       loaded.vectors,
       EmbeddingPolicy.SyntheticTestOnly
     )
-    assertEquals(plain.vectors.query(Ix, q, 2, None).map(_.map(_.key)), Right(Vector(bad, good)))
+    assertEquals(
+      plain.vectorsFor(mv).query(Ix, q, 2, None).map(_.map(_.key)),
+      Right(Vector(bad, good))
+    )
     assertEquals(plain.vectors.getVectors(Ix, Vector(bad)).map(_.size), Right(1))
   }
 

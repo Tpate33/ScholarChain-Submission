@@ -17,14 +17,20 @@ import scholarchain.storage.port.Embedder
  * refuses it unless the load configuration explicitly says `EmbeddingPolicy.SyntheticTestOnly` (a
  * production configuration uses `RealModelsOnly`, which refuses it).
  */
-final class SyntheticTestEmbedding(val dimension: Int) extends Embedder {
+final class SyntheticTestEmbedding(val dimension: Int, val modelVersion: String) extends Embedder {
   require(dimension >= 1, "dimension must be >= 1")
+  require(
+    scholarchain.storage.model.EmbeddingModelVersion.problem(modelVersion).isEmpty &&
+      modelVersion.startsWith(SyntheticTestEmbedding.Prefix),
+    s"a synthetic model version is canonical and starts with ${SyntheticTestEmbedding.Prefix}"
+  )
 
-  val modelVersion: String = SyntheticTestEmbedding.ModelVersion
+  /** The default synthetic model version [[SyntheticTestEmbedding.ModelVersion]]. */
+  def this(dimension: Int) = this(dimension, SyntheticTestEmbedding.ModelVersion)
 
   def embed(texts: Vector[String]): Either[StoreError, Vector[Vector[Float]]] =
     if (texts == null || texts.contains(null)) Left(StoreError.Refused("texts: missing"))
-    else Right(texts.map(SyntheticTestEmbedding.vectorOf(_, dimension)))
+    else Right(texts.map(SyntheticTestEmbedding.vectorOf(_, dimension, modelVersion)))
 }
 
 object SyntheticTestEmbedding {
@@ -34,6 +40,15 @@ object SyntheticTestEmbedding {
 
   /** The model version recorded on every synthetic vector. */
   val ModelVersion = "synthetic-test-only.v1"
+
+  /**
+   * SE-P8-01: the vector of `text` under another synthetic model version (to exercise model
+   * versioning): the version is hashed in front of the text, so another version gives other
+   * vectors. The default version keeps exactly the Phase 7 vectors.
+   */
+  def vectorOf(text: String, dimension: Int, modelVersion: String): Vector[Float] =
+    if (modelVersion == ModelVersion) vectorOf(text, dimension)
+    else vectorOf(modelVersion + "\n" + text, dimension)
 
   def vectorOf(text: String, dimension: Int): Vector[Float] = {
     val bytes = text.getBytes(StandardCharsets.UTF_8)

@@ -155,8 +155,31 @@ class OpeningLoadSuite extends munit.FunSuite {
       (249L, 249L, 249L)
     )
     assertEquals(w.vectorCount, 249)
-    assertEquals(w.objectStore.size, 31 + 249)
-    assertEquals(w.kvStore.itemCount(TableRole.ArtifactRegistry), 31 + 249)
+    // SE-P8-01: + 1 embedding work manifest object, with its registry row.
+    assertEquals(w.objectStore.size, 31 + 249 + 1)
+    assertEquals(w.kvStore.itemCount(TableRole.ArtifactRegistry), 31 + 249 + 1)
+    // SE-P8-01 item 6: the Phase 8 report fields of a clean first load.
+    assertEquals(
+      Vector(
+        "work-items",
+        "skipped-unchanged",
+        "duplicates-on-put",
+        "put-retries",
+        "embed-retries",
+        "remaining",
+        "elapsed-millis",
+        s"embedding-model:${fake.SyntheticTestEmbedding.ModelVersion}"
+      ).map(count(v, _)),
+      Vector(249L, 0L, 0L, 0L, 0L, 0L, 0L, Dimension.toLong)
+    )
+    Routed.foreach { case (ix, n) =>
+      assertEquals(
+        Vector("work-items", "embedded", "skipped-unchanged", "put-retries", "remaining")
+          .map(f => count(v, s"index:$ix:$f")),
+        Vector(n, n, 0L, 0L, 0L),
+        ix
+      )
+    }
     // RunLedger: 4 store-owner rows, 1 publication row, 4 load rows; no rejected-record row.
     assertEquals(w.ledgerStore.itemCount(TableRole.RunLedger), 9)
     assertEquals(TargetStore.values.map(r.store(_).conflicts).sum, 0L)
@@ -168,8 +191,11 @@ class OpeningLoadSuite extends munit.FunSuite {
     val rt = first._2.runtime.getOrElse(fail("runtime missing"))
     Routed.foreach { case (ix, n) =>
       val q = Vector.fill(Dimension)(1f / math.sqrt(Dimension.toDouble).toFloat)
-      val ms =
-        rt.vectors.query(ix, q, math.min(n.toInt, 30), None).fold(e => fail(e.toString), identity)
+      // SE-P8-03: a query names its model version.
+      val ms = rt
+        .vectorsFor("synthetic-test-only.v1")
+        .query(ix, q, math.min(n.toInt, 30), None)
+        .fold(e => fail(e.toString), identity)
       assertEquals(ms.size, math.min(n.toInt, 30), ix)
       ms.foreach { m =>
         val md = m.metadata
@@ -178,7 +204,12 @@ class OpeningLoadSuite extends munit.FunSuite {
         assertEquals(md.string(MetadataField.IndexVersion), Some(ix))
         assertEquals(md.string(MetadataField.SchemaVersion), Some(VectorMetadata.SchemaVersion))
         assert(md.string(MetadataField.SourcePath).exists(_.contains("summary-inputs/")))
-        assert(m.key.startsWith(ix + "/suminput:"), m.key)
+        // SE-P8-01: `<index>/<modelVersion>/<inputId>`.
+        assertEquals(
+          m.key,
+          s"$ix/synthetic-test-only.v1/${md.string(MetadataField.InputId).get}",
+          m.key
+        )
         // The text is in ordinary S3 under textS3Key; its SHA-256 is textSha256 (V3).
         val key = md.string(MetadataField.TextS3Key).get
         val (meta, body) = w.objectStore
@@ -233,8 +264,14 @@ class OpeningLoadSuite extends munit.FunSuite {
       )
     )
     assertEquals(w.kvStore.itemCount(TableRole.ResearcherMetricCache), 1302)
-    assertEquals(w.objectStore.size, 31 + 249)
+    assertEquals(w.objectStore.size, 31 + 249 + 1)
     assertEquals(w.vectorCount, 249)
+    // SE-P8-01 item 2: all 249 skipped as unchanged (content hash and model version), none embedded.
+    val v = r.store(Vectors)
+    assertEquals(
+      (count(v, "skipped-unchanged"), count(v, "embedded"), count(v, "work-items")),
+      (249L, 0L, 249L)
+    )
   }
 
   test(
@@ -319,13 +356,23 @@ class OpeningLoadSuite extends munit.FunSuite {
     assertEquals(w.vectorCount, 249)
     val e = entry(w, Vectors)
     assertEquals((e.state, e.written, e.alreadyPresent), (LoadState.Loaded, 249L, 0L))
-    assertEquals(w.objectStore.size, 31 + 249, "text objects written once")
-    // CR-P7-11 m3: the failed call's outcome counts its text-object and registry writes too.
+    assertEquals(w.objectStore.size, 31 + 249 + 1, "text objects and the manifest written once")
+    // CR-P7-11 m3: the failed call's outcome counts its text-object and registry writes too
+    // (SE-P8-01: first the work manifest and its registry row).
     assertEquals(
       v1.counts,
-      Vector("text-written" -> 249L, "registry-written" -> 249L),
+      Vector("work-manifest-written" -> 1L, "registry-written" -> 250L, "text-written" -> 249L),
       "partial side writes of the failed call"
     )
+    // SE-P8-01 item 4: the failed call's retries are in its ledger row (3 re-sends of 50 records).
+    assertEquals(
+      e.embedding.map(t => (t.workItems, t.remaining, t.passes)),
+      Some((249L, 0L, 2L))
+    )
+    assertEquals(e.embedding.map(_.putRetries), Some(150L), "3 backoffs x 50 records, call 1")
+    assertEquals(e.embedding.map(_.embedded), Some(150L + 149L), "call 1 sent 150, call 2 149")
+    assertEquals(count(v2, "put-retries"), 0L)
+    assertEquals(count(v2, "skipped-unchanged"), 100L, "the resume skips call 1's vectors")
     // CR-P7-11 m4: the resume embeds only the 149 missing vectors (76 profiles, then 73 others).
     assertEquals(count(v2, "embedded"), 149L)
     assertEquals(count(v2, "text-present"), 249L)
@@ -458,15 +505,21 @@ class OpeningLoadSuite extends munit.FunSuite {
     )
     val q = Vector.fill(Dimension)(0.5f)
     Routed.foreach { case (ix, _) =>
-      val out = prod.vectors.query(ix, q, 5, None)
+      // SE-P8-03: a query names its model version (here the synthetic one the load used).
+      val out = prod.vectorsFor("synthetic-test-only.v1").query(ix, q, 5, None)
       assert(
         out.left.exists(_.message.contains("refused by the RealModelsOnly policy")),
         s"$ix: $out"
       )
+      // A get of a loaded synthetic vector is refused as well.
+      val k = w.vectorStore.query(ix, q, 1, None).fold(e => fail(e.toString), identity).head.key
+      assert(prod.vectors.getVectors(ix, Vector(k)).isLeft, s"$ix: get")
     }
     // The test view of the same load (explicit SyntheticTestOnly configuration) reads them.
     val rt = first._2.runtime.getOrElse(fail("runtime missing"))
-    assert(rt.vectors.query("researcher-profile-v1", q, 5, None).isRight)
+    assert(
+      rt.vectorsFor("synthetic-test-only.v1").query("researcher-profile-v1", q, 5, None).isRight
+    )
   }
 
   test("CR-P7-11 m4: a rerun of a loaded run and a fresh-ledger rerun call the embedder 0 times") {

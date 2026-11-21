@@ -138,13 +138,43 @@ class VectorRegistrySuite extends munit.FunSuite {
     assert(VectorKeys.chunkId("not an id", DocumentType.ResearcherProfile, sha).isLeft)
   }
 
-  test("SE-P7-09 V2: vector key = index version + core summary-input ID, independent of text") {
+  test(
+    "SE-P8-01 V2: vector key = index version + model version + core summary-input ID, no text"
+  ) {
     val ix = VectorIndexes.ResearcherProfile
-    assertEquals(VectorKeys.of(ix, inputId), Right(s"researcher-profile-v1/$inputId"))
-    assertNotEquals(VectorKeys.of(ix, inputId), VectorKeys.of(VectorIndexes.PaperAbstract, inputId))
-    assert(VectorKeys.of(ix, researcherA).isLeft, "only a suminput: ID is a vector source")
-    assert(VectorKeys.of(ix, "suminput:not-hex").isLeft)
-    assert(VectorKeys.of(null, inputId).isLeft)
+    val m = "synthetic-test-only.v1"
+    assertEquals(VectorKeys.of(ix, m, inputId), Right(s"researcher-profile-v1/$m/$inputId"))
+    assertNotEquals(
+      VectorKeys.of(ix, m, inputId),
+      VectorKeys.of(VectorIndexes.PaperAbstract, m, inputId)
+    )
+    // A new model version gives a new key for the same input (never an overwrite).
+    assertEquals(
+      VectorKeys.of(ix, "synthetic-test-only.v2", inputId),
+      Right(s"researcher-profile-v1/synthetic-test-only.v2/$inputId")
+    )
+    assertNotEquals(
+      VectorKeys.of(ix, m, inputId),
+      VectorKeys.of(ix, "synthetic-test-only.v2", inputId)
+    )
+    assert(VectorKeys.of(ix, m, researcherA).isLeft, "only a suminput: ID is a vector source")
+    assert(VectorKeys.of(ix, m, "suminput:not-hex").isLeft)
+    assert(VectorKeys.of(null, m, inputId).isLeft)
+    // The model version must be canonical: never normalised, so no two spellings share a key.
+    Vector(
+      "Synthetic-test-only.v1",
+      "model/v1",
+      "amazon.titan:0",
+      "",
+      ".hidden",
+      "-x",
+      "a" * 129,
+      null
+    ).foreach { bad =>
+      assert(VectorKeys.of(ix, bad, inputId).isLeft, String.valueOf(bad))
+      assert(EmbeddingModelVersion.problem(bad).isDefined, String.valueOf(bad))
+    }
+    assertEquals(EmbeddingModelVersion.check("a" * 128), Right("a" * 128))
   }
 
   test("SE-P7-09: path summaries need no researcher IDs (none are cited); profiles do") {

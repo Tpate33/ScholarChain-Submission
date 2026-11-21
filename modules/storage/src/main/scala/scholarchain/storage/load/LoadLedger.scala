@@ -2,9 +2,11 @@ package scholarchain.storage.load
 
 import scholarchain.core.TargetStore
 import scholarchain.storage.model.{
+  EmbeddingTotals,
   ItemCodecs,
   LoadCounts,
   LoadEntry,
+  LoadFailure,
   LoadState,
   PutOutcome,
   RunLedgerStates,
@@ -46,7 +48,8 @@ final class LoadProgress {
    * SE-P7-11 item 4: how many complete rejection sets (rows and the rejects object of one write
    * generation) were recorded through this progress, and the size of the last one. The ledger's
    * `rejected` count is the size of the CURRENT set (the last generation that recorded one), not a
-   * sum over generations.
+   * sum over generations. SE-P8-03: only COMPLETE sets are counted here; the incomplete set of a
+   * failed call is not.
    */
   def rejectionSetsRecorded: Int = sets
   def lastRejectionSetSize: Long = setSize
@@ -62,8 +65,36 @@ final class LoadProgress {
   private[load] def present(): Unit = p += 1
   private[load] def rejectedOne(): Unit = r += 1
   private[load] def sideWrite(name: String): Unit = side.update(name, side.getOrElse(name, 0L) + 1)
+
+  // SE-P8-01 items 3-4: embedding counts recorded by the vector loader (None until its work
+  // manifest is known); the ledger adds this call's part of them to the row's EmbeddingTotals.
+  private var emb: Option[EmbeddingTotals] = None
+  def embedding: Option[EmbeddingTotals] = emb
+  private[load] def workManifest(sha256: String, items: Long, remaining: Long): Unit =
+    emb = Some(
+      emb.fold(EmbeddingTotals(sha256, items, 0L, 0L, 0L, remaining, 0L))(
+        _.copy(workManifestSha256 = sha256, workItems = items, remaining = remaining)
+      )
+    )
+  private[load] def embedded(n: Long): Unit = emb = emb.map(e => e.copy(embedded = e.embedded + n))
+  private[load] def putRetried(n: Long): Unit =
+    emb = emb.map(e => e.copy(putRetries = e.putRetries + n))
+  private[load] def embedRetried(n: Long): Unit =
+    emb = emb.map(e => e.copy(embedRetries = e.embedRetries + n))
+
   override def toString: String =
-    s"LoadProgress(written=$w, alreadyPresent=$p, rejected=$r, side=${sideCounts.mkString(",")})"
+    s"LoadProgress(written=$w, alreadyPresent=$p, rejected=$r, side=${sideCounts.mkString(",")}" +
+      emb.fold("")(e => s", embedding=$e") + ")"
+}
+
+/**
+ * SE-P8-01 item 3: how a write pass ended. `Complete`: every element was handled; the row moves to
+ * `loaded`. `Staged`: the pass stopped at its configured bound with work remaining; the row moves
+ * to `documents-staged` and the next call resumes.
+ */
+enum PassEnd {
+  case Complete
+  case Staged
 }
 
 /**
@@ -74,7 +105,7 @@ final class LoadProgress {
  * field is removed; whether an empty set must be recorded is decided from the stored RL-8
  * summaries, never from the ledger count.)
  */
-final case class WriteAttempt(generation: Long)
+final case class WriteAttempt(generation: Long, embeddingModel: Option[String] = None)
 
 /**
  * The RunLedger protocol every loader follows (SE-P7-05 B4, generalized in SE-P7-06 item 7; risk
@@ -105,9 +136,10 @@ final case class WriteAttempt(generation: Long)
  * earlier writes present, and those are not added again). `rejected` (SE-P7-11 item 4) is the size
  * of the CURRENT rejection set: the set of the last call (write generation) that recorded one, so a
  * rerun that rejects another set replaces it and a clean rerun sets it to 0; a call that stops
- * before recording its set leaves it unchanged. The authoritative current set is the highest RL-8
- * [[scholarchain.storage.model.RejectionSet]] summary (its generation's rows by RL-7); the ledger
- * count is a convenience copy of that summary's count.
+ * before recording its set, or (SE-P8-03) stops with an error and records an INCOMPLETE set, leaves
+ * it unchanged. The authoritative current set is the highest COMPLETE RL-8
+ * [[scholarchain.storage.model.RejectionSet]] summary (`RejectionSet.current`; its generation's
+ * rows by RL-7); the ledger count is a convenience copy of that summary's count.
  */
 private[load] object LoadLedger {
 
@@ -179,15 +211,72 @@ private[load] object LoadLedger {
   )(
       writeAll: (WriteAttempt, Vector[E]) => Either[StoreError, Unit]
   ): Either[StoreError, LedgerRun] =
+    runScoped(permit, ledger, clock, elements, stores, progress, None)(probeAll)((a, es) =>
+      writeAll(a, es).map(_ => PassEnd.Complete)
+    )
+
+  /**
+   * SE-P8-01: the protocol for one ledger SCOPE of a load (`embeddingModel`: the vector load under
+   * one embedding model version has its own row `load#<loadId>#model#<mv>`, its own generations and
+   * totals), with a writer that may end a pass [[PassEnd.Staged]] (bounded work per call): the row
+   * then moves to `documents-staged` instead of `loaded`, and the next call resumes it.
+   */
+  def runScoped[E](
+      permit: LoadPermit,
+      ledger: KeyValueStore,
+      clock: Clock,
+      elements: Vector[E],
+      stores: Vector[TargetStore],
+      progress: LoadProgress,
+      embeddingModel: Option[String]
+  )(
+      probeAll: Vector[E] => Either[StoreError, Unit]
+  )(
+      writeAll: (WriteAttempt, Vector[E]) => Either[StoreError, PassEnd]
+  ): Either[StoreError, LedgerRun] =
     for {
+      _ <- refuseUnscopedRow(permit, ledger, embeddingModel)
       _ <- claimOwners(permit, ledger, stores)
       _ <- claimPublication(permit, ledger)
-      entry <- ensureEntry(permit, ledger, clock)
+      entry <- ensureEntry(permit, ledger, clock, embeddingModel)
       out <-
         if (entry.state == LoadState.Loaded)
           Right(LedgerRun(0L, 0L, LoadState.Loaded, skipped = true))
         else probeAndWrite(permit, ledger, clock, entry, elements, progress, probeAll, writeAll)
     } yield out
+
+  /**
+   * CR-P8-01 m1 (choice: refuse, not only document): a model-scoped load (SE-P8-01) refuses, with
+   * zero writes (read only, before the owner claims), a RunLedger that holds the Phase 7 UNSCOPED
+   * row `load#<loadId>` of the same load. Such a ledger was written by the Phase 7 loader, whose
+   * vectors used the 2-part keys `<index>/<inputId>` that the model-scoped loader neither probes
+   * nor counts; resuming beside them would silently leave them in the indexes. Use fresh stores and
+   * a fresh RunLedger. Documented limitation: Phase 7 2-part vector keys in a store paired with a
+   * FRESH ledger are not detected (S3 Vectors has no key listing in the port); one analysis run per
+   * store instance (human decision 2026-11-20) makes that a misconfiguration.
+   */
+  private def refuseUnscopedRow(
+      permit: LoadPermit,
+      ledger: KeyValueStore,
+      embeddingModel: Option[String]
+  ): Either[StoreError, Unit] =
+    if (embeddingModel == null || embeddingModel.isEmpty) Right(())
+    else
+      for {
+        key <- TableKeys.RunLedger.load(permit.runId, permit.load.loadId, None)
+        row <- ledger.get(entries.table.role, key)
+        _ <- row match {
+          case None => Right(())
+          case Some(_) =>
+            Left(
+              StoreError.Refused(
+                s"${permit.load.loadId}: the RunLedger holds an unscoped (Phase 7) " +
+                  s"${permit.target.tag} row ${key.sk}; its vectors use pre-SE-P8-01 keys the " +
+                  "model-scoped loader does not manage: load into fresh stores with a fresh RunLedger"
+              )
+            )
+        }
+      } yield ()
 
   /** The one message of a store owned by another run (one run per store instance). */
   private[load] def ownedByOther(
@@ -311,16 +400,21 @@ private[load] object LoadLedger {
       }
     } yield ()
 
-  private def readEntry(permit: LoadPermit, ledger: KeyValueStore): Either[StoreError, LoadEntry] =
+  private def readEntry(
+      permit: LoadPermit,
+      ledger: KeyValueStore,
+      scope: Option[String]
+  ): Either[StoreError, LoadEntry] =
     for {
-      key <- TableKeys.RunLedger.load(permit.runId, permit.load.loadId)
+      key <- TableKeys.RunLedger.load(permit.runId, permit.load.loadId, scope)
       item <- ledger.get(entries.table.role, key)
       e <- item.toRight(StoreError.Corrupt(s"${permit.load.loadId}: ledger row vanished"))
       entry <- entries.decode(e)
       _ <-
         if (
           entry.runId == permit.runId && entry.loadId == permit.load.loadId &&
-          entry.targetStore == permit.target && entry.partManifestSha256 == permit.partManifestSha256
+          entry.targetStore == permit.target &&
+          entry.partManifestSha256 == permit.partManifestSha256 && entry.embeddingModel == scope
         ) Right(())
         else
           Left(
@@ -332,7 +426,8 @@ private[load] object LoadLedger {
   private def ensureEntry(
       permit: LoadPermit,
       ledger: KeyValueStore,
-      clock: Clock
+      clock: Clock,
+      scope: Option[String]
   ): Either[StoreError, LoadEntry] =
     for {
       start <- RunLedgerStates.start(
@@ -341,13 +436,14 @@ private[load] object LoadLedger {
         permit.target,
         permit.partManifestSha256,
         permit.items.size,
-        clock.nowMillis()
+        clock.nowMillis(),
+        scope
       )
       item <- entries.encode(start)
       entry <- ledger.putIfAbsent(entries.table.role, item) match {
         case Right(PutOutcome.Written) => Right(start)
-        case Right(PutOutcome.AlreadyPresent) => readEntry(permit, ledger)
-        case Left(StoreError.Conflict(_)) => readEntry(permit, ledger) // later state or time
+        case Right(PutOutcome.AlreadyPresent) => readEntry(permit, ledger, scope)
+        case Left(StoreError.Conflict(_)) => readEntry(permit, ledger, scope) // later state/time
         case Left(e) => Left(e)
       }
     } yield entry
@@ -365,7 +461,7 @@ private[load] object LoadLedger {
       item <- entries.encode(next)
       stored <- ledger.putIfVersion(entries.table.role, item, current.version) match {
         case Right(()) => Right(next)
-        case Left(StoreError.StaleVersion(_)) => readEntry(permit, ledger)
+        case Left(StoreError.StaleVersion(_)) => readEntry(permit, ledger, current.embeddingModel)
         case Left(e) => Left(e)
       }
     } yield stored
@@ -432,50 +528,77 @@ private[load] object LoadLedger {
       elements: Vector[E],
       progress: LoadProgress,
       probeAll: Vector[E] => Either[StoreError, Unit],
-      writer: (WriteAttempt, Vector[E]) => Either[StoreError, Unit]
+      writer: (WriteAttempt, Vector[E]) => Either[StoreError, PassEnd]
   ): Either[StoreError, LedgerRun] =
     toWriting(permit, ledger, clock, start, fresh = true).flatMap { writing =>
       if (writing.state == LoadState.Loaded)
         Right(LedgerRun(0L, 0L, LoadState.Loaded, skipped = true))
       else {
+        val scope = writing.embeddingModel
         val (w0, p0, r0) = (progress.written, progress.alreadyPresent, progress.rejected)
         val s0 = progress.rejectionSetsRecorded
+        val e0 = progress.embedding
         def call = (progress.written - w0, progress.alreadyPresent - p0, progress.rejected - r0)
         def currentSet: Option[Long] =
           Option.when(progress.rejectionSetsRecorded > s0)(progress.lastRejectionSetSize)
+        // SE-P8-01: this call's embedding counts (vector loads only), added once, by the one
+        // transition that ends the call (loaded, documents-staged or failed).
+        def embeddingCall: Option[EmbeddingTotals] =
+          progress.embedding.filter(_ => scope.isDefined).map { now =>
+            e0.fold(now)(b =>
+              now.copy(
+                embedded = now.embedded - b.embedded,
+                putRetries = now.putRetries - b.putRetries,
+                embedRetries = now.embedRetries - b.embedRetries
+              )
+            )
+          }
         def total(e: LoadEntry) = {
           val (w, p, _) = call
-          totals(e, w, p, currentSet)
+          totals(e, w, p, currentSet).copy(embedding = embeddingCall)
         }
-        def markFailed(): Unit = {
-          val _ = readEntry(permit, ledger).flatMap { cur =>
+        // CR-P8-01 M1: the failed row records the error class and detail of the call (and, through
+        // `total`, the rejection set the writer recorded before it returned the error).
+        def markFailed(err: StoreError): Unit = {
+          val _ = readEntry(permit, ledger, scope).flatMap { cur =>
             if (cur.state == LoadState.Writing)
-              advance(permit, ledger, clock, cur, LoadState.Failed, total(cur))
+              advance(
+                permit,
+                ledger,
+                clock,
+                cur,
+                LoadState.Failed,
+                total(cur).copy(failure = Some(LoadFailure.of(err, writing.version)))
+              )
             else Right(cur)
           }
         }
         probeAll(elements) match {
           case Left(e) =>
-            markFailed()
+            markFailed(e)
             Left(e)
           case Right(()) =>
-            writer(WriteAttempt(writing.version), elements) match {
+            writer(WriteAttempt(writing.version, scope), elements) match {
               case Left(e) =>
                 // Best effort: record the failure so a rerun resumes; the original error is returned.
-                markFailed()
+                markFailed(e)
                 Left(e)
-              case Right(()) =>
+              case Right(end) =>
+                val target =
+                  if (end == PassEnd.Staged) LoadState.DocumentsStaged else LoadState.Loaded
                 def finish(e: LoadEntry, rounds: Int): Either[StoreError, LoadEntry] =
-                  if (e.state == LoadState.Loaded) Right(e)
+                  if (e.state == LoadState.Loaded || e.state == target) Right(e)
                   else if (rounds > MaxLedgerRounds)
                     Left(
                       StoreError
                         .Transient(s"${e.loadId}: ledger contended for $MaxLedgerRounds rounds")
                     )
                   else if (e.state == LoadState.Writing)
-                    advance(permit, ledger, clock, e, LoadState.Loaded, total(e)).flatMap(
+                    advance(permit, ledger, clock, e, target, total(e)).flatMap(
                       finish(_, rounds + 1)
                     )
+                  else if (target == LoadState.DocumentsStaged)
+                    Right(e) // moved by a concurrent loader: the next call decides again
                   else // failed by a concurrent loader after our writes: resume it to loaded
                     toWriting(permit, ledger, clock, e, fresh = false).flatMap(
                       finish(_, rounds + 1)

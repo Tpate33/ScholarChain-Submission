@@ -48,7 +48,10 @@ final case class S3LayoutSettings(zones: Map[Zone, ZoneLocation], maxKeyBytes: I
  *   - load artifacts: `<zone>/loads/<loadHex>/<relative path>` (graph, semantic-context, reports,
  *     logs), including
  *     - context text: `<semantic-context>/loads/<loadHex>/text/<chunkHex>.txt`
- *     - rejects: `<reports>/loads/<loadHex>/rejects/part-<NNNNN>.jsonl`
+ *     - rejects: `<reports>/loads/<loadHex>/rejects/part-<NNNNN>.jsonl`; vector loads (SE-P8-01,
+ *       scoped by model version): `<reports>/loads/<loadHex>/rejects/model=<mv>/part-<NNNNN>.jsonl`
+ *     - embedding work manifest (SE-P8-01, content-addressed):
+ *       `<semantic-context>/loads/<loadHex>/embedding-work/model=<mv>/manifest-<sha256>.json`
  *   - run files (SE-P7-13 item 2): `<graph>/runs/<runHex>/_parts.json` and `_run-manifest.json`
  *
  * SE-P7-13 item 3: there is no `load-report.json` key. The durable record of a load is its
@@ -106,10 +109,47 @@ final class S3Layout private (settings: S3LayoutSettings) {
       .hexOf(IdKind.Chunk, chunkId, "chunkId")
       .flatMap(c => loadObject(Zone.SemanticContext, loadId, s"text/$c.txt"))
 
-  def rejects(loadId: String, part: Int): Either[StoreError, ObjectRef] =
+  /**
+   * The rejects object of one write generation: `rejects/part-<NNNNN>.jsonl`, or SE-P8-01, for a
+   * vector load scoped by an embedding model version, `rejects/model=<modelVersion>/part-<NNNNN>
+   * .jsonl` (each model's ledger row has its own generations, so its evidence has its own keys).
+   */
+  def rejects(
+      loadId: String,
+      part: Int,
+      embeddingModel: Option[String] = None
+  ): Either[StoreError, ObjectRef] =
     if (part < 0 || part > 99999)
       Left(StoreError.Refused(s"part: $part is outside 0..99999"))
-    else loadObject(Zone.Reports, loadId, f"rejects/part-$part%05d.jsonl")
+    else
+      modelSegment(embeddingModel).flatMap(m =>
+        loadObject(Zone.Reports, loadId, f"rejects/$m$part%05d.jsonl")
+      )
+
+  /**
+   * SE-P8-01 item 3: one embedding work manifest of a vector load under one model version,
+   * content-addressed: `<semantic-context>/loads/<loadHex>/embedding-work/model=<modelVersion>/
+   * manifest-<sha256>.json`, where `sha256` is the SHA-256 of the manifest bytes. A key therefore
+   * never names another work list; a configuration change that changes the work list writes another
+   * manifest (the earlier one stays as history) instead of wedging the load.
+   */
+  def embeddingWorkManifest(
+      loadId: String,
+      modelVersion: String,
+      sha256: String
+  ): Either[StoreError, ObjectRef] =
+    for {
+      m <- EmbeddingModelVersion.check(modelVersion)
+      h <- StoreIds.hex64(sha256, "sha256")
+      r <- loadObject(Zone.SemanticContext, loadId, s"embedding-work/model=$m/manifest-$h.json")
+    } yield r
+
+  /** `part-` or `model=<modelVersion>/part-`, refusing a non-canonical version. */
+  private def modelSegment(embeddingModel: Option[String]): Either[StoreError, String] =
+    embeddingModel match {
+      case None => Right("part-")
+      case Some(m) => EmbeddingModelVersion.check(m).map(v => s"model=$v/part-")
+    }
 
   private def allowed(zone: Zone, zones: Set[Zone], what: String): Either[StoreError, Zone] =
     if (zone != null && zones.contains(zone)) Right(zone)

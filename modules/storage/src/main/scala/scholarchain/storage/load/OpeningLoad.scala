@@ -148,10 +148,18 @@ enum StoreLoadStatus(val tag: String) {
 
   /** The gate opened and the loader stopped with an error (a rerun resumes). */
   case Failed extends StoreLoadStatus("failed")
+
+  /**
+   * SE-P8-01: the gate opened and the vector loader stopped at its per-call bound
+   * (`maxItemsPerCall`) with embedding work remaining (ledger `documents-staged`); a rerun
+   * continues. Not complete: no runtime view.
+   */
+  case Staged extends StoreLoadStatus("documents-staged")
 }
 
 /**
- * The outcome of one target store (deterministic: no time, no randomness).
+ * The outcome of one target store (deterministic: no randomness; the only time is the s3-vectors
+ * `elapsed-millis` count, read from the injected clock, SE-P8-01).
  *
  * @param performed
  *   deferred checks performed and passed for the store, in declaration order (tags)
@@ -546,6 +554,7 @@ object OpeningLoad {
 
     /** (written, alreadyPresent, skipped, counts, rejected records) of a finished load. */
     type Done = (Long, Long, Boolean, Vector[(String, Long)], Long)
+    var staged = false // SE-P8-01: the vector loader ended `documents-staged`
 
     /** The production gate, then the one-run-per-store-set preflight, then the loader. */
     def gate(
@@ -637,7 +646,8 @@ object OpeningLoad {
               ),
               progress
             )
-            .map(r =>
+            .map { r =>
+              staged = r.finalState == scholarchain.storage.model.LoadState.DocumentsStaged
               (
                 r.written,
                 r.alreadyPresent,
@@ -649,7 +659,14 @@ object OpeningLoad {
                       s"index:${i.index}:written" -> i.written,
                       s"index:${i.index}:present" -> i.alreadyPresent,
                       s"index:${i.index}:rejected" -> i.rejected.toLong,
-                      s"index:${i.index}:stored" -> i.stored.toLong
+                      s"index:${i.index}:stored" -> i.stored.toLong,
+                      // SE-P8-01 item 6
+                      s"index:${i.index}:work-items" -> i.workItems.toLong,
+                      s"index:${i.index}:skipped-unchanged" -> i.skippedUnchanged,
+                      s"index:${i.index}:duplicates-on-put" -> i.duplicatesOnPut,
+                      s"index:${i.index}:embedded" -> i.embedded,
+                      s"index:${i.index}:put-retries" -> i.putRetries,
+                      s"index:${i.index}:remaining" -> i.remaining.toLong
                     )
                   ) ++ Vector(
                     "text-objects" -> r.textObjects.toLong,
@@ -657,11 +674,22 @@ object OpeningLoad {
                     "text-present" -> r.textPresent,
                     "registry-rows" -> r.registryRows.toLong,
                     "rejected" -> r.rejected.size.toLong,
-                    "embedded" -> r.embedded
+                    "embedded" -> r.embedded,
+                    // SE-P8-01 item 6 (the model version is named in the count's key; its value
+                    // is the embedding dimension)
+                    s"embedding-model:${r.modelVersion}" -> r.dimension.toLong,
+                    "work-items" -> r.workItems.toLong,
+                    "skipped-unchanged" -> r.skippedUnchanged,
+                    "duplicates-on-put" -> r.duplicatesOnPut,
+                    "put-retries" -> r.putRetries,
+                    "embed-retries" -> r.embedRetries,
+                    "remaining" -> r.remaining.toLong,
+                    // injected clock only (simulated time under a test clock; no latency claim)
+                    "elapsed-millis" -> (r.finishedAtMillis - r.startedAtMillis)
                   ),
                 r.rejected.size.toLong
               )
-            )
+            }
         )
     }
     attempt match {
@@ -678,7 +706,10 @@ object OpeningLoad {
           rejected = progress.rejected
         )
       case Right(Right((w, a, skipped, counts, rejected))) =>
-        val status = if (skipped) StoreLoadStatus.Skipped else StoreLoadStatus.Loaded
+        val status =
+          if (skipped) StoreLoadStatus.Skipped
+          else if (staged) StoreLoadStatus.Staged
+          else StoreLoadStatus.Loaded
         outcome(status, w, a, counts, rejected = rejected)
     }
   }

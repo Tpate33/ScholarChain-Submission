@@ -56,7 +56,9 @@ object OpeningFixture {
       dimension: Int = Dimension,
       policy: scholarchain.storage.model.EmbeddingPolicy =
         scholarchain.storage.model.EmbeddingPolicy.SyntheticTestOnly,
-      maxKeyBytes: Int = 512
+      maxKeyBytes: Int = 512,
+      // SE-P8-01: above the fixture's 249 work items, so one call loads everything by default.
+      maxItemsPerCall: Int = 10000
   ): VectorLoadConfig =
     VectorLoadConfig
       .of(
@@ -69,7 +71,8 @@ object OpeningFixture {
         maxRejected,
         64 * 1024,
         maxKeyBytes,
-        policy
+        policy,
+        maxItemsPerCall
       )
       .fold(e => throw new AssertionError(e.mkString("; ")), identity)
 

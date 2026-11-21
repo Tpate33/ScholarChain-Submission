@@ -267,14 +267,18 @@ class OpeningLoadSurfaceSuite extends munit.FunSuite {
   private val Index = "researcher-profile-v1"
   private val Query = Vector.fill(OpeningFixture.Dimension)(0.5f)
 
+  // SE-P8-03: queries name their model version (the load's synthetic one).
+  private val Model = "synthetic-test-only.v1"
+
   private def assertRefusesCorrupted(rt: RuntimeStores, c: Corrupting, path: String): Unit = {
     c.on = false
-    val ms = rt.vectors.query(Index, Query, 3, None).fold(e => fail(s"$path: $e"), identity)
+    val ms =
+      rt.vectorsFor(Model).query(Index, Query, 3, None).fold(e => fail(s"$path: $e"), identity)
     assertEquals(ms.size, 3, path)
     assert(rt.vectors.getVectors(Index, ms.map(_.key)).isRight, path)
     c.on = true
     try {
-      rt.vectors.query(Index, Query, 3, None) match {
+      rt.vectorsFor(Model).query(Index, Query, 3, None) match {
         case Left(StoreError.Corrupt(d)) => assert(d.contains("do not match its dataSha256"), d)
         case other => fail(s"$path: query served a corrupted vector: $other")
       }
@@ -299,7 +303,7 @@ class OpeningLoadSurfaceSuite extends munit.FunSuite {
     assertRefusesCorrupted(test, c, "RuntimeStores.apply")
     // Under the production policy the synthetic vectors are refused whether or not corrupted.
     val prod = RuntimeStores(w.objects, w.kv, w.kv, w.graph, c, c, EmbeddingPolicy.RealModelsOnly)
-    assert(prod.vectors.query(Index, Query, 3, None).isLeft)
+    assert(prod.vectorsFor(Model).query(Index, Query, 3, None).isLeft)
   }
 
   test("CR-P7-15 N1: no other public way builds a runtime view or an unchecked vector reader") {

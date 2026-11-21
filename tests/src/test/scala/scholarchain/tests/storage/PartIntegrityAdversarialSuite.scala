@@ -4,10 +4,18 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
 
 import scholarchain.core.TargetStore
-import scholarchain.storage.{Fixtures, OpeningFixture}
+import scholarchain.storage.{Fixtures, OpeningFixture, TestData}
 import scholarchain.storage.OpeningFixture.{World, config, sources}
+import scholarchain.storage.fake.SyntheticTestEmbedding
 import scholarchain.storage.load.*
-import scholarchain.storage.model.{StoreError, TableRole}
+import scholarchain.storage.model.{
+  EmbeddingWorkManifest,
+  ItemCodecs,
+  StoreError,
+  TableKeys,
+  TableRole,
+  Zone
+}
 
 import StorageAdversarial.*
 
@@ -152,8 +160,52 @@ class PartIntegrityAdversarialSuite extends munit.FunSuite {
       .list("test-data-bucket", "graph/", 1000)
       .fold(e => fail(e.toString), identity)
     assertEquals(graphZone, Vector.empty, "the s3 loader wrote no object")
-    assertEquals(w.objects.counts.written, 249, "only the 249 vector context texts")
-    assertEquals(w.kvStore.itemCount(TableRole.ArtifactRegistry), 249)
+    // TE-P8-01 (SE-P8-01 item 3): the vector load alone wrote, all under semantic-context/: the
+    // 249 context texts plus exactly one embedding work manifest, and one registry row each.
+    val semantic = w.objectStore
+      .list("test-data-bucket", "semantic-context/", 1000)
+      .fold(e => fail(e.toString), identity)
+    assertEquals(w.objects.counts.written, 250, "249 context texts + 1 work manifest, nothing else")
+    assertEquals(w.objectStore.size, 250, "no object outside semantic-context/")
+    assertEquals(semantic.size, 250)
+    val Hex64 = "[0-9a-f]{64}"
+    val TextKey = s"semantic-context/loads/$Hex64/text/$Hex64\\.txt".r
+    val mv = SyntheticTestEmbedding.ModelVersion
+    val ManifestKey =
+      s"semantic-context/loads/$Hex64/embedding-work/model=${java.util.regex.Pattern.quote(mv)}/manifest-$Hex64\\.json".r
+    val (texts, others) = semantic.partition(m => TextKey.matches(m.ref.key))
+    assertEquals(texts.size, 249, "the 249 vector context texts")
+    assertEquals(others.size, 1, s"exactly one non-text object: ${others.map(_.ref.key)}")
+    val manifestMeta = others.head
+    assert(ManifestKey.matches(manifestMeta.ref.key), manifestMeta.ref.key)
+    val manifestBody = w.objectStore
+      .get(manifestMeta.ref)
+      .fold(e => fail(e.toString), identity)
+      .getOrElse(fail("no manifest body"))
+      ._2
+    val manifest = EmbeddingWorkManifest.parse(manifestBody).fold(e => fail(e.toString), identity)
+    assertEquals((manifest.runId, manifest.modelVersion), (Fixtures.RunId, mv))
+    assertEquals(manifest.items.size, 249, "one work item per context text")
+    assertEquals(manifest.items.map(_.textS3Key).toSet, texts.map(_.ref.key).toSet)
+    // The key is exactly S3Layout's content-addressed manifest key for this load and model.
+    assertEquals(
+      TestData.layout.embeddingWorkManifest(manifest.loadId, mv, manifestBody.sha256),
+      Right(manifestMeta.ref)
+    )
+    // 249 + 1 registry rows: one per stored object, the extra one the manifest's.
+    assertEquals(w.kvStore.itemCount(TableRole.ArtifactRegistry), 250)
+    semantic.foreach { m =>
+      val row = TableKeys.ArtifactRegistry
+        .artifact(Fixtures.RunId, Zone.SemanticContext, m.ref.key)
+        .flatMap(w.kvStore.get(TableRole.ArtifactRegistry, _))
+        .flatMap(i =>
+          ItemCodecs.ArtifactCodec.decode(i.getOrElse(fail(s"no registry row ${m.ref.key}")))
+        )
+        .fold(e => fail(e.toString), identity)
+      assertEquals(row.sha256, m.sha256, m.ref.key)
+      if (m == manifestMeta)
+        assertEquals(row.recordSchemaVersion, Some(EmbeddingWorkManifest.SchemaVersion))
+    }
     assert(!r.complete)
     assertEquals(res.runtime, None, "no runtime view while s3 is not loaded")
     // The honest source resumes: s3 alone loads, the other stores are skipped.

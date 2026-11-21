@@ -11,7 +11,10 @@ import scholarchain.storage.model.{
   Attrs,
   Bytes,
   DistanceMetric,
+  EmbeddingModelVersion,
   EmbeddingPolicy,
+  EmbeddingWorkItem,
+  EmbeddingWorkManifest,
   ItemCodecs,
   LoadState,
   MetaValue,
@@ -110,6 +113,11 @@ object RetryPolicy {
  * @param embedding
  *   [[EmbeddingPolicy.RealModelsOnly]] in production; [[EmbeddingPolicy.SyntheticTestOnly]] only in
  *   local tests
+ * @param maxItemsPerCall
+ *   SE-P8-01 item 3: the most work-manifest items one call embeds and puts (items found stored and
+ *   unchanged do not count); the rest is left for the next call (ledger `documents-staged`). It
+ *   must exceed `maxRejected`, so every call that does not fail stores at least one item and a
+ *   bounded sequence of calls finishes the manifest
  */
 final case class VectorLoadConfig private (
     limits: VectorLimits,
@@ -119,7 +127,8 @@ final case class VectorLoadConfig private (
     maxRejected: Int,
     maxTextBytes: Int,
     maxKeyBytes: Int,
-    embedding: EmbeddingPolicy
+    embedding: EmbeddingPolicy,
+    maxItemsPerCall: Int
 )
 
 object VectorLoadConfig {
@@ -131,7 +140,8 @@ object VectorLoadConfig {
       maxRejected: Int,
       maxTextBytes: Int,
       maxKeyBytes: Int,
-      embedding: EmbeddingPolicy
+      embedding: EmbeddingPolicy,
+      maxItemsPerCall: Int
   ): Either[Vector[String], VectorLoadConfig] = {
     val names = Option(indexes).getOrElse(Vector.empty).filter(_ != null).map(_.name)
     val problems =
@@ -154,7 +164,12 @@ object VectorLoadConfig {
         Option.when(maxRejected < 0)("maxRejected: negative").toVector ++
         Option.when(maxTextBytes < 1)("maxTextBytes: must be >= 1").toVector ++
         Option.when(maxKeyBytes < 1)("maxKeyBytes: must be >= 1").toVector ++
-        Option.when(embedding == null)("embedding: missing").toVector
+        Option.when(embedding == null)("embedding: missing").toVector ++
+        Option
+          .when(maxItemsPerCall < 1 || maxItemsPerCall <= maxRejected)(
+            s"maxItemsPerCall: $maxItemsPerCall must be >= 1 and above maxRejected $maxRejected"
+          )
+          .toVector
     if (problems.isEmpty)
       Right(
         new VectorLoadConfig(
@@ -165,11 +180,22 @@ object VectorLoadConfig {
           maxRejected,
           maxTextBytes,
           maxKeyBytes,
-          embedding
+          embedding,
+          maxItemsPerCall
         )
       )
     else Left(problems)
   }
+}
+
+/** SE-P8-01 item 2: what the skip rule ([[VectorLoad.classify]]) found under a work item's key. */
+enum StoredVector {
+
+  /** Nothing stored: the item is embedded and put. */
+  case Absent
+
+  /** This item's intact vector (same model version and text hash): skipped, never re-embedded. */
+  case Unchanged
 }
 
 /** The stores and injectable effects of one vector load. */
@@ -194,6 +220,20 @@ final case class VectorLoadTargets(
  *   `row:<path>#<row>` fallback when the record has no vector key)
  * @param stored
  *   routed vectors found stored with this load's metadata after the call (GetVectors; measured)
+ * @param workItems
+ *   SE-P8-01: items of this index in the work manifest
+ * @param skippedUnchanged
+ *   SE-P8-01 item 2: items found stored, intact and unchanged (same key, so same model version,
+ *   same `textSha256` and metadata) before embedding; never sent to the embedder
+ * @param duplicatesOnPut
+ *   items the store reported `AlreadyPresent` on put (stored by a concurrent loader after the
+ *   probe); `alreadyPresent` = `skippedUnchanged` + `duplicatesOnPut`
+ * @param embedded
+ *   texts of this index sent to the embedder by this call
+ * @param putRetries
+ *   record re-sends of this index after transient put failures
+ * @param remaining
+ *   items of this index left for a later call by the per-call bound
  */
 final case class VectorIndexCounts(
     index: String,
@@ -201,7 +241,13 @@ final case class VectorIndexCounts(
     written: Long,
     alreadyPresent: Long,
     rejected: Int,
-    stored: Int
+    stored: Int,
+    workItems: Int,
+    skippedUnchanged: Long,
+    duplicatesOnPut: Long,
+    embedded: Long,
+    putRetries: Long,
+    remaining: Int
 )
 
 /**
@@ -212,6 +258,17 @@ final case class VectorIndexCounts(
  *   generations' records are history in the RunLedger and the rejects objects (CR-P7-11 m1)
  * @param embedded
  *   texts sent to the embedder by this call (CR-P7-11 m4: only vectors not already stored)
+ * @param modelVersion
+ *   SE-P8-01: the embedder's canonical model version (a component of every key; the ledger scope)
+ * @param workManifestKey
+ *   the ordinary-S3 key of the work manifest ([[S3Layout.embeddingWorkManifest]])
+ * @param remaining
+ *   items left for a later call by `maxItemsPerCall` (`finalState` is then `documents-staged`)
+ * @param startedAtMillis
+ *   the injected clock when the call started (a timing hook for throughput measurements; with a
+ *   test clock it measures only simulated time: no latency claim is made from it)
+ * @param finishedAtMillis
+ *   the injected clock when the call ended
  */
 final case class VectorLoadReport(
     runId: String,
@@ -227,7 +284,19 @@ final case class VectorLoadReport(
     alreadyPresent: Long,
     finalState: LoadState,
     skipped: Boolean,
-    embedded: Long
+    embedded: Long,
+    modelVersion: String,
+    dimension: Int,
+    workManifestKey: String,
+    workManifestSha256: String,
+    workItems: Int,
+    skippedUnchanged: Long,
+    duplicatesOnPut: Long,
+    putRetries: Long,
+    embedRetries: Long,
+    remaining: Int,
+    startedAtMillis: Long,
+    finishedAtMillis: Long
 )
 
 /**
@@ -278,7 +347,37 @@ final case class VectorLoadReport(
  *     bounded exponential backoff and jitter; a per-record permanent failure becomes a
  *     [[RejectedRecord]] (RunLedger row and one rejects object per write generation, CR-P7-11 m1);
  *     more than `maxRejected` rejections mark the load failed. A batch that stays throttled after
- *     every attempt fails the load (resumable).
+ *     every attempt fails the call (resumable). CR-P8-01 M1: every early exit records the
+ *     rejections collected so far and the ledger row's `failure` (error class, detail, generation);
+ *     a `Permanent` embedding error of a batch is split down to single texts ([[embedResolved]]),
+ *     so a text the provider always refuses becomes one `embedding-failure` rejection instead of
+ *     stopping every rerun at the same batch.
+ *
+ * SE-P8-01 (Phase 8 increment 1):
+ *
+ *   - Key: `<index>/<modelVersion>/<inputId>` ([[VectorKeys.of]]); a new model version writes new
+ *     keys and never touches an earlier model's vectors.
+ *   - Ledger scope: one RunLedger row per (load, model version), `load#<loadId>#model#<mv>`, with
+ *     its own write generations (rejected records, rejects objects and rejection sets are keyed by
+ *     the scope too) and its [[scholarchain.storage.model.EmbeddingTotals]]. A `loaded` row of one
+ *     model never skips another model's work.
+ *   - Skip rule ([[classify]]): before any embedding, every manifest item's key is probed. An
+ *     intact stored vector whose metadata equals the item's (same key, hence the same model
+ *     version, and the same `textSha256`, provenance and filterable fields) is UNCHANGED: counted
+ *     `skippedUnchanged`, never embedded or put again. Other metadata under the key (another text
+ *     under the same model) is a `Conflict`; a damaged stored vector is `Corrupt`; both refuse the
+ *     call before any data write. Same text under a new model version is new work under a new key.
+ *   - Work list: each call derives its work list from the verified permit (index then key order)
+ *     and stores it, create-once in ordinary S3 with an ArtifactRegistry row and before any vector
+ *     is put, as the deterministic [[scholarchain.storage.model.EmbeddingWorkManifest]] (one item
+ *     per (index, inputId, modelVersion)). CR-P8-01 m2: the stored manifest is the recorded,
+ *     content-addressed EVIDENCE of that work list (its SHA-256 is in the ledger totals); the
+ *     loader does not read it back as its queue. One call embeds at most `maxItemsPerCall` pending
+ *     items, in `batchSize` batches (embedding and put); when items remain, the row ends
+ *     `documents-staged` and the next call resumes (done items are skipped by the probe). No SQS.
+ *   - Retries: transient embedding and put failures are retried with the same bounded backoff;
+ *     re-sends are counted (`embedRetries`, `putRetries`) in the report and the ledger totals; a
+ *     record that still fails becomes a [[RejectedRecord]] with its attempts and final error.
  */
 object VectorLoad {
 
@@ -466,7 +565,8 @@ object VectorLoad {
       reason: RejectReason,
       why: String,
       attempts: Int,
-      generation: Long
+      generation: Long,
+      scope: Option[String] = None
   ): RejectedRecord =
     RejectedRecord(
       RejectedRecord.SchemaVersion,
@@ -479,7 +579,8 @@ object VectorLoad {
       reason,
       detail(why),
       attempts,
-      generation
+      generation,
+      scope
     )
 
   private def checkIndexes(
@@ -534,6 +635,8 @@ object VectorLoad {
   private def checkEmbedder(config: VectorLoadConfig, e: Embedder): Either[StoreError, Unit] =
     if (e == null || !StableId.isToken(e.modelVersion))
       Left(StoreError.Refused("embedder: missing, or its model version is not a token"))
+    else if (EmbeddingModelVersion.problem(e.modelVersion).isDefined)
+      Left(StoreError.Refused(s"embedder ${EmbeddingModelVersion.problem(e.modelVersion).get}"))
     else
       EmbeddingPolicy.refusal(config.embedding, Some(e.modelVersion)) match {
         case Some(why) => Left(StoreError.Refused(s"embedder $why"))
@@ -597,7 +700,7 @@ object VectorLoad {
         def rej(key: String, reason: RejectReason, why: String) =
           index.name -> reject(permit, it, key, reason, why, 0, 1L)
         (for {
-          key <- VectorKeys.of(index, in.inputId)
+          key <- VectorKeys.of(index, modelVersion, in.inputId)
           _ <-
             if (bytesOf(key) <= config.maxKeyBytes) Right(())
             else Left(StoreError.Refused(s"key: ${bytesOf(key)} bytes exceed maxKeyBytes"))
@@ -678,9 +781,50 @@ object VectorLoad {
       dimension: Int,
       s: VectorRecord
   ): Either[StoreError, Unit] =
+    classify(ix, d.key, d.metadata, dimension, Some(s)).map(_ => ())
+
+  /**
+   * SE-P8-01 item 2, THE SKIP RULE (skip unchanged text by content hash and embedding model
+   * version), for one work item whose expected metadata (without `dataSha256`) is `expected` and
+   * whose key `key` holds the model version ([[VectorKeys.of]]):
+   *
+   *   - nothing stored under the key: [[StoredVector.Absent]] (embed and put);
+   *   - a stored vector whose metadata without `dataSha256` equals `expected` (so the same
+   *     `textSha256`, the same `modelVersion` and the same provenance and filterable fields) and
+   *     whose floats are intact and of the index dimension: [[StoredVector.Unchanged]] (skipped:
+   *     not embedded, not put; counted `skippedUnchanged`);
+   *   - stored metadata that differs (another text hash under the same key and model, or another
+   *     model or provenance): `Conflict` (never an overwrite; the call stops before any data
+   *     write);
+   *   - stored floats that do not verify, a wrong dimension or no metadata: `Corrupt`.
+   *
+   * Same text under a NEW model version is never decided here as unchanged: its key differs (the
+   * model is a key component), so it is `Absent` and embedded under the new key.
+   */
+  private[load] def classify(
+      ix: String,
+      key: String,
+      expected: VectorMetadata,
+      dimension: Int,
+      stored: Option[VectorRecord]
+  ): Either[StoreError, StoredVector] =
+    stored match {
+      case None => Right(StoredVector.Absent)
+      case Some(s) => classifyStored(ix, key, expected, dimension, s)
+    }
+
+  private def classifyStored(
+      ix: String,
+      key: String,
+      expected: VectorMetadata,
+      dimension: Int,
+      s: VectorRecord
+  ): Either[StoreError, StoredVector] =
     if (s == null || s.metadata == null || s.metadata.values == null)
-      Left(StoreError.Corrupt(s"$ix ${d.key}: a stored vector without metadata (pre-write probe)"))
-    else if (VectorDigest.withoutDigest(s.metadata) != d.metadata)
+      Left(StoreError.Corrupt(s"$ix $key: a stored vector without metadata (pre-write probe)"))
+    else if (s.key != key)
+      Left(StoreError.Corrupt(s"$ix $key: the stored vector has another key (pre-write probe)"))
+    else if (VectorDigest.withoutDigest(s.metadata) != expected)
       Left(
         StoreError.Conflict(
           s"$ix ${s.key}: holds textSha256 ${s.metadata.string(MetadataField.TextSha256).orNull} " +
@@ -689,7 +833,7 @@ object VectorLoad {
       )
     else
       VectorDigest.verify(ix, s).flatMap { _ =>
-        if (s.data.size == dimension) Right(())
+        if (s.data.size == dimension) Right(StoredVector.Unchanged)
         else
           Left(
             StoreError.Corrupt(s"$ix ${s.key}: stored dimension ${s.data.size} is not $dimension")
@@ -706,11 +850,34 @@ object VectorLoad {
       permit: LoadPermit,
       config: VectorLoadConfig,
       t: VectorLoadTargets,
+      work: Work,
       present: mutable.Set[String]
   )(docs: Vector[Doc]): Either[StoreError, Unit] = {
     present.clear()
     val dims = config.indexes.map(i => i.name -> i.dimension).toMap
-    val vectorCheck = docs
+    // SE-P8-01: the work manifest object and its registry row are absent or exactly this one.
+    val manifestCheck = for {
+      meta <- t.objects.head(work.ref)
+      _ <- meta match {
+        case Some(m) if m.sha256 != work.sha256 =>
+          Left(
+            StoreError.Conflict(
+              s"${work.ref.uri}: holds another embedding work manifest (pre-write probe)"
+            )
+          )
+        case _ => Right(())
+      }
+      row = workRow(permit, work)
+      item <- artifacts.encode(row)
+      key <- artifacts.key(row)
+      stored <- t.registry.get(artifacts.table.role, key)
+      _ <- stored match {
+        case Some(s) if s.get(Attrs.RecordSha256) != item.get(Attrs.RecordSha256) =>
+          Left(StoreError.Conflict(s"registry ${key.sk}: holds a different row (pre-write probe)"))
+        case _ => Right(())
+      }
+    } yield ()
+    lazy val vectorCheck = docs
       .groupBy(_.index.name)
       .toVector
       .sortBy(_._1)
@@ -739,7 +906,7 @@ object VectorLoad {
           }
         }
       }
-    vectorCheck.flatMap { _ =>
+    manifestCheck.flatMap(_ => vectorCheck).flatMap { _ =>
       docs.foldLeft[Either[StoreError, Unit]](Right(())) { (acc, d) =>
         acc.flatMap { _ =>
           for {
@@ -778,13 +945,23 @@ object VectorLoad {
   /** Mutable per-call tallies (reported; the ledger keeps its own). */
   private final class Tally {
     val written: mutable.Map[String, Long] = mutable.Map.empty.withDefaultValue(0L)
-    val present: mutable.Map[String, Long] = mutable.Map.empty.withDefaultValue(0L)
+
+    /** SE-P8-01: found unchanged by the skip rule (probe), per index. */
+    val skipped: mutable.Map[String, Long] = mutable.Map.empty.withDefaultValue(0L)
+
+    /** SE-P8-01: `AlreadyPresent` on put (a concurrent loader stored it after the probe). */
+    val duplicates: mutable.Map[String, Long] = mutable.Map.empty.withDefaultValue(0L)
+    val embeddedBy: mutable.Map[String, Long] = mutable.Map.empty.withDefaultValue(0L)
+    val putRetries: mutable.Map[String, Long] = mutable.Map.empty.withDefaultValue(0L)
+    val remaining: mutable.Map[String, Int] = mutable.Map.empty.withDefaultValue(0)
 
     /** (index, record) of this call, in rejection order. */
     val rejected: mutable.ArrayBuffer[(String, RejectedRecord)] = mutable.ArrayBuffer.empty
     var textWritten = 0L
     var textPresent = 0L
     var embedded = 0L
+    var embedRetries = 0L
+    def present(ix: String): Long = skipped(ix) + duplicates(ix)
   }
 
   private final case class Attempted(
@@ -798,13 +975,18 @@ object VectorLoad {
       index: String,
       batch: Vector[Embedded],
       config: VectorLoadConfig,
-      t: VectorLoadTargets
+      t: VectorLoadTargets,
+      retried: Int => Unit
   ): Either[StoreError, Vector[Attempted]] = {
     var pending = batch
     var done = Vector.empty[Attempted]
     var attempt = 0
     var fatal: Option[StoreError] = None
-    def backoff(): Unit = t.sleeper.sleep(config.retry.delay(attempt, t.jitter))
+    // SE-P8-01 item 4: every record re-sent after a transient failure is counted.
+    def backoff(): Unit = {
+      retried(pending.size)
+      t.sleeper.sleep(config.retry.delay(attempt, t.jitter))
+    }
     while (pending.nonEmpty && fatal.isEmpty) {
       attempt += 1
       t.vectors.putVectors(index, pending.map(_.record)) match {
@@ -845,17 +1027,20 @@ object VectorLoad {
   }
 
   /**
-   * SE-P7-11 (CR-P7-12 F2): whether any earlier generation of this load recorded a complete
-   * rejection set (a [[RejectionSet]] summary under RL-8). Decided from the STORED evidence, never
-   * from the ledger count, so a ledger row that missed an update cannot hide stale evidence.
+   * SE-P7-11 (CR-P7-12 F2): whether any earlier generation of this load recorded a rejection set (a
+   * [[RejectionSet]] summary under RL-8, complete or, SE-P8-03, the incomplete set of a failed
+   * call). Decided from the STORED evidence, never from the ledger count, so a ledger row that
+   * missed an update cannot hide stale evidence; a finished pass then records its (possibly empty)
+   * complete set, which becomes the current one.
    */
   private def anySetRecorded(
       permit: LoadPermit,
-      t: VectorLoadTargets
+      t: VectorLoadTargets,
+      scope: Option[String]
   ): Either[StoreError, Boolean] =
     for {
       p <- TableKeys.RunLedger.partition(permit.runId)
-      prefix <- TableKeys.RunLedger.rejectionSetPrefix(permit.load.loadId)
+      prefix <- TableKeys.RunLedger.rejectionSetPrefix(permit.load.loadId, scope)
       rows <- t.ledger.query(
         TableRole.RunLedger,
         KeyQuery(None, p, SortKeyCondition.BeginsWith(prefix), 1)
@@ -869,6 +1054,11 @@ object VectorLoad {
    * earlier generation recorded a set, so the highest summarized generation is always the current
    * evidence and never leaves an earlier call's rejections as the last word for records this call
    * stored. The summary is written last: rows without a summary are an incomplete set.
+   *
+   * SE-P8-03 (CR-P8-02 m-A): `complete` is false for the set of a call that stops with an error
+   * (only then is it called with rejections only: a failed call that rejected nothing records
+   * nothing). Such a summary is marked `complete = false`, is never the current set, and does not
+   * replace the ledger's `rejected` count.
    */
   private def recordRejections(
       permit: LoadPermit,
@@ -876,10 +1066,14 @@ object VectorLoad {
       t: VectorLoadTargets,
       attempt: WriteAttempt,
       all: Vector[RejectedRecord],
-      progress: LoadProgress
+      progress: LoadProgress,
+      complete: Boolean
   ): Either[StoreError, Unit] =
-    (if (all.nonEmpty) Right(true) else anySetRecorded(permit, t)).flatMap { needed =>
-      if (!needed) Right(()) else writeRejectionSet(permit, layout, t, attempt, all, progress)
+    (if (all.nonEmpty) Right(true)
+     else if (!complete) Right(false)
+     else anySetRecorded(permit, t, attempt.embeddingModel)).flatMap { needed =>
+      if (!needed) Right(())
+      else writeRejectionSet(permit, layout, t, attempt, all, progress, complete)
     }
 
   private def writeRejectionSet(
@@ -888,7 +1082,8 @@ object VectorLoad {
       t: VectorLoadTargets,
       attempt: WriteAttempt,
       all: Vector[RejectedRecord],
-      progress: LoadProgress
+      progress: LoadProgress,
+      complete: Boolean
   ): Either[StoreError, Unit] = {
     val sorted = all.sortWith((a, b) => Canonical.compareUtf8(a.recordKey, b.recordKey) < 0)
     val text = sorted.map(RejectedRecord.jsonLine).map(_ + "\n").mkString
@@ -911,7 +1106,7 @@ object VectorLoad {
           }
         )
       }
-      ref <- layout.rejects(permit.load.loadId, attempt.generation.toInt)
+      ref <- layout.rejects(permit.load.loadId, attempt.generation.toInt, attempt.embeddingModel)
       o <- t.objects.putCreateOnce(ref, Bytes.utf8(text), RejectsContentType)
       _ = progress.sideWrite(
         if (o == PutOutcome.Written) "rejects-object-written" else "rejects-object-present"
@@ -926,7 +1121,9 @@ object VectorLoad {
           attempt.generation,
           sorted.size.toLong,
           ref.key,
-          Canonical.sha256HexUtf8(text)
+          Canonical.sha256HexUtf8(text),
+          attempt.embeddingModel,
+          complete
         )
       )
       s <- t.ledger.putIfAbsent(setCodec.table.role, summary)
@@ -934,8 +1131,9 @@ object VectorLoad {
       progress.sideWrite(
         if (s == PutOutcome.Written) "rejection-set-written" else "rejection-set-present"
       )
-      // SE-P7-11 item 4: this generation's set is now the current one (the ledger's `rejected`).
-      progress.rejectionSet(sorted.size.toLong)
+      // SE-P7-11 item 4: a COMPLETE set is now the current one (the ledger's `rejected`); SE-P8-03:
+      // a failed call's partial set leaves the current set and the ledger count unchanged.
+      if (complete) progress.rejectionSet(sorted.size.toLong)
     }
   }
 
@@ -945,7 +1143,8 @@ object VectorLoad {
       d: Doc,
       v: Vector[Float],
       dimension: Int,
-      generation: Long
+      generation: Long,
+      scope: Option[String]
   ): Either[RejectedRecord, Embedded] =
     if (v == null || v.size != dimension)
       Left(
@@ -956,7 +1155,8 @@ object VectorLoad {
           RejectReason.DimensionMismatch,
           s"embedding of dimension ${Option(v).map(_.size).getOrElse(0)}, index ${d.index.name} has $dimension",
           0,
-          generation
+          generation,
+          scope
         )
       )
     else
@@ -971,7 +1171,8 @@ object VectorLoad {
               RejectReason.MalformedRecord,
               "non-finite component",
               0,
-              generation
+              generation,
+              scope
             )
           )
         case Right(digest) =>
@@ -985,66 +1186,147 @@ object VectorLoad {
       t: VectorLoadTargets,
       pre: Vector[(String, RejectedRecord)],
       present: collection.Set[String],
+      work: Work,
       tally: Tally,
       progress: LoadProgress
-  )(attempt: WriteAttempt, docs: Vector[Doc]): Either[StoreError, Unit] = {
+  )(attempt: WriteAttempt, docs: Vector[Doc]): Either[StoreError, PassEnd] = {
     val g = attempt.generation
+    val scope = attempt.embeddingModel
     val dims = config.indexes.map(i => i.name -> i.dimension).toMap
     def bound(n: Int) =
       StoreError.Refused(
         s"vector load: $n rejected records exceed maxRejected ${config.maxRejected}; the load is failed"
       )
-    def record() =
-      recordRejections(permit, layout, t, attempt, tally.rejected.toVector.map(_._2), progress)
-    tally.rejected ++= pre.map { case (ix, r) => ix -> r.copy(generation = g) }
-    if (pre.size > config.maxRejected) record().flatMap(_ => Left(bound(pre.size)))
+    var recorded = false
+    // SE-P8-03 (CR-P8-02 m-A): `complete` only for the set of a finished pass; every set recorded
+    // on the way to an error is marked incomplete.
+    def record(complete: Boolean) = {
+      recorded = true
+      recordRejections(
+        permit,
+        layout,
+        t,
+        attempt,
+        tally.rejected.toVector.map(_._2),
+        progress,
+        complete
+      )
+    }
+    // CR-P8-01 M1: on EVERY early exit (a put Conflict, a fatal put or embedding error, a failed
+    // text or manifest write) the rejections collected so far are recorded as this generation's
+    // set before the error is returned (best effort: a recording error never replaces the original
+    // error). A failed call's set holds only the items it reached and is recorded INCOMPLETE
+    // (SE-P8-03): never the current set, never the ledger's `rejected` count; the ledger row's
+    // `failure` names the error. Nothing is recorded when the call rejected nothing. Either way an
+    // earlier complete set stays the current one.
+    def onExit(r: Either[StoreError, PassEnd]): Either[StoreError, PassEnd] = r match {
+      case Left(e) if !recorded =>
+        if (tally.rejected.nonEmpty) { val _ = record(complete = false) }
+        Left(e)
+      case other => other
+    }
+    // SE-P8-01 item 3: the bounded slice of this call: pending items (not found unchanged by the
+    // probe) in manifest order, at most maxItemsPerCall; the rest is left for the next call.
+    val pending = docs.filter(d => !present.contains(d.key))
+    val slice = pending.take(config.maxItemsPerCall)
+    val left = pending.drop(config.maxItemsPerCall)
+    left.foreach(d => tally.remaining(d.index.name) += 1)
+    tally.rejected ++= pre.map { case (ix, r) =>
+      ix -> r.copy(generation = g, embeddingModel = scope)
+    }
+    if (pre.size > config.maxRejected)
+      record(complete = false).flatMap(_ => Left(bound(pre.size)))
     else {
+      // 0. SE-P8-01: the work manifest and its registry row (create-once), before any vector.
+      val manifest = for {
+        o <- t.objects.putCreateOnce(work.ref, work.bytes, EmbeddingWorkManifest.ContentType)
+        _ = progress.sideWrite(
+          if (o == PutOutcome.Written) "work-manifest-written" else "work-manifest-present"
+        )
+        row <- artifacts.encode(workRow(permit, work))
+        r <- t.registry.putIfAbsent(artifacts.table.role, row)
+      } yield {
+        progress.sideWrite(if (r == PutOutcome.Written) "registry-written" else "registry-present")
+        // The ledger records embedding totals only for a call whose manifest is stored.
+        progress.workManifest(work.sha256, work.manifest.items.size.toLong, left.size.toLong)
+      }
       // 1. Context text objects and their registry rows (create-once).
-      val texts = docs.foldLeft[Either[StoreError, Unit]](Right(())) { (acc, d) =>
-        acc.flatMap { _ =>
-          for {
-            o <- t.objects.putCreateOnce(d.textRef, Bytes.utf8(d.text), TextContentType)
-            _ = o match {
-              case PutOutcome.Written =>
-                tally.textWritten += 1; progress.sideWrite("text-written")
-              case PutOutcome.AlreadyPresent =>
-                tally.textPresent += 1; progress.sideWrite("text-present")
-            }
-            row <- artifacts.encode(artifactRow(permit, d))
-            r <- t.registry.putIfAbsent(artifacts.table.role, row)
-          } yield progress.sideWrite(
-            if (r == PutOutcome.Written) "registry-written" else "registry-present"
-          )
+      val texts = manifest.flatMap { _ =>
+        docs.foldLeft[Either[StoreError, Unit]](Right(())) { (acc, d) =>
+          acc.flatMap { _ =>
+            for {
+              o <- t.objects.putCreateOnce(d.textRef, Bytes.utf8(d.text), TextContentType)
+              _ = o match {
+                case PutOutcome.Written =>
+                  tally.textWritten += 1; progress.sideWrite("text-written")
+                case PutOutcome.AlreadyPresent =>
+                  tally.textPresent += 1; progress.sideWrite("text-present")
+              }
+              row <- artifacts.encode(artifactRow(permit, d))
+              r <- t.registry.putIfAbsent(artifacts.table.role, row)
+            } yield progress.sideWrite(
+              if (r == PutOutcome.Written) "registry-written" else "registry-present"
+            )
+          }
         }
       }
-      // 2. Vectors found stored by the probe are present (never embedded again, CR-P7-11 m4).
-      def presentOnes(): Unit =
+      // 2. The skip rule: vectors found stored and unchanged by the probe are never embedded again
+      // (CR-P7-11 m4; SE-P8-01 item 2).
+      def skippedOnes(): Unit =
         docs.filter(d => present.contains(d.key)).foreach { d =>
-          tally.present(d.index.name) += 1; progress.present()
+          tally.skipped(d.index.name) += 1; progress.present()
         }
-      // 3. The others, per index in batches: embed one batch, then put it with bounded retries.
+      // 3. This call's slice, per index in batches: embed one batch (bounded retries), then put it
+      // with bounded retries.
       val batches = VectorIndexes.all.flatMap(ix =>
-        docs
-          .filter(d => d.index.name == ix.name && !present.contains(d.key))
-          .grouped(config.batchSize)
-          .toVector
+        slice.filter(_.index.name == ix.name).grouped(config.batchSize).toVector
       )
       val vectors = texts.flatMap { _ =>
-        presentOnes()
+        skippedOnes()
         batches.foldLeft[Either[StoreError, Unit]](Right(())) { (acc, batch) =>
           acc.flatMap { _ =>
             val ix = batch.head.index.name
             tally.embedded += batch.size
-            t.embedder.embed(batch.map(_.text)).flatMap { vs =>
-              if (vs == null || vs.size != batch.size)
-                Left(StoreError.Corrupt("embedder: returned another number of vectors"))
-              else {
-                val out = batch.zip(vs).map((d, v) => checked(permit, d, v, dims(ix), g))
+            tally.embeddedBy(ix) += batch.size
+            progress.embedded(batch.size.toLong)
+            // CR-P8-01 M1: a text the embedder refuses alone is a per-item rejection.
+            def refused(d: Doc, why: String, n: Int): RejectedRecord =
+              reject(
+                permit,
+                d.item,
+                d.key,
+                RejectReason.EmbeddingFailure,
+                s"embedder: $why",
+                n,
+                g,
+                scope
+              )
+            val (resolvedSoFar, embedError) = embedResolved(batch, config, t, tally, progress, 0)
+            embedError match {
+              case Some(e) =>
+                // SE-P8-03 (CR-P8-02 n-A): texts already refused alone before the error (for
+                // example in the sibling half of a split) keep their rejections; onExit records them.
+                tally.rejected ++= resolvedSoFar.collect { case (d, Left((why, n))) =>
+                  ix -> refused(d, why, n)
+                }
+                Left(e)
+              case None =>
+                val out = resolvedSoFar.map {
+                  case (d, Right(v)) => checked(permit, d, v, dims(ix), g, scope)
+                  case (d, Left((why, n))) => Left(refused(d, why, n))
+                }
                 tally.rejected ++= out.collect { case Left(r) => ix -> r }
                 val good = out.collect { case Right(e) => e }
                 val put =
                   if (good.isEmpty) Right(Vector.empty[Attempted])
-                  else putBatch(ix, good, config, t)
+                  else
+                    putBatch(
+                      ix,
+                      good,
+                      config,
+                      t,
+                      n => { tally.putRetries(ix) += n; progress.putRetried(n.toLong) }
+                    )
                 put.flatMap { results =>
                   val conflict = results.collectFirst {
                     case Attempted(_, Left(c: StoreError.Conflict), _) => c
@@ -1053,7 +1335,7 @@ object VectorLoad {
                     case Attempted(_, Right(PutOutcome.Written), _) =>
                       tally.written(ix) += 1; progress.wrote()
                     case Attempted(_, Right(PutOutcome.AlreadyPresent), _) =>
-                      tally.present(ix) += 1; progress.present()
+                      tally.duplicates(ix) += 1; progress.present()
                     case Attempted(_, Left(_: StoreError.Conflict), _) => ()
                     case Attempted(e, Left(err), n) =>
                       val reason =
@@ -1066,25 +1348,160 @@ object VectorLoad {
                         reason,
                         err.message,
                         n,
-                        g
+                        g,
+                        scope
                       )
                   }
                   conflict match {
                     case Some(c) => Left(c) // never an overwrite: the load fails
                     case None if tally.rejected.size > config.maxRejected =>
-                      record().flatMap(_ => Left(bound(tally.rejected.size)))
+                      record(complete = false).flatMap(_ => Left(bound(tally.rejected.size)))
                     case None => Right(())
                   }
                 }
-              }
             }
           }
         }
       }
-      // 4. Rejected records of a finished pass (also an empty set after an earlier generation's).
-      vectors.flatMap(_ => record())
+      // 4. Rejected records of a finished pass (also an empty set after an earlier generation's):
+      // the only COMPLETE set (SE-P8-03).
+      onExit(
+        vectors
+          .flatMap(_ => record(complete = true))
+          .map(_ => if (left.isEmpty) PassEnd.Complete else PassEnd.Staged)
+      )
     }
   }
+
+  /**
+   * SE-P8-01 item 4: one embedding call with the same bounded backoff as puts: a `Transient`
+   * failure is retried (every re-sent text counted in `embedRetries`) up to `retry.maxAttempts`
+   * attempts; then, or on any other error, the error is returned with the attempts made (the
+   * caller, [[embedResolved]], splits a `Permanent` batch and stops the call on anything else).
+   */
+  private def embedBatch(
+      texts: Vector[String],
+      config: VectorLoadConfig,
+      t: VectorLoadTargets,
+      tally: Tally,
+      progress: LoadProgress
+  ): (Either[StoreError, Vector[Vector[Float]]], Int) = {
+    var attempt = 0
+    var out: Option[Either[StoreError, Vector[Vector[Float]]]] = None
+    while (out.isEmpty) {
+      attempt += 1
+      t.embedder.embed(texts) match {
+        case Left(StoreError.Transient(why)) if attempt < config.retry.maxAttempts =>
+          tally.embedRetries += texts.size
+          progress.embedRetried(texts.size.toLong)
+          t.sleeper.sleep(config.retry.delay(attempt, t.jitter))
+        case Left(StoreError.Transient(why)) =>
+          out = Some(
+            Left(
+              StoreError.Transient(
+                s"embedder: a batch of ${texts.size} stayed throttled after $attempt attempts ($why)"
+              )
+            )
+          )
+        case other => out = Some(other)
+      }
+    }
+    (out.get, attempt)
+  }
+
+  /**
+   * CR-P8-01 M1: one batch embedded and resolved PER ITEM, so a text the provider always refuses
+   * cannot wedge the load. [[embedBatch]] first (bounded transient retries). On a `Permanent` batch
+   * error the batch is split in halves and each half is embedded again (recursively, halving),
+   * until the failing texts are embedded alone; a text whose single-item call is still `Permanent`
+   * becomes `Left((final error, attempts))`: a per-item rejection (reason `embedding-failure`, its
+   * attempts are every embedding attempt that included it), counted against `maxRejected`, and the
+   * load goes on. Bound: at most `2 * batchSize - 1` embedding calls per batch (a halving tree of
+   * depth `ceil(log2 batchSize)`), each with at most `retry.maxAttempts` attempts; texts re-sent by
+   * a split are counted in `embedRetries`. Any other error (`Transient` after every attempt,
+   * `Refused`, `Corrupt`, a wrong vector count) stops the call; its rejections so far are recorded.
+   *
+   * SE-P8-03 (CR-P8-02 n-A): the result is the items resolved SO FAR plus the error that stopped
+   * the batch, if any, so a text already refused alone (for example in the first half of a split)
+   * keeps its `embedding-failure` rejection when a later half fails with `Corrupt` or an exhausted
+   * `Transient`: the caller records those rejections before it returns the error.
+   */
+  private def embedResolved(
+      batch: Vector[Doc],
+      config: VectorLoadConfig,
+      t: VectorLoadTargets,
+      tally: Tally,
+      progress: LoadProgress,
+      prior: Int
+  ): (Vector[(Doc, Either[(String, Int), Vector[Float]])], Option[StoreError]) = {
+    val (out, n) = embedBatch(batch.map(_.text), config, t, tally, progress)
+    out match {
+      case Right(vs) =>
+        if (vs == null || vs.size != batch.size)
+          (Vector.empty, Some(StoreError.Corrupt("embedder: returned another number of vectors")))
+        else (batch.zip(vs).map((d, v) => d -> Right(v)), None)
+      case Left(StoreError.Permanent(why)) if batch.size == 1 =>
+        (Vector(batch.head -> Left((why, prior + n))), None)
+      case Left(StoreError.Permanent(_)) =>
+        tally.embedRetries += batch.size
+        progress.embedRetried(batch.size.toLong)
+        val (a, b) = batch.splitAt(batch.size / 2)
+        val (x, xError) = embedResolved(a, config, t, tally, progress, prior + n)
+        if (xError.isDefined) (x, xError)
+        else {
+          val (y, yError) = embedResolved(b, config, t, tally, progress, prior + n)
+          (x ++ y, yError)
+        }
+      case Left(e) => (Vector.empty, Some(e))
+    }
+  }
+
+  /** SE-P8-01 item 3: the work manifest of one call, its bytes, address and SHA-256. */
+  private final case class Work(
+      manifest: EmbeddingWorkManifest,
+      ref: ObjectRef,
+      bytes: Bytes,
+      sha256: String
+  )
+
+  private def workOf(
+      permit: LoadPermit,
+      layout: S3Layout,
+      modelVersion: String,
+      dimension: Int,
+      docs: Vector[Doc]
+  ): Either[StoreError, Work] = {
+    val m = EmbeddingWorkManifest(
+      EmbeddingWorkManifest.SchemaVersion,
+      permit.runId,
+      permit.load.loadId,
+      modelVersion,
+      dimension,
+      docs.map(d =>
+        EmbeddingWorkItem(d.index.name, d.inputId, modelVersion, d.key, d.textSha256, d.textRef.key)
+      )
+    )
+    for {
+      b <- EmbeddingWorkManifest.bytes(m)
+      ref <- layout.embeddingWorkManifest(permit.load.loadId, modelVersion, b.sha256)
+    } yield Work(m, ref, b, b.sha256)
+  }
+
+  /** The ArtifactRegistry row of the work manifest object. */
+  private def workRow(permit: LoadPermit, w: Work): ArtifactRecord =
+    ArtifactRecord(
+      ArtifactRecord.SchemaVersion,
+      permit.runId,
+      Some(permit.load.loadId),
+      Zone.SemanticContext.tag,
+      w.ref.bucket,
+      w.ref.key,
+      w.sha256,
+      w.bytes.size.toLong,
+      EmbeddingWorkManifest.ContentType,
+      None,
+      Some(EmbeddingWorkManifest.SchemaVersion)
+    )
 
   def load(
       permit: LoadPermit,
@@ -1105,33 +1522,51 @@ object VectorLoad {
       Left(StoreError.Refused(s"vector load: the permit is for ${permit.target.tag}"))
     else
       for {
+        started <- Right[StoreError, Long](t.clock.nowMillis())
         _ <- checkEmbedder(config, t.embedder)
         _ <- checkIndexes(config, t.vectors, t.embedder)
-        p <- plan(permit, parquet, layout, config, t.embedder.modelVersion)
+        model = t.embedder.modelVersion
+        p <- plan(permit, parquet, layout, config, model)
+        work <- workOf(permit, layout, model, t.embedder.dimension, p.docs)
         tally = new Tally
         present = mutable.Set.empty[String]
-        run <- LoadLedger.runBulk(permit, t.ledger, t.clock, p.docs, WrittenStores, progress)(
-          probe(permit, config, t, present)
-        )(writeAll(permit, layout, config, t, p.rejected, present, tally, progress))
+        run <- LoadLedger.runScoped(
+          permit,
+          t.ledger,
+          t.clock,
+          p.docs,
+          WrittenStores,
+          progress,
+          Some(model)
+        )(
+          probe(permit, config, t, work, present)
+        )(writeAll(permit, layout, config, t, p.rejected, present, work, tally, progress))
         stored <- measureVectors(config, t, p.docs)
         rows <- measureRegistry(permit, t, p.docs)
       } yield {
         val rejectedNow =
           if (run.skipped) Vector.empty[(String, RejectedRecord)] else tally.rejected.toVector
+        val counts = VectorIndexes.all.map { ix =>
+          VectorIndexCounts(
+            ix.name,
+            p.routed.getOrElse(ix.name, 0),
+            tally.written(ix.name),
+            tally.present(ix.name),
+            rejectedNow.count(_._1 == ix.name),
+            stored.getOrElse(ix.name, 0),
+            work.manifest.items.count(_.index == ix.name),
+            tally.skipped(ix.name),
+            tally.duplicates(ix.name),
+            tally.embeddedBy(ix.name),
+            tally.putRetries(ix.name),
+            tally.remaining(ix.name)
+          )
+        }
         VectorLoadReport(
           permit.runId,
           permit.load.loadId,
           p.rows,
-          VectorIndexes.all.map { ix =>
-            VectorIndexCounts(
-              ix.name,
-              p.routed.getOrElse(ix.name, 0),
-              tally.written(ix.name),
-              tally.present(ix.name),
-              rejectedNow.count(_._1 == ix.name),
-              stored.getOrElse(ix.name, 0)
-            )
-          },
+          counts,
           p.docs.size,
           tally.textWritten,
           tally.textPresent,
@@ -1141,7 +1576,19 @@ object VectorLoad {
           run.alreadyPresent,
           run.finalState,
           run.skipped,
-          tally.embedded
+          tally.embedded,
+          model,
+          t.embedder.dimension,
+          work.ref.key,
+          work.sha256,
+          work.manifest.items.size,
+          counts.map(_.skippedUnchanged).sum,
+          counts.map(_.duplicatesOnPut).sum,
+          counts.map(_.putRetries).sum,
+          tally.embedRetries,
+          counts.map(_.remaining).sum,
+          started,
+          t.clock.nowMillis()
         )
       }
 
