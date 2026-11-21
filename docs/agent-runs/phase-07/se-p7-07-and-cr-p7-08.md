@@ -1,0 +1,38 @@
+# CR-P7-08 (review of SE-P7-06) and SE-P7-07 (WP5 increment 2) — orchestrator-condensed records
+
+Full reports are in the session transcript.
+
+## CR-P7-08 (code-reviewer): VERDICT REQUEST_CHANGES
+- Section 1, custom Snappy decoder (parquet/SnappyRaw.scala): every path traced; no verified defect. Preamble varint ≤5 bytes in a Long, equal to expected and ≤ maxBytes before allocation; literal/copy lengths checked as Long against remaining input/output; offsets 1..produced; overlapping copies byte by byte; termination; trailing bytes and truncation refused; errors typed (OOM only if maxPageBytes configured huge). SNAPPY-only enforced at footer (ParquetRows.scala:154-155) and page level (SnappyOnly :293-300); no snappy-java/aircompressor/zstd-jni/Hadoop imports in storage main.
+- M1 (major): row-count overflow bypasses `maxRowsPerPart` (ParquetFooters.scala:129, ParquetRows.scala:156-194): two row groups of 2^62 wrap the sum; cheap null pages → heap exhaustion.
+- m1: column-chunk extents not checked against part size. m3: hostile SnappyRaw cases untested.
+- Section 2, gate mapping: exhaustive match, pinned test; only verifier marks checks; settings bound by configDigest (AnalysisRunSettings private constructor).
+- M2 (major): neptune opened without `CanonicalGraphValidation.checkTables`/`checkEdges` (internal-consistency checks only); over-merge or consistently inflated counts would load. Human scope decision requested.
+- m2: `SummaryUpstream` trusted as given (bound only by run IDs; empty GraphInput passes checkGraphInput).
+- Nits n1 (page bound tag), n2 (page-level codec refusal unreachable in tests), n3 (UTF-16 vs `Canonical.compareUtf8`).
+- Unverified: parquet-mr 1.13.1 internal allocation (chunk buffers, RLE/bit-packed, dictionary, Thrift limits, negative num_rows); Hadoop Configuration creation; decompress(ByteBuffer) overload use; Scala 3 Mirror for AnalysisRunSettings (core, domain-engineer).
+- Routing: all findings sent to the running SE-P7-07 by the orchestrator (addendum); M2 implemented fail-closed pending the human's decision.
+
+## SE-P7-07 (storage-engineer): WP5 increment 2 + CR-P7-08 addendum
+- STATUS: BLOCKED-ON human (procedural marker review). `sbt check` backgrounded (task bwceatwlq); agent read: `[success] Total time: 352 s (0:05:52.0), completed Nov 20, 2026, 4:24:58 PM`, exit 0; core 621, entityResolution 464, hadoop 85, sparkAnalytics 259, storage 282, tests 145; markTestRun suites=145, passed=1856, skipped=0.
+- Marker as read by the orchestrator: written_at_utc=2026-11-20T22:24:58.614220Z, suites 145, tests_passed 1856, failed/errored/skipped 0, production_sources 155.
+- **Orchestrator procedural deviation (disclosed):** before the human reviewed this marker, the orchestrator made a read-only Bash call (`git ls-files -- modules/spark/src/test/resources/scholarchain/spark/dev-run-01`). It was refused UNATTRIBUTED for `.claude/.last-test-run` and reset the audit baseline before the human review. The human review of the 22:24:58Z marker is still required and is requested.
+
+### Results on real fixtures (production verifier, upstream read by production readers)
+| Store | Performed and passed | Open | Gate |
+|---|---|---|---|
+| neptune-bulk-load | row-contracts, graph-ids, graph-id-parity, evidence-trace, analysis-recompute, canonical-tables | — | OPENS (459 vertices + 799 edges; rerun writes nothing) |
+| dynamodb | parquet-rows, row-contracts, evidence-trace, analysis-recompute | paths-run-chain | refused, zero writes |
+| s3 | parquet-rows, row-contracts, graph-id-parity, evidence-trace, summary-evidence, analysis-recompute, canonical-tables | paths-run-chain | refused, zero writes |
+| s3-vectors | parquet-rows, row-contracts, summary-evidence | — | OPENS (permit for 4 summary-input parts; no vector writer yet, WP6) |
+- Core validators run on real data with no rejection: checkGraphInput, checkSummaryInputs, checkEntitySummaries, checkEdges, checkMetrics, checkComponents, checkBridges, checkCoreness, checkWindows, StructureValidation.checkTemporal, checkPathLengthEstimates, CanonicalGraphValidation.checkTables. No upstream defect found.
+- Not run: checkPaths, checkRunChain (need committed `modules/spark/src/test/resources/scholarchain/spark/dev-run-01/benchmark-pairs-dev.v1.json`, manifest `benchmarkPairsDigest` 2e1ff182…be9) → new check `paths-run-chain` on dynamodb, s3. checkIdentity needs the decision run (not in fixtures, not in scope of any check).
+- Mapping changes: neptune + analysis-recompute, canonical-tables (M2 fail closed); dynamodb, s3 + paths-run-chain; s3 + canonical-tables. New rejection tags upstream-binding, analysis-recompute, canonical-tables, paths-run-chain.
+- Upstream readers (`load/UpstreamRuns.scala`): grouping run verified like an analysis run; curated run with CRC32 sidecars verified per chunk (not cryptographic), `_SUCCESS` + `_counters.json` per stage, EMITTED counts = decoded rows, JDK gzip bounded by `maxInflatedBytes`. `SummaryUpstream` has a `private[load]` constructor, built only by these readers (m2). Finding: sbt's test-resource copy drops hidden `.crc` files, so tests read the curated fixture from the source tree.
+- UpstreamFixtureIntegritySuite: grouping 5 parts vs `_parts.json`, run ID = groupingRunId, 292/90/143/41 rows; curated run ID = inputRunId, 5 stages, no run-level `_SUCCESS`, CRC verified, 11 counter/output pairs equal; settings sha256 pinned, configDigest e37c32b1… equals the manifest. RunSettingsFixture now parses the fixture with core `ConfigLoader.resolve`.
+- DynamoDB design: one analysis-results table (the README's optional ResearcherMetricCache) with typed keys, `AnalysisResultRecord` body = core record JSON + sha256 + provenance; 12 roles (not 11) mapped; GSIs byGroup, byPair, rank; access patterns MC-1..MC-8 (metrics by researcher+window N4, per researcher, pair+window, group members, top-k, window partition, temporal change, evidence ID); no scans, no TTL; largest item 3617 bytes; 400 KB limit UNVERIFIED, configured as `KeyValueLoadLimits.maxItemBytes`.
+- `load/KeyValueLoad.scala`: through LoadGate/LoadPermit and LoadLedger; rows built, de-duplicated, size-checked before writes; putIfAbsent only. In-package mechanics tests: 1302 rows; rerun zero; fresh-ledger 1302 AlreadyPresent; resume 500 then 802 + 500; interleaved loaders; run-2 Conflict zero writes; provenance; N4 lookups; oversize refused.
+- CR-P7-08: M1, M2, m1, m2, m3 (incl. differential test vs parquet-mr's SNAPPY writer, test classpath only), n1, n3 done; n2 partly.
+- CR-P7-07: m1 (NeptuneRowBranchesSuite; wrong-label test), m3 (text only; no NIO non-blocking open), n1, n2, n4, n7 done; n6 partly (`plan` takes a LoadPermit; bulk-load copy under a neptune permit needs a design decision); n3, n5 not done.
+- FILES CREATED: main load/UpstreamRuns, load/KeyValueLoad; tests UpstreamFixtureIntegritySuite, UpstreamChecksSuite, NeptuneRowBranchesSuite, load/KeyValueLoadSuite, parquet/ParquetHostileSuite. MODIFIED: main load/LoadVerification, ParquetChecks, SummaryEvidence, ParquetRecords, NeptuneRows, NeptuneBulkLoad, local/LocalRunSource, model/ItemCodecs, Records, StoreIds, TableKeys, TableSpecs, parquet/ParquetFooters, ParquetRows; tests RunSettingsFixture, RecordChecksSuite, LoadGateSuite, NeptuneRowsSuite, NeptuneBulkLoadSuite, load/GraphLoadSuite, load/ObjectLoadSuite, parquet/ParquetRowsSuite.
+- Risks: upstream checks rely on human-copied fixtures (curated CRC32 only); analysis results share a key space with the old ResearcherMetricRecord codec (collision = Conflict); item size limit unverified; CR-P7-07 m2 (Neptune templates without RETURN) open for the adapter; T1 FIFO residual.

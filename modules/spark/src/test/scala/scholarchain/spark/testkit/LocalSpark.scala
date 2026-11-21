@@ -16,14 +16,39 @@ import scholarchain.core.config.{AnalysisRunSettings, ConfigLoader, ScholarChain
  * `local[2]` in [[PublishedRunComparisonMain]]), UI off, one shuffle partition, driver bound to
  * 127.0.0.1 (loopback listeners only; no outbound network is used), UTC, and every warehouse, local
  * and `hadoop.tmp.dir` directory under `root` (a directory inside `java.io.tmpdir`).
+ *
+ * Compression ([[TestCompression]], SP-P7-01, human decision 2026-11-20, DU-P7-04): every codec
+ * Spark can choose is Snappy, and shuffle, spill and broadcast compression are pinned on, so
+ * compression stays exercised without the LZ4 and Zstandard codecs. Test sessions only: the
+ * production job ([[scholarchain.spark.job.CollaborationJob]]) sets no Spark setting in code.
  */
 object LocalSpark {
+
+  /**
+   * The compression settings of every test session (keys checked against the Spark 3.5.5 config
+   * registry by `TestCompressionSuite`, which also prints the defaults they replace: LZ4 for
+   * `spark.io.compression.codec` and `spark.sql.streaming.stateStore.compression.codec`, Zstandard
+   * for `spark.shuffle.mapStatus.compression.codec` and `spark.eventLog.compression.codec`; the
+   * Parquet codec (default Snappy) and the three `true` flags (defaults `true`) are pinned.
+   */
+  val TestCompression: Vector[(String, String)] = Vector(
+    "spark.io.compression.codec" -> "snappy",
+    "spark.shuffle.mapStatus.compression.codec" -> "snappy",
+    "spark.eventLog.compression.codec" -> "snappy",
+    "spark.sql.streaming.stateStore.compression.codec" -> "snappy",
+    "spark.sql.parquet.compression.codec" -> "snappy",
+    "spark.shuffle.compress" -> "true",
+    "spark.shuffle.spill.compress" -> "true",
+    "spark.broadcast.compress" -> "true"
+  )
 
   def start(appName: String, root: Path, master: String = "local[1]"): SparkSession = {
     require(master.startsWith("local"), s"LocalSpark starts local masters only, not $master")
     Files.createDirectories(root.resolve("local"))
-    val s = SparkSession
-      .builder()
+    val builder = TestCompression.foldLeft(SparkSession.builder()) { case (b, (k, v)) =>
+      b.config(k, v)
+    }
+    val s = builder
       .master(master)
       .appName(appName)
       .config("spark.ui.enabled", "false")

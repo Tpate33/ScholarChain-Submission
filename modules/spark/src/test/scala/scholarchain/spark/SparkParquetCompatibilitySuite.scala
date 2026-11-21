@@ -34,22 +34,8 @@ class SparkParquetCompatibilitySuite extends munit.FunSuite {
 
   override def beforeAll(): Unit = {
     tmp = Files.createTempDirectory("scholarchain-spark-compat-")
-    Files.createDirectories(tmp.resolve("local"))
-    spark = SparkSession
-      .builder()
-      .master("local[1]")
-      .appName("scholarchain-spark-compat")
-      .config("spark.ui.enabled", "false")
-      .config("spark.sql.shuffle.partitions", "1")
-      .config("spark.default.parallelism", "1")
-      .config("spark.sql.warehouse.dir", tmp.resolve("warehouse").toUri.toString)
-      .config("spark.local.dir", tmp.resolve("local").toString)
-      .config("spark.hadoop.hadoop.tmp.dir", tmp.resolve("hadoop").toString)
-      .config("spark.driver.host", "127.0.0.1")
-      .config("spark.driver.bindAddress", "127.0.0.1")
-      .config("spark.sql.session.timeZone", "UTC")
-      .getOrCreate()
-    spark.sparkContext.setLogLevel("WARN")
+    // SP-P7-01: the shared test session (same settings as before, plus LocalSpark.TestCompression).
+    spark = scholarchain.spark.testkit.LocalSpark.start("scholarchain-spark-compat", tmp)
   }
 
   override def afterAll(): Unit =

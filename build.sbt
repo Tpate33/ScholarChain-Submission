@@ -117,6 +117,33 @@ lazy val verifySparkItRunner =
     "Forks the real sparkIT JUnit runner on the SparkIT classpath against compiled fixture " +
       "classes (pass, fail, ignore, assume, exit, mixed); never reads the archive"
   )
+// Dependency scopes on resolved classpaths and packaging (BE-P7-01): see project/DependencyScopes.scala.
+lazy val verifyDependencyScopes =
+  taskKey[Unit](
+    "Checks the resolved classpaths and services packaging: Parquet/Hadoop on storage (and tests " +
+      "Test) only, the AWS SDK modules (one BOM version) on services and never on rag; native " +
+      "codecs off storage Compile/Runtime, rag, services, hadoop Test and the job Runtimes, " +
+      "snappy-java once at the ledger version on the storage, Spark and tests Test classpaths; " +
+      "io.netty (and io.netty.*) at the ledger version and module set; opens every resolved " +
+      "hadoop-client-api/-runtime jar on the storage Compile/Runtime/Test, hadoop Test, " +
+      "sparkAnalytics Test/SparkIT and tests Test classpaths and fails on entry paths containing " +
+      "io/netty/ (root, relocated under any prefix, multi-release), META-INF/maven/io.netty/ or " +
+      "Netty native libraries; does not detect Netty relocated without io/netty/ in its path, " +
+      "nested inside an inner jar, a standalone META-INF/io.netty.versions.properties, corrupt " +
+      "entry data behind a valid central directory, or Hadoop outside the build (EMR, the pinned " +
+      "Spark distribution); prints watched-family, codec and Hadoop client revisions; part of check"
+  )
+lazy val hadoopJobAssemblyCheck =
+  taskKey[Unit](
+    "Checks the hadoop job assembly holds no class under the forbidden prefixes (Spark, Hadoop, " +
+      "Parquet, AWS SDK, logging, Netty, native codecs) and prints its sha256; run by packageJobs"
+  )
+// rag ports-only boundary in source (BE-P7-02, CR-P7-01 F1): see project/RagSourceImports.scala.
+lazy val verifyRagSourceImports =
+  taskKey[Unit](
+    "Scans modules/rag/src for references to the AWS SDK (v1, v2), Parquet, Hadoop and the storage " +
+      "adapter packages scholarchain.storage.aws and scholarchain.storage.parquet; part of check"
+  )
 // EMR Option A packaging and local runtime gate (BE-P6-09): see project/SparkSubmitLocal.scala.
 lazy val sparkJobAssemblyCheck =
   taskKey[Unit](
@@ -175,6 +202,41 @@ val logbackClassic = javaDep("ch.qos.logback", "logback-classic", "logback")
 val typesafeConfig = javaDep("com.typesafe", "config", "typesafe-config")
 val hadoopClientApi = javaDep("org.apache.hadoop", "hadoop-client-api", "hadoop")
 val hadoopClientRuntime = javaDep("org.apache.hadoop", "hadoop-client-runtime", "hadoop")
+val parquetHadoop = javaDep("org.apache.parquet", "parquet-hadoop", "parquet-hadoop")
+val snappyJava =
+  javaDep(DependencyScopes.SnappyOrg, DependencyScopes.SnappyName, "snappy-java")
+// BE-P7-05 (DU-P7-02): native compression codecs kept off storage Compile/Runtime.
+val nativeCodecExclusions = Seq(
+  ExclusionRule(DependencyScopes.AircompressorOrg, DependencyScopes.AircompressorName),
+  ExclusionRule(DependencyScopes.ZstdOrg, DependencyScopes.ZstdName),
+  ExclusionRule(DependencyScopes.SnappyOrg, DependencyScopes.SnappyName)
+)
+// BE-P7-06 (DU-P7-04): decision L1, lz4-java excluded where the Spark test codec is Snappy
+// (SP-P7-01); the flag lives in DependencyScopes so the check enforces the same outcome.
+val lz4Exclusions =
+  if (DependencyScopes.Lz4ExcludedFromSparkTests)
+    Seq(ExclusionRule(DependencyScopes.Lz4Org, DependencyScopes.Lz4Name))
+  else Nil
+// spark-sql on sparkAnalytics (Provided) and tests (Test): aircompressor and zstd-jni (and lz4-java
+// under L1) removed; Spark's own snappy-java stays and is pinned by dependencyOverrides below.
+val sparkCodecExclusions = Seq(
+  ExclusionRule(DependencyScopes.AircompressorOrg, DependencyScopes.AircompressorName),
+  ExclusionRule(DependencyScopes.ZstdOrg, DependencyScopes.ZstdName)
+) ++ lz4Exclusions
+// The Hadoop client and parquet-hadoop on tests Test: every codec (Spark supplies snappy-java).
+val testsCodecExclusions = nativeCodecExclusions ++ lz4Exclusions
+// BE-P7-06 (DU-P7-04): every io.netty module of DependencyScopes.NettySparkModules at the ledger
+// `netty` version. An override only changes the version of a module that is already resolved; it
+// adds nothing and is not published. Classifier jars (native transports) follow their module.
+val nettyOverrides = Def.setting {
+  val netty = versionLedger.value("netty")
+  DependencyScopes.NettySparkModules.map(module => DependencyScopes.NettyOrg % module % netty)
+}
+// AWS SDK for Java v2 service modules, all at the one BOM version (see the ledger).
+val awsSdkModules = Def.setting {
+  val bom = versionLedger.value("aws-sdk-v2.bom")
+  DependencyScopes.AwsModules.map(module => DependencyScopes.AwsOrg % module % bom)
+}
 // Spark publishes no Scala 3 artifacts: use the _2.13 artifacts from Scala 3.
 // Runtime target pending human decision (review F2) before Phase 6: see the ledger.
 val sparkSql = Def.setting {
@@ -323,9 +385,15 @@ lazy val hadoop = project
   .settings(jobAssembly("hadoop-jobs"))
   .settings(
     name := "scholarchain-hadoop",
+    // BE-P7-06 decision H1 (DU-P7-03/-04): snappy-java excluded from the Hadoop client; the hadoop
+    // tests use DefaultCodec/GzipCodec. verifyDependencyScopes fails on any codec on hadoop Test.
     libraryDependencies ++= Seq(
-      hadoopClientApi.value % Provided,
-      hadoopClientRuntime.value % Provided
+      hadoopClientApi.value.excludeAll(
+        ExclusionRule(DependencyScopes.SnappyOrg, DependencyScopes.SnappyName)
+      ) % Provided,
+      hadoopClientRuntime.value.excludeAll(
+        ExclusionRule(DependencyScopes.SnappyOrg, DependencyScopes.SnappyName)
+      ) % Provided
     ),
     Test / javaOptions ++= java17Opens,
     // decisions-15 item 4: Test/runMain already forks (Test / run / fork delegates to
@@ -342,7 +410,11 @@ lazy val sparkAnalytics = project
   .settings(jobAssembly("spark-jobs"))
   .settings(
     name := "scholarchain-spark-analytics",
-    libraryDependencies += sparkSql.value % Provided,
+    // BE-P7-06 (DU-P7-04): codec exclusions and the snappy-java and Netty pins. All are on the
+    // Provided Spark tree only (Test, SparkIT and Compile/dependencyClasspath see them; the job
+    // assembly, built from Runtime, contains none of them; sparkJobAssemblyCheck verifies).
+    libraryDependencies += sparkSql.value.excludeAll(sparkCodecExclusions: _*) % Provided,
+    dependencyOverrides ++= nettyOverrides.value :+ snappyJava.value,
     Test / javaOptions ++= java17Opens,
     // BE-P6-09 (EMR Option A): the job entry point; scala-library is supplied by the runtime (the
     // ledger's spark.runtime.scala-library first on the driver and executor classpath), never by
@@ -389,13 +461,45 @@ lazy val storage = project
   .in(file("modules/storage"))
   .dependsOn(core)
   .settings(commonSettings)
-  .settings(name := "scholarchain-storage")
+  .settings(
+    name := "scholarchain-storage",
+    // BE-P7-01. AWS SDK v2 at Compile: services (dependsOn storage) receives it transitively; rag
+    // excludes it (see rag below; CLAUDE.md: rag uses storage ports only, never concrete clients).
+    // Parquet and Hadoop at Optional: on storage's Compile, Runtime and Test classpaths (sbt's
+    // compile-internal, runtime-internal and test-internal all extend Optional), so a storage
+    // loader runs locally and storage tests read the fixture Parquet; Optional dependencies are
+    // not transitive, so rag, services and the services package do not receive them. Provided
+    // would leave them off storage / Runtime. verifyDependencyScopes (part of check) proves all of
+    // this on the resolved classpaths and the services packaging mappings.
+    // BE-P7-05 (DU-P7-02): snappy-java, aircompressor and zstd-jni are excluded from the
+    // transitive trees of the three Optional dependencies (excludeAll on each dependency, not
+    // excludeDependencies, which would also remove the direct Test snappy-java). Storage main reads
+    // Parquet through its own SnappyRaw decoder; storage tests that write or decode Snappy through
+    // parquet's SnappyCodec get snappy-java at Test only, at the ledger `snappy-java` version.
+    // verifyDependencyScopes checks both on the resolved classpaths.
+    libraryDependencies ++= awsSdkModules.value ++ Seq(
+      parquetHadoop.value.excludeAll(nativeCodecExclusions: _*) % Optional,
+      hadoopClientApi.value.excludeAll(nativeCodecExclusions: _*) % Optional,
+      hadoopClientRuntime.value.excludeAll(nativeCodecExclusions: _*) % Optional,
+      snappyJava.value % Test
+    ),
+    // BE-P7-06 (DU-P7-04): the AWS SDK's netty-nio-client modules at the ledger `netty` version.
+    dependencyOverrides ++= nettyOverrides.value
+  )
 
 lazy val rag = project
   .in(file("modules/rag"))
   .dependsOn(core, storage)
   .settings(commonSettings)
-  .settings(name := "scholarchain-rag")
+  .settings(
+    name := "scholarchain-rag",
+    // BE-P7-01 repair 01: rag sees storage's ports and models, never a concrete AWS client. Every
+    // software.amazon.awssdk artifact (and whatever only it pulls in) is excluded from rag's
+    // resolution in every configuration. services still resolves the SDK through its own direct
+    // dependency on storage. verifyDependencyScopes fails if any SDK jar reaches rag's Compile,
+    // Runtime or Test classpath.
+    excludeDependencies += ExclusionRule(organization = DependencyScopes.AwsOrg)
+  )
 
 lazy val services = project
   .in(file("modules/services"))
@@ -405,6 +509,8 @@ lazy val services = project
   .settings(
     name := "scholarchain-services",
     libraryDependencies ++= Seq(slf4jApi.value, logbackClassic.value % Runtime),
+    // BE-P7-06 (DU-P7-04): services resolves the SDK (and its Netty) itself; same pin as storage.
+    dependencyOverrides ++= nettyOverrides.value,
     // Local container image (`sbt dockerLocal`): pinned JRE, non-root user,
     // percentage-based heap limits. No registry, tag `latest`, or cloud settings.
     dockerBaseImage := versionLedger.value("docker.java-runtime-image"),
@@ -431,7 +537,9 @@ lazy val tests = project
     entityResolution % Test,
     hadoop % Test,
     sparkAnalytics % Test,
-    storage % Test,
+    // BE-P7-06 (SE-P7-13): tests Test also sees storage's Test classes and resources (the fixture
+    // helpers); test scope only, so the CLAUDE.md module graph is unchanged.
+    storage % "test->test",
     rag % Test,
     services % Test
   )
@@ -439,12 +547,17 @@ lazy val tests = project
   .settings(
     name := "scholarchain-tests",
     publish / skip := true,
-    // Provided dependencies are not transitive; cross-module tests need them directly.
+    // Provided and Optional dependencies are not transitive; cross-module tests need them directly.
+    // BE-P7-06: parquet-hadoop for storage's loader (SE-P7-13); codecs excluded from the Hadoop
+    // client and parquet-hadoop, aircompressor/zstd-jni (and lz4-java under L1) from spark-sql;
+    // Spark's snappy-java and every io.netty module pinned to the ledger.
     libraryDependencies ++= Seq(
-      hadoopClientApi.value % Test,
-      hadoopClientRuntime.value % Test,
-      sparkSql.value % Test
+      hadoopClientApi.value.excludeAll(testsCodecExclusions: _*) % Test,
+      hadoopClientRuntime.value.excludeAll(testsCodecExclusions: _*) % Test,
+      parquetHadoop.value.excludeAll(testsCodecExclusions: _*) % Test,
+      sparkSql.value.excludeAll(sparkCodecExclusions: _*) % Test
     ),
+    dependencyOverrides ++= nettyOverrides.value :+ snappyJava.value,
     Test / javaOptions ++= java17Opens
   )
 
@@ -579,6 +692,12 @@ lazy val root = project
       )
       ()
     },
+    // BE-P7-06: the hadoop job assembly carries none of the EMR-supplied or codec/Netty packages.
+    hadoopJobAssemblyCheck := SparkSubmitLocal.checkPrefixesOnly(
+      "hadoopJobAssemblyCheck",
+      (hadoop / assembly).value,
+      streams.value.log
+    ),
     // BE-P6-09: opt-in local runtime gate. Not part of `check`; writes no marker. A dynamic task, so
     // the Java, ledger, code-scope and archive checks run before sbt builds the assembly and the
     // sparkAnalytics Test classpath; they run again before anything is downloaded or forked.
@@ -628,6 +747,92 @@ lazy val root = project
       java17Opens,
       streams.value.log
     ),
+    // BE-P7-01, run by `check` before markTestRun: resolved classpaths (module IDs), the services
+    // Universal and Docker mappings; never the declared libraryDependencies.
+    verifyDependencyScopes := {
+      val log = streams.value.log
+      val ledger = versionLedger.value
+      val aws = ledger("aws-sdk-v2.bom")
+      // Attributed classpaths (BE-P7-06 addendum: the Hadoop client jars are opened from these).
+      val storageCompileCp = (storage / Compile / fullClasspath).value
+      val storageRuntimeCp = (storage / Runtime / fullClasspath).value
+      val storageTestCp = (storage / Test / fullClasspath).value
+      val hadoopTestCp = (hadoop / Test / fullClasspath).value
+      val sparkTestCp = (sparkAnalytics / Test / fullClasspath).value
+      val sparkItCp = (sparkAnalytics / SparkIT / fullClasspath).value
+      val testsTestCp = (tests / Test / fullClasspath).value
+      val in = DependencyScopes.Inputs(
+        DependencyScopes.jars(storageCompileCp),
+        DependencyScopes.jars(storageRuntimeCp),
+        DependencyScopes.jars(storageTestCp),
+        DependencyScopes.jars((rag / Compile / fullClasspath).value),
+        DependencyScopes.jars((rag / Runtime / fullClasspath).value),
+        DependencyScopes.jars((rag / Test / fullClasspath).value),
+        DependencyScopes.jars((services / Runtime / fullClasspath).value),
+        DependencyScopes.mappings((services / Universal / mappings).value),
+        DependencyScopes.mappings((services / Docker / mappings).value),
+        hadoopRuntime = DependencyScopes.jars((hadoop / Runtime / fullClasspath).value),
+        hadoopTest = DependencyScopes.jars(hadoopTestCp),
+        sparkRuntime = DependencyScopes.jars((sparkAnalytics / Runtime / fullClasspath).value),
+        sparkTest = DependencyScopes.jars(sparkTestCp),
+        sparkItTest = DependencyScopes.jars(sparkItCp),
+        testsTest = DependencyScopes.jars(testsTestCp)
+      )
+      val labelled = Seq(
+        "storage-compile" -> in.storageCompile,
+        "storage-runtime" -> in.storageRuntime,
+        "storage-test" -> in.storageTest,
+        "rag-runtime" -> in.ragRuntime,
+        "services-runtime" -> in.servicesRuntime,
+        "hadoop-runtime" -> in.hadoopRuntime,
+        "hadoop-test" -> in.hadoopTest,
+        "spark-runtime" -> in.sparkRuntime,
+        "spark-test" -> in.sparkTest,
+        "sparkit-test" -> in.sparkItTest,
+        "tests-test" -> in.testsTest
+      )
+      // Conflict evidence: what each classpath resolved for the watched families (Jackson,
+      // Guava, Netty, HttpComponents, SLF4J, commons-*), next to the Spark and Hadoop worlds.
+      val revisions = DependencyScopes.familyRevisions(labelled)
+      // Codec coordinates (snappy-java, aircompressor, zstd-jni, lz4-java) per classpath (INFO).
+      val codecLine = DependencyScopes.codecRevisions(labelled)
+      DependencyScopes.run(
+        in,
+        revisions :+ codecLine,
+        DependencyScopes.bomLine(dependencyResolution.value, aws, log),
+        DependencyScopes.Pins(
+          aws,
+          ledger("parquet-hadoop"),
+          ledger("hadoop"),
+          ledger("snappy-java"),
+          ledger("netty")
+        ),
+        // BE-P7-06 addendum (DU-P7-05 option (d)): Hadoop client jar contents, read-only.
+        Seq(
+          "storage-compile" -> storageCompileCp,
+          "storage-runtime" -> storageRuntimeCp,
+          "storage-test" -> storageTestCp,
+          "hadoop-test" -> hadoopTestCp,
+          "spark-test" -> sparkTestCp,
+          "sparkit-test" -> sparkItCp,
+          "tests-test" -> testsTestCp
+        ),
+        target.value / "dependency-scopes-selftest",
+        log
+      )
+    },
+    // BE-P7-02, run by `check` before Test/compile (so a forbidden import is reported even when it
+    // would not compile): a lexical scan of modules/rag/src, and sbt's own rag source roots. Reads
+    // only repository source; the self-test fixture lives under target/rag-source-imports/.
+    verifyRagSourceImports := RagSourceImports.run(
+      (ThisBuild / baseDirectory).value,
+      target.value / "rag-source-imports",
+      (rag / Compile / unmanagedSourceDirectories).value ++
+        (rag / Test / unmanagedSourceDirectories).value,
+      (rag / Compile / unmanagedSources).value ++ (rag / Test / unmanagedSources).value,
+      (rag / Compile / managedSources).value ++ (rag / Test / managedSources).value,
+      streams.value.log
+    ),
     // Synthetic held-out output-route check (decisions-17/19), run by `check`. The probe's task
     // streams are closed when it completes, before the scan reads every sbt target directory.
     heldoutRouteProbe := LocalRuns.routeProbe(
@@ -659,11 +864,13 @@ addCommandAlias("fmt", "; scalafmtSbt ; scalafmtAll")
 lazy val checkSteps = Seq(
   "verifyBuildSources",
   "verifyVersionLedger",
+  "verifyRagSourceImports", // BE-P7-02: rag sources name no SDK, Parquet, Hadoop or storage adapter
   "scalafmtSbtCheck",
   "scalafmtCheckAll",
   SparkItRuns.FormatCheckStep, // CR-P6-16 F2: modules/spark/src/it/scala
   "Test/compile",
   SparkItRuns.CompileCheckStep, // BE-P6-05: compiles modules/spark/src/it/scala; no archive, no run
+  "verifyDependencyScopes", // BE-P7-01: resolved classpaths and services packaging
   "verifyHeldoutOutputRoute",
   "verifyHeldoutGuards",
   "verifyErDevRunGuards",
@@ -675,7 +882,7 @@ lazy val checkSteps = Seq(
 addCommandAlias("check", checkSteps.mkString("; ", " ; ", ""))
 addCommandAlias(
   "packageJobs",
-  "; hadoop/assembly ; sparkAnalytics/assembly ; sparkJobAssemblyCheck"
+  "; hadoop/assembly ; sparkAnalytics/assembly ; sparkJobAssemblyCheck ; hadoopJobAssemblyCheck"
 )
 addCommandAlias("dockerLocal", "; services/Docker/publishLocal")
 // localPipelineDev/Heldout and goldSetEvalDev/Heldout are root tasks, not aliases: see the

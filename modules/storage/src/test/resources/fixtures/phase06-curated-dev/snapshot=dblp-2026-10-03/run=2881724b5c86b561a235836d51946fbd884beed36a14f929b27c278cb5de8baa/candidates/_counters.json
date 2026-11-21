@@ -1,0 +1,42 @@
+{
+  "stage": "candidates",
+  "counters": {
+    "ACCEPTED": 382,
+    "ACCEPTED.researcher": 292,
+    "ACCEPTED.work": 90,
+    "CANDIDATE_PAIRS": 374,
+    "CANDIDATE_PAIRS.researcher": 296,
+    "CANDIDATE_PAIRS.work": 78,
+    "CONFLICT": 0,
+    "DUPLICATE": 0,
+    "EMITTED": 374,
+    "EMITTED.researcher-candidates": 296,
+    "EMITTED.work-candidates": 78,
+    "EMITTED_PAIR": 0,
+    "INPUT": 382,
+    "INPUT.researcher": 292,
+    "INPUT.work": 90,
+    "MISSING_KEY": 0,
+    "OVERSIZE_BLOCK": 0,
+    "OVERSIZE_TEAM": 0,
+    "RECORDS_READ": 96,
+    "RECORDS_READ.profiles": 6,
+    "RECORDS_READ.works": 90,
+    "REJECTED": 0,
+    "SCHEMA_FAILURE": 0
+  },
+  "stats": {
+    "largestBlockPairs": {
+      "value": 6,
+      "id": "block:0e96f799ef078f62474ab1299e5465ec54f3b7da4cd28a377487ef52da8a1151"
+    },
+    "maxBlockKeysPerCandidate.researcher": {
+      "value": 1,
+      "id": "mcand:04b87c8e896ca142500ee22b4dace64109eee68f81825848a5e19eff0e212de6"
+    },
+    "maxBlockKeysPerCandidate.work": {
+      "value": 1,
+      "id": "mcand:014391ac74afceb5aabca2de2ef168e7bdbf43128c8673db8194691f13a78604"
+    }
+  }
+}

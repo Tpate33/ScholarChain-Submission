@@ -1,0 +1,32 @@
+{
+  "stage": "teams",
+  "counters": {
+    "ACCEPTED": 41,
+    "ACCEPTED.dblp": 41,
+    "CONFLICT": 0,
+    "DUPLICATE": 0,
+    "EMITTED": 41,
+    "EMITTED.teams": 41,
+    "EMITTED_PAIR": 182,
+    "INPUT": 90,
+    "INPUT.works": 90,
+    "MISSING_KEY": 0,
+    "OVERSIZE_BLOCK": 0,
+    "OVERSIZE_TEAM": 0,
+    "REJECTED": 0,
+    "SCHEMA_FAILURE": 0,
+    "TEAM_SOURCE_EXCLUDED": 49,
+    "TEAM_SOURCE_EXCLUDED.crossref": 6,
+    "TEAM_SOURCE_EXCLUDED.openalex": 43
+  },
+  "stats": {
+    "maxPairExpansion": {
+      "value": 10,
+      "id": "work:dblp:conf/aaai/YuanBZLD23"
+    },
+    "maxTeamSize": {
+      "value": 5,
+      "id": "work:dblp:conf/aaai/YuanBZLD23"
+    }
+  }
+}

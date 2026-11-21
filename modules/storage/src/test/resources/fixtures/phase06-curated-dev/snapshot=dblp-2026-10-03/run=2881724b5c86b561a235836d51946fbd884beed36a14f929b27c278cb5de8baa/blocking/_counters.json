@@ -1,0 +1,43 @@
+{
+  "stage": "blocking",
+  "counters": {
+    "ACCEPTED": 382,
+    "ACCEPTED.researcher": 292,
+    "ACCEPTED.work": 90,
+    "BLOCK_EMITTED": 144,
+    "BLOCK_EMITTED.researcher.level-0": 108,
+    "BLOCK_EMITTED.work.level-0": 36,
+    "CONFLICT": 0,
+    "DUPLICATE": 0,
+    "EMITTED_PAIR": 0,
+    "INPUT": 382,
+    "INPUT.researcher": 292,
+    "INPUT.work": 90,
+    "MISSING_KEY": 0,
+    "OVERSIZE_BLOCK": 0,
+    "OVERSIZE_TEAM": 0,
+    "RECORDS_READ": 96,
+    "RECORDS_READ.profiles": 6,
+    "RECORDS_READ.works": 90,
+    "REJECTED": 0,
+    "SCHEMA_FAILURE": 0
+  },
+  "stats": {
+    "largestBlock.researcher": {
+      "value": 4,
+      "id": "researcher:0:alemparte|m"
+    },
+    "largestBlock.work": {
+      "value": 4,
+      "id": "work:0:empirical_distribution"
+    },
+    "largestGroup.researcher": {
+      "value": 4,
+      "id": "researcher:0:alemparte|m"
+    },
+    "largestGroup.work": {
+      "value": 4,
+      "id": "work:0:empirical_distribution"
+    }
+  }
+}

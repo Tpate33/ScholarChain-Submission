@@ -1,0 +1,58 @@
+{
+  "stage": "exact-ids",
+  "counters": {
+    "ACCEPTED": 96,
+    "ACCEPTED.crossref": 6,
+    "ACCEPTED.dblp": 41,
+    "ACCEPTED.openalex": 49,
+    "CONFLICT": 0,
+    "DUPLICATE": 0,
+    "EMITTED": 496,
+    "EMITTED.links": 496,
+    "EMITTED_PAIR": 0,
+    "EXACT_ID_CROSS_SOURCE": 82,
+    "EXACT_ID_CROSS_SOURCE.doi": 43,
+    "EXACT_ID_CROSS_SOURCE.orcid": 39,
+    "EXACT_ID_KEY": 347,
+    "EXACT_ID_KEY.dblp-key": 41,
+    "EXACT_ID_KEY.doi": 45,
+    "EXACT_ID_KEY.mag": 28,
+    "EXACT_ID_KEY.openalex-author": 101,
+    "EXACT_ID_KEY.openalex-work": 43,
+    "EXACT_ID_KEY.orcid": 89,
+    "INPUT": 96,
+    "INPUT.profiles": 6,
+    "INPUT.works": 90,
+    "MISSING_KEY": 0,
+    "OVERSIZE_BLOCK": 0,
+    "OVERSIZE_TEAM": 0,
+    "REJECTED": 0,
+    "SCHEMA_FAILURE": 0
+  },
+  "stats": {
+    "largestGroup.dblp-key": {
+      "value": 1,
+      "id": "dblp-key:conf/aaai/YuanBZLD23"
+    },
+    "largestGroup.doi": {
+      "value": 3,
+      "id": "doi:10.1109/tkde.2020.3027950"
+    },
+    "largestGroup.mag": {
+      "value": 1,
+      "id": "mag:1965059293"
+    },
+    "largestGroup.openalex-author": {
+      "value": 2,
+      "id": "openalex-author:A5002080975"
+    },
+    "largestGroup.openalex-work": {
+      "value": 1,
+      "id": "openalex-work:W1965059293"
+    },
+    "largestGroup.orcid": {
+      "value": 4,
+      "id": "orcid:0000-0001-5952-232X"
+    }
+  }
+}

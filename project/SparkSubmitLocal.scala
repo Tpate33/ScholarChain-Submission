@@ -178,8 +178,42 @@ object SparkSubmitLocal {
     "software/amazon/awssdk/",
     "org/apache/logging/log4j/",
     "org/apache/log4j/",
-    "org/slf4j/"
+    "org/slf4j/",
+    // BE-P7-06 (DU-P7-04): Netty and the native/compression codecs (Provided through Spark only).
+    "io/netty/",
+    "org/xerial/snappy/",
+    "com/github/luben/",
+    "io/airlift/compress/",
+    "net/jpountz/"
   )
+
+  /** Problems: entries of `names` under any of [[ForbiddenPrefixes]]. */
+  def forbiddenEntryProblems(names: Seq[String]): Seq[String] =
+    ForbiddenPrefixes.flatMap { f =>
+      val hits = names.filter(_.startsWith(f))
+      if (hits.isEmpty) Nil
+      else
+        Seq(
+          s"${hits.size} entr(y/ies) under $f (supplied by EMR or the distribution), first ${hits.head}"
+        )
+    }
+
+  /** The hadoop job assembly (BE-P7-06): prefix check only; refuses, or logs and returns. */
+  def checkPrefixesOnly(task: String, jar: File, log: Logger): Unit = {
+    val names = Try(jarEntries(jar).map(_.getName)).getOrElse(
+      throw new MessageOnlyException(s"$task: refused: cannot read ${jar.getName}")
+    )
+    if (names.isEmpty) throw new MessageOnlyException(s"$task: refused: ${jar.getName} is empty")
+    val problems = forbiddenEntryProblems(names)
+    if (problems.nonEmpty)
+      throw new MessageOnlyException(s"$task: refused: ${jar.getName}: ${problems.mkString("; ")}")
+    log.info(
+      s"$task: PASS: ${jar.getName}: ${names.size} entries, none under ${ForbiddenPrefixes.mkString(", ")}"
+    )
+    log.info(
+      s"$task: ${jar.getAbsolutePath} bytes=${jar.length} sha256=${digestFile(jar.toPath, "SHA-256")}"
+    )
+  }
 
   private val Hex40 = "^[0-9a-f]{40}$".r
   private val Hex64 = "^[0-9a-f]{64}$".r
@@ -843,11 +877,7 @@ object SparkSubmitLocal {
       finally j.close()
     }.getOrElse("")
     if (manifestMain != main) p += s"Main-Class is '$manifestMain', expected $main"
-    ForbiddenPrefixes.foreach { f =>
-      val hits = names.filter(_.startsWith(f))
-      if (hits.nonEmpty)
-        p += s"${hits.size} entr(y/ies) under $f (supplied by EMR or the distribution), first ${hits.head}"
-    }
+    p ++= forbiddenEntryProblems(names)
     val classes = names.filter(_.endsWith(".class"))
     val fromLibrary = classes.filter(scalaLibrary.contains)
     if (fromLibrary.nonEmpty)
@@ -2511,6 +2541,27 @@ object SparkSubmitLocal {
         Some(JobMainClass),
         Seq("scala/Other.class"),
         "not from scala3-library_3"
+      )
+      // BE-P7-06: Netty and codec classes.
+      Seq(
+        "netty.jar" -> "io/netty/buffer/ByteBuf.class",
+        "snappy.jar" -> "org/xerial/snappy/Snappy.class",
+        "zstd.jar" -> "com/github/luben/zstd/Zstd.class",
+        "aircompressor.jar" -> "io/airlift/compress/snappy/SnappyCompressor.class",
+        "lz4.jar" -> "net/jpountz/lz4/LZ4Factory.class"
+      ).foreach { case (n, e) =>
+        bad(n, Some(JobMainClass), Seq(e), e.split('/').take(2).mkString("/") + "/")
+      }
+      expect(
+        "hadoop assembly prefix check refuses a Netty class",
+        forbiddenEntryProblems(Seq("a/B.class", "io/netty/X.class"))
+          .exists(_.contains("io/netty/")),
+        ""
+      )
+      expect(
+        "hadoop assembly prefix check passes a clean jar",
+        forbiddenEntryProblems(Seq("scholarchain/hadoop/A.class", "scala/Predef.class")).isEmpty,
+        ""
       )
       bad("nomain.jar", None, Seq("scholarchain/A.class"), "Main-Class")
       bad("wrongmain.jar", Some("x.Y"), Seq("scholarchain/A.class"), "Main-Class")
