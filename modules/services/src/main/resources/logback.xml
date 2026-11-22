@@ -1,0 +1,18 @@
+<!--
+  Production logging of the services runtime (SE-P10-01; closes BE-P10-01 risk 1: without a
+  configuration logback logs every logger at DEBUG). Root WARN; ScholarChain's own loggers at INFO
+  (the access log). The access log records IDs, the route template, status, duration, client ID
+  and error code only: never headers, keys, bodies, question text or researcher names.
+  Forked Test JVMs use the build-owned configuration instead (project/test-logging/, BE-P10-01).
+-->
+<configuration>
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{ISO8601} %-5level %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+  <logger name="scholarchain" level="INFO"/>
+  <root level="WARN">
+    <appender-ref ref="STDOUT"/>
+  </root>
+</configuration>

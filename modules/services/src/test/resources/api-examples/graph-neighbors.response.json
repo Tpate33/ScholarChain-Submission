@@ -1,0 +1,20 @@
+{
+  "nodeId": "<string>",
+  "edgeType": "coauthored-with",
+  "depth": 1,
+  "window": "2018-2022",
+  "items": [
+    {
+      "nodeId": "<string>",
+      "edgeType": "coauthored-with",
+      "hop": 1,
+      "properties": {
+        "jointPublicationCount": 2,
+        "firstCollaborationYear": 2019,
+        "lastCollaborationYear": 2021,
+        "sourceEvidence": "<string>"
+      }
+    }
+  ],
+  "page": {"limit": 1, "cursor": null, "nextCursor": "<string>"}
+}

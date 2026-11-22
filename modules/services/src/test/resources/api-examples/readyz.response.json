@@ -1,0 +1,13 @@
+{
+  "status": "ready",
+  "checks": {
+    "accepting-requests": "ok",
+    "credential-source": "ok",
+    "executors": "ok",
+    "workflow-workers": "ok",
+    "job-workers": "ok",
+    "circuit-workflow": "ok",
+    "circuit-key-value": "ok",
+    "circuit-graph": "ok"
+  }
+}

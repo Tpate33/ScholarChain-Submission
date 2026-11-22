@@ -1,0 +1,18 @@
+{
+  "queryId": "<string>",
+  "status": "abstained",
+  "abstention": {
+    "reason": "identity-unresolved",
+    "gaps": [],
+    "names": [
+      {
+        "ordinal": 0,
+        "reason": "multiple-candidates",
+        "candidateIds": ["<string>", "<string>"],
+        "truncated": false
+      }
+    ]
+  },
+  "auditPersisted": true,
+  "links": {"explain": "<string>"}
+}

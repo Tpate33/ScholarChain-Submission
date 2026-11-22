@@ -1,0 +1,9 @@
+{
+  "error": {
+    "code": "unsupported-constraint",
+    "message": "unsupported query constraint(s): maxPathHops",
+    "requestId": "<string>",
+    "traceId": "<string>",
+    "constraints": ["maxPathHops"]
+  }
+}

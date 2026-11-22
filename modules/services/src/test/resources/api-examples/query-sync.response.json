@@ -1,0 +1,26 @@
+{
+  "queryId": "<string>",
+  "status": "answered",
+  "answer": {
+    "schemaVersion": "scholarchain.answer-response.v1",
+    "responseId": "<string>",
+    "queryId": "<string>",
+    "window": {"startYear": 2018, "endYear": 2022},
+    "answerText": "<string>",
+    "claims": "<array>",
+    "evidenceBundle": "<object>",
+    "provenance": "<object>"
+  },
+  "verification": {
+    "overall": "VERIFIED",
+    "counts": {
+      "CONFLICTING": "<number>",
+      "PARTIALLY_SUPPORTED": "<number>",
+      "UNSUPPORTED": "<number>",
+      "VERIFIED": "<number>"
+    }
+  },
+  "nonProductionModel": true,
+  "auditPersisted": true,
+  "links": {"explain": "<string>", "evidence": "<array>"}
+}

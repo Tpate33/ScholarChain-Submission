@@ -1,0 +1,33 @@
+{
+  "queryId": "<string>",
+  "outcome": "answered",
+  "reason": null,
+  "plan": {"planVersion": "scholarchain.rag.query-planner.v1", "window": "2018-2022", "steps": "<array>"},
+  "planVersion": "scholarchain.rag.query-planner.v1",
+  "planSha256": "<string>",
+  "stagesExecuted": "<array>",
+  "stepsTruncated": false,
+  "promptVersions": {
+    "answerSynthesis": "scholarchain.rag.prompt.answer-synthesis.v3",
+    "outputSchema": "scholarchain.rag.answer-synthesis-output.v3"
+  },
+  "modelVersions": {"answerModel": "<string>", "nonProductionModel": true},
+  "evidenceIds": "<array>",
+  "bundleId": "<string>",
+  "metricVersions": "<array>",
+  "graphRunId": "<string>",
+  "executedTemplates": "<array>",
+  "scoreComponents": "<array>",
+  "counters": {
+    "latencyMillis": "<number>",
+    "synthesisAttempts": 1,
+    "inputTokens": null,
+    "outputTokens": null,
+    "abstainedNames": 0,
+    "droppedMissingEvidence": 0,
+    "evidenceItems": "<number>"
+  },
+  "verification": {"overall": "VERIFIED", "counts": "<object>"},
+  "auditSha256": "<string>",
+  "notice": "the audit stores no hidden reasoning, question text or researcher names"
+}

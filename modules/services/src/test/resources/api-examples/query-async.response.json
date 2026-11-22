@@ -1,0 +1,11 @@
+{
+  "jobId": "<string>",
+  "queryId": "<string>",
+  "state": "queued",
+  "stage": "queued",
+  "createdAt": "<string>",
+  "startedAt": null,
+  "finishedAt": null,
+  "error": null,
+  "links": {"self": "<string>", "result": "<string>"}
+}

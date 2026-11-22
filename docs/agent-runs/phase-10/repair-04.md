@@ -1,0 +1,23 @@
+# Phase 10 repair 04 (SE-P10-05, service-engineer) for CR-P10-05
+
+Records state only; approves nothing. Condensed from the agent's final report. STATUS: BLOCKED-ON human, solely for the R1-b test-marker attribution (backgrounded `sbt check`); the work is complete and `sbt check` passed.
+
+Human decisions applied: accept F1 and F2 as recorded residuals with corrected docstrings; fix F3 and F4 now.
+
+## Findings and results
+- F1, F2 (accepted residuals; documentation only, no behaviour change): EvidenceService docstring in ReadServices.scala rewritten; false "never a leak" wording removed; occurrencesTruncated comment corrected. F1: scan window cut before the ownership filter, so foreign co-citations can push the caller's own occurrence out and reveal a rough count and timing. F2: evidence rows are written per query and IDs are computable from public inputs, so 404 -> 200 reveals the first citation by any query and roughly when. Deferred fix named: owner-keyed evidence index and/or published-run evidence table (storage-engineer, possibly rag-engineer and domain-engineer).
+- U-c (recorded in the same docstring): evidenceScanLimit not checked against the adapter's maxQueryLimit; a larger value makes the adapter refuse (500). Deployment config for domain-engineer (contract) and infra-engineer (value).
+- F3 (fixed, Resilience.scala): the unproven-trial mark is a timestamp expiring one breakerOpenMillis period after notStarted(), with no traffic needed; the breaker then returns to ordinary half-open (ready; next call is the trial). A real success or failure clears it at once. Tests (RepairP10dSuite, TestClock): (a) unit: not ready at period - 1 ms, ready at the period, next allow() is the trial; (b) workflow breaker: pinned worker -> 504 opens circuit; trial cannot start -> 503 overloaded; pinned call released, workflow-workers recovers, /readyz stays 503 on circuit-workflow; one period later with no traffic /readyz 200; next query succeeds and closes the circuit; (c) same for the key-value breaker (one key-value worker, interrupt-ignoring ownership lookup). m3 test title in RepairP10cSuite renamed.
+- F4 (fixed): ServiceRuntime builds two read policies over one shared key-value pool and breaker: store reads through `access`, ownership calls through StoreAccess.concurrent. QueryService, EvidenceService and ExplainService use the ownership policy for record, ownedBy and owner (timeouts, retries, errors still apply). QueryOwnership contract requires concurrency safety (InMemoryQueryOwnership synchronized). N5 notes in Support.scala and QueryWorkflow.of updated (only store reads remain behind the lock). Test (All composition): first workflow holds the serialized lock 800 ms (read timeout 100 ms, 2 attempts, threshold 1); the second client's sync query gets 200 (not 504); the first also 200; key-value circuit stays closed; /readyz 200; each client can explain its own query.
+- U-b (checked: yes, fixed): ownership had been recorded before the breaker, pool and job-queue checks, so refused floods could evict older owners. Now recorded only inside the admitted workflow call (after breaker allow and pool claim), shared by sync and async. A failed record still means no workflow runs; neutral for the workflow breaker; error returned with Idempotency-Key released; m2 policy test still passes. Residual: admitted floods can still evict owners (bounded by queryOwnershipCapacity); a forgotten query fails closed. Test: capacity 2; q1; one admitted failure; circuit opens; five submissions refused 503 circuit-open; q1's explain still 200.
+
+## Files
+Created: test/.../RepairP10dSuite.scala. Modified: main Resilience, ServiceRuntime, ReadServices, QueryService, Stores, Support; test RepairP10cSuite (title only).
+
+## Commands and rerun evidence
+`git diff --stat`; `git ls-files --others --exclude-standard -- modules/services`; `sbt services/test` 97/97; `sbt check` (bv1udyol6) exit 0 — see test-report.md CURRENT. Inside check: scalafmt, build-source, version-ledger, rag-import, dependency-scope and test-logging checks passed, then markTestRun.
+
+## Agent-stated assumptions and risks
+Assumptions: F3 expiry period = breakerOpenMillis; ownership and store reads share one key-value breaker (same dependency class); recording ownership on the workflow thread counts toward the sync/async timeout, bounded by readRequestTimeoutMillis. Risks: F1, F2 accepted side channels; U-c; N5 lock residual for store reads; owners evictable by admitted floods; U2, U-1..U-3.
+
+Next gate: human marker review (done by orchestrator verification against the run output), code-reviewer CR-P10-06.

@@ -1,0 +1,10 @@
+{
+  "error": {
+    "code": "unsupported-query",
+    "message": "the question asks for no supported collaboration analysis",
+    "requestId": "<string>",
+    "traceId": "<string>",
+    "reason": "no-allowlisted-operation",
+    "queryId": "<string>"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "nodeId": "<string>",
+  "label": "Researcher",
+  "properties": {
+    "anchorNamespace": "dblp-pid",
+    "identityStatus": "resolved",
+    "memberCount": 2
+  }
+}

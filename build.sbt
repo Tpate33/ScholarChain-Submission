@@ -161,6 +161,17 @@ lazy val verifySparkSubmitLocalGuards =
     "Tests the sparkSubmitLocal pins, tar reader, cache, assembly, command and verdict rules on " +
       "constants and temporary directories; no network, no fork"
   )
+// Bounded test logging (BE-P10-01): see project/TestLogging.scala.
+lazy val testLoggingInputs =
+  taskKey[TestLogging.ProjectInputs](
+    "This project's SLF4J providers, Test javaOptions and resource directories"
+  )
+lazy val verifyTestLogging =
+  taskKey[Unit](
+    "Checks that forked Test JVMs log at WARN or less verbose: SLF4J provider selection and " +
+      "configuration per project, the build-owned configurations, and a probe on the tests and " +
+      "services Test classpaths (with counter-probe); part of check"
+  )
 
 // SparkIT: the integration-test configuration of sparkAnalytics. It extends Test (test classes and
 // munit/JUnit are on its classpath) and has its own source directory modules/spark/src/it/.
@@ -306,8 +317,28 @@ lazy val commonSettings = Seq(
     (Test / executeTests).value,
     (Compile / sources).value.size,
     (Test / sources).value.size
+  ),
+  testLoggingInputs := TestLogging.ProjectInputs(
+    thisProject.value.id,
+    (Test / sources).value.size,
+    TestLogging.providersOn((Test / fullClasspath).value),
+    (Test / javaOptions).value,
+    (Test / resourceDirectories).value,
+    (Compile / resourceDirectories).value
   )
 )
+
+// BE-P10-01: bounded logging in a forked Test JVM (project/TestLogging.scala). Selects the SLF4J
+// provider when `forceProvider` (two are on the classpath) and points the backend at the
+// build-owned WARN configuration under project/test-logging/, unless the project's Test resources
+// hold the owner's own logback-test.xml / log4j2-test.* (which then applies).
+def boundedTestLogging(backend: TestLogging.Backend, forceProvider: Boolean) =
+  Test / javaOptions ++= TestLogging.javaOptions(
+    backend,
+    (ThisBuild / baseDirectory).value,
+    forceProvider,
+    (Test / resourceDirectories).value
+  )
 
 // Fat job jars for EMR: Provided (EMR-supplied Hadoop/Spark) jars are excluded.
 def jobAssembly(jarBase: String) = Seq(
@@ -516,6 +547,8 @@ lazy val services = project
     dockerBaseImage := versionLedger.value("docker.java-runtime-image"),
     dockerUpdateLatest := false,
     dockerRepository := None,
+    // BE-P10-01: logback (Runtime) is on the Test classpath with no configuration; WARN in tests.
+    boundedTestLogging(TestLogging.Logback, forceProvider = false),
     Docker / packageName := "scholarchain-services",
     Docker / daemonUser := "scholarchain",
     Docker / daemonUserUid := Some("10001"),
@@ -558,7 +591,11 @@ lazy val tests = project
       sparkSql.value.excludeAll(sparkCodecExclusions: _*) % Test
     ),
     dependencyOverrides ++= nettyOverrides.value :+ snappyJava.value,
-    Test / javaOptions ++= java17Opens
+    Test / javaOptions ++= java17Opens,
+    // BE-P10-01: logback-classic (through services) and log4j-slf4j2-impl (through Spark) are both
+    // on this Test classpath; logback bound first and, unconfigured, logged everything at DEBUG.
+    // Select the log4j2 provider (the one Spark expects) and its build WARN configuration.
+    boundedTestLogging(TestLogging.Log4j2, forceProvider = true)
   )
 
 lazy val root = project
@@ -821,6 +858,31 @@ lazy val root = project
         log
       )
     },
+    // BE-P10-01, run by `check` before markTestRun: static rules on every project, the build-owned
+    // configurations, and probes forked on the tests and services Test classpaths and javaOptions
+    // (files only under target/test-logging-probe/; no network call, no AWS call).
+    verifyTestLogging := TestLogging.run(
+      (ThisBuild / baseDirectory).value,
+      testLoggingInputs.all(ScopeFilter(inAnyProject)).value,
+      Seq(
+        TestLogging.ProbeTarget(
+          "tests",
+          (tests / Test / fullClasspath).value.map(_.data),
+          (tests / Test / javaOptions).value,
+          TestLogging.Log4j2
+        ),
+        TestLogging.ProbeTarget(
+          "services",
+          (services / Test / fullClasspath).value.map(_.data),
+          (services / Test / javaOptions).value,
+          TestLogging.Logback
+        )
+      ),
+      javaHome.value,
+      awsIsolationEnv(target.value / "no-aws"),
+      target.value / "test-logging-probe",
+      streams.value.log
+    ),
     // BE-P7-02, run by `check` before Test/compile (so a forbidden import is reported even when it
     // would not compile): a lexical scan of modules/rag/src, and sbt's own rag source roots. Reads
     // only repository source; the self-test fixture lives under target/rag-source-imports/.
@@ -871,6 +933,7 @@ lazy val checkSteps = Seq(
   "Test/compile",
   SparkItRuns.CompileCheckStep, // BE-P6-05: compiles modules/spark/src/it/scala; no archive, no run
   "verifyDependencyScopes", // BE-P7-01: resolved classpaths and services packaging
+  "verifyTestLogging", // BE-P10-01: forked Test JVMs log at WARN or less verbose
   "verifyHeldoutOutputRoute",
   "verifyHeldoutGuards",
   "verifyErDevRunGuards",
