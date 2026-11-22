@@ -182,12 +182,19 @@ object TableKeys {
       if (ordinal < 0 || ordinal > 9999)
         Left(StoreError.Refused(s"ordinal: $ordinal is outside 0..9999"))
       else partition(queryId).map(PrimaryKey(_, f"step#$ordinal%04d"))
+
+    /** SE-P9-02 (QS-3): the one audit row of a query; never under the `step#` prefix of QS-2. */
+    def audit(queryId: String): Either[StoreError, PrimaryKey] =
+      partition(queryId).map(PrimaryKey(_, "audit"))
   }
 
   // ------------------------------------------------------------------ EntityLinkCache
   object EntityLinkCache {
 
-    /** The surface form arrives hashed: storage never normalizes or stores names here. */
+    /**
+     * The surface form arrives hashed: no name is stored here. The loader computes the hash with
+     * [[EntityLinkSurfaceForm]] (SE-P9-01), the runtime with the same versioned rules.
+     */
     def partition(surfaceSha256: String): Either[StoreError, String] =
       StoreIds.hex64(surfaceSha256, "surfaceSha256").map("surface#" + _)
 

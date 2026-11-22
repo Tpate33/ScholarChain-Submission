@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "scholarchain.rag.benchmark-set.v1",
+  "title": "ScholarChain benchmark-query set (RE-P9-02)",
+  "description": "A committed, versioned set of benchmark questions with expected outcomes, run by scholarchain.rag.benchmark.BenchmarkRunner. Strings may name store-world aliases as {alias}. Categories: graph (deterministic graph and metric retrieval) and semantic (vector retrieval); the runner reports the two families separately. Pinned to BenchmarkSet by BenchmarkSuite.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "setVersion", "description", "cases"],
+  "properties": {
+    "schemaVersion": { "const": "scholarchain.rag.benchmark-set.v1" },
+    "setVersion": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "category", "question", "expect"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "category": { "enum": ["graph", "semantic"] },
+          "question": { "type": "string", "minLength": 1 },
+          "expect": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "outcome",
+              "reason",
+              "operations",
+              "resolved",
+              "candidates",
+              "verifiedFacts",
+              "allowedVerdicts",
+              "minVerified",
+              "forbiddenText",
+              "semanticIndex",
+              "semanticTopSubject"
+            ],
+            "properties": {
+              "outcome": { "enum": ["answered", "abstained", "refused"] },
+              "reason": { "type": ["string", "null"] },
+              "operations": { "type": "array", "items": { "type": "string" } },
+              "resolved": { "type": "array", "items": { "type": "string" } },
+              "candidates": { "type": "array", "items": { "type": "string" } },
+              "verifiedFacts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["subject", "field", "value"],
+                  "properties": {
+                    "subject": { "type": "string" },
+                    "field": { "type": "string" },
+                    "value": { "type": "string" }
+                  }
+                }
+              },
+              "allowedVerdicts": {
+                "type": "array",
+                "items": { "enum": ["VERIFIED", "PARTIALLY_SUPPORTED", "UNSUPPORTED", "CONFLICTING"] }
+              },
+              "minVerified": { "type": "integer", "minimum": 0 },
+              "forbiddenText": { "type": "array", "items": { "type": "string" } },
+              "semanticIndex": { "type": ["string", "null"] },
+              "semanticTopSubject": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    }
+  }
+}

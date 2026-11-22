@@ -93,6 +93,22 @@ object OpeningFixture {
     vectorConfig()
   )
 
+  /**
+   * SE-P9-01: test entity-link configuration (test values, not AWS limits): an absolute expiry
+   * after the [[World]] clock (1.7e9 s), room for the fixture's 157 links, at most 8 mention IDs
+   * listed per link.
+   */
+  val entityLinkConfig: EntityLinkLoadConfig =
+    EntityLinkLoadConfig.of(1_900_000_000L, 10000, 8).toOption.get
+
+  /**
+   * SE-P9-01: [[config]] with the entity-link load enabled: the local corpus with EntityLinkCache
+   * rows from the fixture's entity-resolution outputs (its dynamodb outcome and RunLedger then hold
+   * the extra `entity-link-*` counts and one more load row; [[config]] itself is unchanged).
+   */
+  lazy val configWithEntityLinks: OpeningLoadConfig =
+    config.copy(entityLinks = Some(entityLinkConfig))
+
   /** The five indexes as Terraform would create them (every non-filterable key declared). */
   def indexInfos(
       dimension: Int = Dimension

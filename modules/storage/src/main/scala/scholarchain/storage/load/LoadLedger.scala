@@ -108,6 +108,26 @@ enum PassEnd {
 final case class WriteAttempt(generation: Long, embeddingModel: Option[String] = None)
 
 /**
+ * SE-P9-01: what one RunLedger load row describes: the run, its `_parts.json` SHA-256, the load ID,
+ * the target store and the row's item count. A [[LoadPermit]] gives the subject of a manifest load
+ * ([[LedgerSubject.of]]); a load derived from a verified run (the entity-link load,
+ * [[EntityLinkLoad]]) names its own deterministic load ID under the permit's run and store, so it
+ * gets its own row, state machine and generations under the same protocol.
+ */
+private[load] final case class LedgerSubject(
+    runId: String,
+    partManifestSha256: String,
+    loadId: String,
+    target: TargetStore,
+    itemCount: Int
+)
+
+private[load] object LedgerSubject {
+  def of(p: LoadPermit): LedgerSubject =
+    LedgerSubject(p.runId, p.partManifestSha256, p.load.loadId, p.target, p.items.size)
+}
+
+/**
  * The RunLedger protocol every loader follows (SE-P7-05 B4, generalized in SE-P7-06 item 7; risk
  * T2, checklist L2), for any target store:
  *
@@ -234,6 +254,24 @@ private[load] object LoadLedger {
   )(
       writeAll: (WriteAttempt, Vector[E]) => Either[StoreError, PassEnd]
   ): Either[StoreError, LedgerRun] =
+    runSubject(LedgerSubject.of(permit), ledger, clock, elements, stores, progress, embeddingModel)(
+      probeAll
+    )(writeAll)
+
+  /** [[runScoped]] for any [[LedgerSubject]] (SE-P9-01: a derived load's own row). */
+  def runSubject[E](
+      permit: LedgerSubject,
+      ledger: KeyValueStore,
+      clock: Clock,
+      elements: Vector[E],
+      stores: Vector[TargetStore],
+      progress: LoadProgress,
+      embeddingModel: Option[String]
+  )(
+      probeAll: Vector[E] => Either[StoreError, Unit]
+  )(
+      writeAll: (WriteAttempt, Vector[E]) => Either[StoreError, PassEnd]
+  ): Either[StoreError, LedgerRun] =
     for {
       _ <- refuseUnscopedRow(permit, ledger, embeddingModel)
       _ <- claimOwners(permit, ledger, stores)
@@ -256,21 +294,21 @@ private[load] object LoadLedger {
    * store instance (human decision 2026-11-20) makes that a misconfiguration.
    */
   private def refuseUnscopedRow(
-      permit: LoadPermit,
+      permit: LedgerSubject,
       ledger: KeyValueStore,
       embeddingModel: Option[String]
   ): Either[StoreError, Unit] =
     if (embeddingModel == null || embeddingModel.isEmpty) Right(())
     else
       for {
-        key <- TableKeys.RunLedger.load(permit.runId, permit.load.loadId, None)
+        key <- TableKeys.RunLedger.load(permit.runId, permit.loadId, None)
         row <- ledger.get(entries.table.role, key)
         _ <- row match {
           case None => Right(())
           case Some(_) =>
             Left(
               StoreError.Refused(
-                s"${permit.load.loadId}: the RunLedger holds an unscoped (Phase 7) " +
+                s"${permit.loadId}: the RunLedger holds an unscoped (Phase 7) " +
                   s"${permit.target.tag} row ${key.sk}; its vectors use pre-SE-P8-01 keys the " +
                   "model-scoped loader does not manage: load into fresh stores with a fresh RunLedger"
               )
@@ -335,12 +373,12 @@ private[load] object LoadLedger {
    * are checked (reads) before any is claimed, so a refusal writes nothing at all.
    */
   private def claimOwners(
-      permit: LoadPermit,
+      permit: LedgerSubject,
       ledger: KeyValueStore,
       stores: Vector[TargetStore]
   ): Either[StoreError, Unit] =
     if (stores == null || stores.contains(null) || !stores.contains(permit.target))
-      Left(StoreError.Refused(s"${permit.load.loadId}: the written stores must include the target"))
+      Left(StoreError.Refused(s"${permit.loadId}: the written stores must include the target"))
     else {
       val ordered = TargetStore.values.toVector.filter(stores.contains)
       for {
@@ -352,7 +390,7 @@ private[load] object LoadLedger {
     }
 
   private def claimOwner(
-      permit: LoadPermit,
+      permit: LedgerSubject,
       ledger: KeyValueStore,
       store: TargetStore
   ): Either[StoreError, Unit] = {
@@ -379,7 +417,7 @@ private[load] object LoadLedger {
   }
 
   private def claimPublication(
-      permit: LoadPermit,
+      permit: LedgerSubject,
       ledger: KeyValueStore
   ): Either[StoreError, Unit] =
     for {
@@ -388,7 +426,7 @@ private[load] object LoadLedger {
           RunPublication.SchemaVersion,
           permit.runId,
           permit.partManifestSha256,
-          permit.load.loadId
+          permit.loadId
         )
       )
       _ <- ledger.putIfAbsent(publications.table.role, item) match {
@@ -401,30 +439,30 @@ private[load] object LoadLedger {
     } yield ()
 
   private def readEntry(
-      permit: LoadPermit,
+      permit: LedgerSubject,
       ledger: KeyValueStore,
       scope: Option[String]
   ): Either[StoreError, LoadEntry] =
     for {
-      key <- TableKeys.RunLedger.load(permit.runId, permit.load.loadId, scope)
+      key <- TableKeys.RunLedger.load(permit.runId, permit.loadId, scope)
       item <- ledger.get(entries.table.role, key)
-      e <- item.toRight(StoreError.Corrupt(s"${permit.load.loadId}: ledger row vanished"))
+      e <- item.toRight(StoreError.Corrupt(s"${permit.loadId}: ledger row vanished"))
       entry <- entries.decode(e)
       _ <-
         if (
-          entry.runId == permit.runId && entry.loadId == permit.load.loadId &&
+          entry.runId == permit.runId && entry.loadId == permit.loadId &&
           entry.targetStore == permit.target &&
           entry.partManifestSha256 == permit.partManifestSha256 && entry.embeddingModel == scope
         ) Right(())
         else
           Left(
             StoreError
-              .Conflict(s"${permit.load.loadId}: the ledger row describes another run or load")
+              .Conflict(s"${permit.loadId}: the ledger row describes another run or load")
           )
     } yield entry
 
   private def ensureEntry(
-      permit: LoadPermit,
+      permit: LedgerSubject,
       ledger: KeyValueStore,
       clock: Clock,
       scope: Option[String]
@@ -432,10 +470,10 @@ private[load] object LoadLedger {
     for {
       start <- RunLedgerStates.start(
         permit.runId,
-        permit.load.loadId,
+        permit.loadId,
         permit.target,
         permit.partManifestSha256,
-        permit.items.size,
+        permit.itemCount,
         clock.nowMillis(),
         scope
       )
@@ -449,7 +487,7 @@ private[load] object LoadLedger {
     } yield entry
 
   private def advance(
-      permit: LoadPermit,
+      permit: LedgerSubject,
       ledger: KeyValueStore,
       clock: Clock,
       current: LoadEntry,
@@ -467,7 +505,7 @@ private[load] object LoadLedger {
     } yield stored
 
   private def toWriting(
-      permit: LoadPermit,
+      permit: LedgerSubject,
       ledger: KeyValueStore,
       clock: Clock,
       start: LoadEntry,
@@ -521,7 +559,7 @@ private[load] object LoadLedger {
   }
 
   private def probeAndWrite[E](
-      permit: LoadPermit,
+      permit: LedgerSubject,
       ledger: KeyValueStore,
       clock: Clock,
       start: LoadEntry,

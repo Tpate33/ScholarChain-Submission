@@ -99,6 +99,11 @@ object ParquetReadLimits {
  * @param vectors
  *   the vector loader's configuration (SE-P7-09; S3 Vectors limits UNVERIFIED, see
  *   [[VectorLoadConfig]])
+ * @param entityLinks
+ *   SE-P9-01: the entity-link load's configuration ([[EntityLinkLoad]]). When present, the
+ *   `dynamodb` store also fills the EntityLinkCache from the run's verified entity-resolution
+ *   upstream (its own RunLedger row; counts `entity-link-*` in the dynamodb outcome). Absent: no
+ *   entity link is written (the pre-SE-P9-01 behaviour; nothing is assumed, no expiry is invented)
  */
 final case class OpeningLoadConfig(
     settings: AnalysisRunSettings,
@@ -107,7 +112,8 @@ final case class OpeningLoadConfig(
     benchmarkMaxBytes: Long,
     keyValueLimits: KeyValueLoadLimits,
     layout: S3Layout,
-    vectors: VectorLoadConfig
+    vectors: VectorLoadConfig,
+    entityLinks: Option[EntityLinkLoadConfig] = None
 )
 
 /**
@@ -401,7 +407,7 @@ object OpeningLoad {
           Vector.empty,
           p.verification.rejections,
           TargetStore.values.toVector.map(t =>
-            loadOne(p.verification, t, config, targets, p.foreign)
+            loadOne(p.verification, t, config, targets, p.foreign, p.upstream)
           )
         )
     }
@@ -426,7 +432,8 @@ object OpeningLoad {
       verification: VerificationReport,
       benchmarkDigest: String,
       recordedBenchmarkDigest: Option[String],
-      foreign: Option[StoreError]
+      foreign: Option[StoreError],
+      upstream: SummaryUpstream
   )
 
   /**
@@ -486,7 +493,7 @@ object OpeningLoad {
                   .toOption
               case _ => None
             }
-          Right(Prepared(verification, bp.digest, recorded, foreign))
+          Right(Prepared(verification, bp.digest, recorded, foreign, up))
       }
     } catch {
       case e: LinkageError =>
@@ -523,7 +530,8 @@ object OpeningLoad {
       t: TargetStore,
       config: OpeningLoadConfig,
       targets: OpeningLoadTargets,
-      foreign: Option[StoreError]
+      foreign: Option[StoreError],
+      upstream: SummaryUpstream
   ): StoreLoadOutcome = {
     val performed =
       DeferredCheck.appliesTo(t).filter(c => report.verified.exists(_.passedFor(t).contains(c)))
@@ -599,6 +607,40 @@ object OpeningLoad {
                 0L
               )
             )
+            .flatMap { case kv @ (w, a, skipped, counts, rejected) =>
+              // SE-P9-01: the EntityLinkCache rows of the same dynamodb store, own ledger row.
+              config.entityLinks match {
+                case None => Right(kv)
+                case Some(lc) =>
+                  EntityLinkLoad
+                    .load(
+                      p,
+                      upstream,
+                      lc,
+                      config.keyValueLimits,
+                      targets.keyValues,
+                      targets.ledger,
+                      targets.clock,
+                      progress
+                    )
+                    .map(l =>
+                      (
+                        w + l.written,
+                        a + l.alreadyPresent,
+                        skipped && l.skipped,
+                        counts ++ Vector(
+                          "entity-link-rows" -> l.links.toLong,
+                          "entity-link-surface-forms" -> l.surfaceForms.toLong,
+                          "entity-link-ambiguous-surface-forms" -> l.ambiguousSurfaceForms.toLong,
+                          "entity-link-empty-names" -> l.skippedEmptyNames.toLong,
+                          "entity-link-written" -> l.written,
+                          "entity-link-present" -> l.alreadyPresent
+                        ),
+                        rejected
+                      )
+                    )
+              }
+            }
         )
       case TargetStore.S3 =>
         gate(p =>

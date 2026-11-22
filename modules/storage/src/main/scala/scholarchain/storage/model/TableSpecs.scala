@@ -260,6 +260,16 @@ object TableSpecs {
         "query#<queryId>",
         BeginsWith,
         "step#"
+      ),
+      ap(
+        "QS-3",
+        "the audit record of a query (SE-P9-02; README stage 10): plan hash, resolved researcher " +
+          "IDs, evidence IDs, versions, token counts, latency, verification and answer hash; " +
+          "written once, under the session TTL",
+        None,
+        "query#<queryId>",
+        Exact,
+        "audit"
       )
     ),
     "required (README L1383): runtime query sessions"

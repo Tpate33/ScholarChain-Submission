@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "scholarchain.rag.query-plan-arguments.v1",
+  "title": "ScholarChain query plan step arguments (planner rules scholarchain.rag.query-planner.v1)",
+  "description": "The closed vocabulary of the `arguments` map of every core QueryStep (scholarchain.query-plan.v1) that the deterministic planner emits. Keys are fixed tokens; every value is untrusted user data or a planner tag, never query text, Cypher, a key, a table, an index or an AWS operation. Pinned to QueryPlanner.Args and QueryPlanner.AllowedOperations by QueryPlannerSuite.",
+  "x-plannerVersion": "scholarchain.rag.query-planner.v1",
+  "x-allowedOperations": [
+    "resolve-researcher",
+    "rank-researchers",
+    "get-metrics",
+    "direct-collaborators",
+    "shortest-path",
+    "component",
+    "community",
+    "bridge-researchers",
+    "k-core",
+    "team-size",
+    "temporal-trend",
+    "semantic-context",
+    "verify-claims"
+  ],
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "resolve-researcher only: the researcher name as written in the question (data; hashed for the entity-link lookup)."
+    },
+    "researchers": {
+      "type": "string",
+      "pattern": "^[0-9]+(,[0-9]+)*$",
+      "description": "Ordinals of the resolve-researcher steps whose resolved IDs this step uses, comma separated."
+    },
+    "intent": {
+      "type": "string",
+      "enum": [
+        "researcher-ranking",
+        "strongest-repeated-collaboration",
+        "maximum-team-size",
+        "direct-coauthors",
+        "shortest-path",
+        "component-lookup",
+        "community-comparison",
+        "bridge-ranking",
+        "temporal-comparison",
+        "metric-lookup",
+        "coreness-lookup",
+        "semantic-explanation"
+      ]
+    },
+    "window.source": {
+      "type": "string",
+      "enum": ["question", "configured-default"],
+      "description": "Whether the plan window was written in the question or is the configured runtime.defaultWindow."
+    },
+    "compare.toWindowStart": { "type": "string", "pattern": "^[0-9]{4}$" },
+    "compare.toWindowEnd": { "type": "string", "pattern": "^[0-9]{4}$" },
+    "filter.topic": { "type": "string", "minLength": 1, "description": "Topic text from the question (data)." },
+    "filter.venue": { "type": "string", "minLength": 1, "description": "Venue text from the question (data)." },
+    "filter.institution": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Institution text from the question (data); on resolve-researcher steps it may narrow candidates to one whose stored affiliation name contains it."
+    },
+    "ranking.rule": {
+      "type": "string",
+      "enum": [
+        "distinct-coauthor-count",
+        "joint-publication-count",
+        "cross-community-degree",
+        "coreness",
+        "maximum-coauthors-on-one-paper"
+      ],
+      "description": "The documented ranking measure of a ranked intent (no universal formula)."
+    }
+  }
+}

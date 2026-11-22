@@ -286,6 +286,24 @@ object ItemCodecs {
       override protected def expiresAt(a: QueryStepRecord) = Some(a.expiresAtEpochSeconds)
     }
 
+  /**
+   * SE-P9-02: the audit row of a query (QS-3). The body is checked against its hash, the storage
+   * ceiling, the query ID and the token form of its schema version; the configured bound is applied
+   * by the runtime writer before encoding.
+   */
+  given QueryAuditCodec: ItemCodec[QueryAuditRecord] =
+    new ItemCodec[QueryAuditRecord](TableSpecs.QuerySession, QueryAuditRecord.SchemaVersion) {
+      protected def schemaVersionOf(a: QueryAuditRecord) = a.schemaVersion
+      override protected def validate(a: QueryAuditRecord) =
+        for {
+          _ <- StoreIds.require(IdKind.Query, a.queryId, "queryId")
+          p = QueryAuditRecord.problems(a)
+          _ <- check(p.isEmpty, p.mkString("; "))
+        } yield ()
+      def key(a: QueryAuditRecord) = K.QuerySession.audit(a.queryId)
+      override protected def expiresAt(a: QueryAuditRecord) = Some(a.expiresAtEpochSeconds)
+    }
+
   given EntityLinkCodec: ItemCodec[EntityLinkRecord] =
     new ItemCodec[EntityLinkRecord](TableSpecs.EntityLinkCache, EntityLinkRecord.SchemaVersion) {
       protected def schemaVersionOf(a: EntityLinkRecord) = a.schemaVersion
@@ -293,7 +311,15 @@ object ItemCodecs {
         StoreIds.firstError(
           StoreIds.token(a.matchedBy, "matchedBy"),
           check(a.candidateRank >= 1, "candidateRank is below 1"),
-          StoreIds.require(IdKind.Run, a.sourceRunId, "sourceRunId")
+          StoreIds.require(IdKind.Run, a.sourceRunId, "sourceRunId"),
+          // SE-P9-01: a loader-written link's provenance, when present, is complete and valid.
+          check(a.evidence != null, "evidence must be absent or present"),
+          Option(a.evidence).flatten match {
+            case None => Right(())
+            case Some(e) =>
+              val p = EntityLinkEvidence.problems(e)
+              check(p.isEmpty, p.mkString("; "))
+          }
         )
       def key(a: EntityLinkRecord) = K.EntityLinkCache.link(a.surfaceSha256, a.researcherId)
       override protected def indexKeys(a: EntityLinkRecord) =

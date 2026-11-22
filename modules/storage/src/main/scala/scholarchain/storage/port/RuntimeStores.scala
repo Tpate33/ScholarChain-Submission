@@ -2,12 +2,14 @@ package scholarchain.storage.port
 
 import scholarchain.core.EvidenceBundle
 import scholarchain.storage.model.{
+  AuditBounds,
   EmbeddingPolicy,
   EntityLinkRecord,
   EvidenceItemRow,
   ItemCodec,
   ItemCodecs,
   PutOutcome,
+  QueryAuditRecord,
   QuerySessionRecord,
   QueryStepRecord,
   StoreError,
@@ -21,19 +23,38 @@ private[port] final class CodecWriter[A](codec: ItemCodec[A], kv: KeyValueWriter
     codec.encode(a).flatMap(kv.putIfAbsent(codec.table.role, _))
 }
 
-/** Runtime writer of the QuerySession table only (sessions and their plan steps). */
+/** Runtime writer of the QuerySession table only (sessions, their plan steps and audit rows). */
 final class QuerySessionWriter private (
     sessions: CodecWriter[QuerySessionRecord],
-    steps: CodecWriter[QueryStepRecord]
+    steps: CodecWriter[QueryStepRecord],
+    audits: CodecWriter[QueryAuditRecord]
 ) {
   def putSession(s: QuerySessionRecord): Either[StoreError, PutOutcome] = sessions.put(s)
   def putStep(s: QueryStepRecord): Either[StoreError, PutOutcome] = steps.put(s)
+
+  /**
+   * SE-P9-02: the audit row of a query (QS-3), create-once: `Written` the first time,
+   * `AlreadyPresent` for an identical row, `Conflict` for a different row under the same query
+   * (another body, hash, schema version or TTL). A body over `bounds` is `Refused` before any
+   * write. Pass the same `expiresAtEpochSeconds` as the query's session and step rows.
+   */
+  def putAudit(a: QueryAuditRecord, bounds: AuditBounds): Either[StoreError, PutOutcome] =
+    if (bounds == null) Left(StoreError.Refused("QuerySession: audit bounds are required"))
+    else if (a != null && QueryAuditRecord.jsonBytes(a) > bounds.maxAuditJsonBytes)
+      Left(
+        StoreError.Refused(
+          s"QuerySession: auditJson is ${QueryAuditRecord.jsonBytes(a)} bytes, over the " +
+            s"configured bound of ${bounds.maxAuditJsonBytes}"
+        )
+      )
+    else audits.put(a)
 }
 object QuerySessionWriter {
   def apply(kv: KeyValueWriter): QuerySessionWriter =
     new QuerySessionWriter(
       new CodecWriter(ItemCodecs.QuerySessionCodec, kv),
-      new CodecWriter(ItemCodecs.QueryStepCodec, kv)
+      new CodecWriter(ItemCodecs.QueryStepCodec, kv),
+      new CodecWriter(ItemCodecs.QueryAuditCodec, kv)
     )
 }
 

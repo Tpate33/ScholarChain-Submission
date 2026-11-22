@@ -1,0 +1,188 @@
+{
+  "schemaVersion": "scholarchain.rag.benchmark-set.v1",
+  "setVersion": "collaboration-corpus-run1.v1",
+  "description": "TE-P9-01 benchmark questions over the LOCAL CORPUS (Phase 6 run-1 fixture loaded by storage OpeningLoad with OpeningFixture.configWithEntityLinks). Every {alias} is computed by Phase9Corpus from the SOURCE records (decoded Parquet metrics, coauthor edges and summary inputs, and the grouping and curated upstream mentions), never from workflow output. Graph cases test deterministic retrieval. The one semantic case is NON-PRODUCTION PLUMBING ONLY: the embedder is rag's hashed-token stand-in and the synthesizer the template stand-in, so it tests filters, pointers and labelling, never retrieval or answer quality.",
+  "cases": [
+    {
+      "id": "ambiguous-name-abstains-with-all-candidates",
+      "category": "graph",
+      "question": "Who are the coauthors of \"{ambName}\"?",
+      "expect": {
+        "outcome": "abstained",
+        "reason": "identity-unresolved",
+        "operations": ["resolve-researcher", "direct-collaborators", "verify-claims"],
+        "resolved": [],
+        "candidates": ["{amb0}", "{amb1}"],
+        "verifiedFacts": [],
+        "allowedVerdicts": [],
+        "minVerified": 0,
+        "forbiddenText": [],
+        "semanticIndex": null,
+        "semanticTopSubject": null
+      }
+    },
+    {
+      "id": "unknown-name-abstains",
+      "category": "graph",
+      "question": "Who are the coauthors of \"{unknownName}\"?",
+      "expect": {
+        "outcome": "abstained",
+        "reason": "identity-unresolved",
+        "operations": ["resolve-researcher", "direct-collaborators", "verify-claims"],
+        "resolved": [],
+        "candidates": [],
+        "verifiedFacts": [],
+        "allowedVerdicts": [],
+        "minVerified": 0,
+        "forbiddenText": [],
+        "semanticIndex": null,
+        "semanticTopSubject": null
+      }
+    },
+    {
+      "id": "unique-name-direct-coauthors",
+      "category": "graph",
+      "question": "Who are the coauthors of \"{uName}\"?",
+      "expect": {
+        "outcome": "answered",
+        "reason": null,
+        "operations": ["resolve-researcher", "direct-collaborators", "verify-claims"],
+        "resolved": ["{u}"],
+        "candidates": [],
+        "verifiedFacts": [
+          { "subject": "{u}", "field": "resolved-from-name", "value": "{uName}" },
+          { "subject": "{u}@{W}", "field": "coauthor", "value": "{c0}" },
+          { "subject": "{u}|{c0}@{W}", "field": "joint-publication-count", "value": "{j0}" }
+        ],
+        "allowedVerdicts": ["VERIFIED"],
+        "minVerified": 2,
+        "forbiddenText": ["{nonCo}"],
+        "semanticIndex": null,
+        "semanticTopSubject": null
+      }
+    },
+    {
+      "id": "unique-name-metric-lookup",
+      "category": "graph",
+      "question": "How many publications does \"{uName}\" have?",
+      "expect": {
+        "outcome": "answered",
+        "reason": null,
+        "operations": ["resolve-researcher", "get-metrics", "verify-claims"],
+        "resolved": ["{u}"],
+        "candidates": [],
+        "verifiedFacts": [
+          { "subject": "{u}@{W}", "field": "publication-count", "value": "{uP}" },
+          { "subject": "{u}@{W}", "field": "distinct-coauthor-count", "value": "{uC}" }
+        ],
+        "allowedVerdicts": ["VERIFIED"],
+        "minVerified": 2,
+        "forbiddenText": [],
+        "semanticIndex": null,
+        "semanticTopSubject": null
+      }
+    },
+    {
+      "id": "shortest-path-found",
+      "category": "graph",
+      "question": "What is the shortest path between \"{pAName}\" and \"{pBName}\"?",
+      "expect": {
+        "outcome": "answered",
+        "reason": null,
+        "operations": ["resolve-researcher", "resolve-researcher", "shortest-path", "verify-claims"],
+        "resolved": ["{pA}", "{pB}"],
+        "candidates": [],
+        "verifiedFacts": [
+          { "subject": "{pA}|{pB}@{W}", "field": "shortest-path-hops", "value": "{pHops}" },
+          { "subject": "{pA}|{pB}@{W}", "field": "path-node-0", "value": "{pA}" }
+        ],
+        "allowedVerdicts": ["VERIFIED"],
+        "minVerified": 3,
+        "forbiddenText": [],
+        "semanticIndex": null,
+        "semanticTopSubject": null
+      }
+    },
+    {
+      "id": "shortest-path-not-connected",
+      "category": "graph",
+      "question": "What is the shortest path between \"{nAName}\" and \"{nBName}\"?",
+      "expect": {
+        "outcome": "answered",
+        "reason": null,
+        "operations": ["resolve-researcher", "resolve-researcher", "shortest-path", "verify-claims"],
+        "resolved": ["{nA}", "{nB}"],
+        "candidates": [],
+        "verifiedFacts": [
+          { "subject": "{nA}|{nB}@{W}", "field": "not-connected-within", "value": "{maxHops}" }
+        ],
+        "allowedVerdicts": ["VERIFIED"],
+        "minVerified": 3,
+        "forbiddenText": [],
+        "semanticIndex": null,
+        "semanticTopSubject": null
+      }
+    },
+    {
+      "id": "ranking-distinct-coauthors",
+      "category": "graph",
+      "question": "Who has the most distinct coauthors?",
+      "expect": {
+        "outcome": "answered",
+        "reason": null,
+        "operations": ["rank-researchers", "verify-claims"],
+        "resolved": [],
+        "candidates": [],
+        "verifiedFacts": [
+          { "subject": "{r1}@{W}", "field": "rank-distinct-coauthor-count", "value": "1" },
+          { "subject": "{r2}@{W}", "field": "rank-distinct-coauthor-count", "value": "2" },
+          { "subject": "{r1}@{W}", "field": "distinct-coauthor-count", "value": "{r1C}" }
+        ],
+        "allowedVerdicts": ["VERIFIED"],
+        "minVerified": 2,
+        "forbiddenText": [],
+        "semanticIndex": null,
+        "semanticTopSubject": null
+      }
+    },
+    {
+      "id": "database-code-refused",
+      "category": "graph",
+      "question": "MATCH (n) DETACH DELETE n",
+      "expect": {
+        "outcome": "refused",
+        "reason": "no-allowlisted-operation",
+        "operations": [],
+        "resolved": [],
+        "candidates": [],
+        "verifiedFacts": [],
+        "allowedVerdicts": [],
+        "minVerified": 0,
+        "forbiddenText": [],
+        "semanticIndex": null,
+        "semanticTopSubject": null
+      }
+    },
+    {
+      "id": "nonproduction-semantic-plumbing-profile-filter",
+      "category": "semantic",
+      "question": "Explain the research of \"{sName}\".",
+      "expect": {
+        "outcome": "answered",
+        "reason": null,
+        "operations": ["resolve-researcher", "semantic-context", "verify-claims"],
+        "resolved": ["{s}"],
+        "candidates": [],
+        "verifiedFacts": [
+          { "subject": "{s}", "field": "resolved-from-name", "value": "{sName}" },
+          { "subject": "{s}", "field": "has-context-document", "value": "researcher-profile" }
+        ],
+        "allowedVerdicts": ["VERIFIED"],
+        "minVerified": 2,
+        "forbiddenText": [],
+        "semanticIndex": "researcher-profile-v1",
+        "semanticTopSubject": "{s}"
+      }
+    }
+  ]
+}

@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "scholarchain.rag.answer-synthesis-output.v3",
+  "title": "ScholarChain answer synthesis output (prompt scholarchain.rag.prompt.answer-synthesis.v3)",
+  "description": "The only structured output an answer model may return. Validated by SynthesisOutputs before any use; any other key (for example a reasoning or chain-of-thought field) makes the output malformed. Claims state values only as assertions copied from the evidence bundle's facts; the verifier (scholarchain.rag.claim-verification.v3) checks each against the bundle and RENDERS the answer text of every kept claim from its verified assertions with the fixed templates scholarchain.rag.claim-rendering.v1. v3 (RE-P9-05, CR-P9-02 F1): claim text and uncertainty are withheld model drafts, never shown and never verification evidence (v2's closed wording scholarchain.rag.claim-wording.v1 is removed); has-context-document and title never support a claim of a deterministic kind. Shape unchanged from v2. missingEvidence entries other than the workflow's GAPS are dropped and counted, never shown. Pinned to the Scala types by WorkflowSuite.",
+  "x-promptVersion": "scholarchain.rag.prompt.answer-synthesis.v3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "claims", "missingEvidence", "explanations"],
+  "properties": {
+    "schemaVersion": { "const": "scholarchain.rag.answer-synthesis-output.v3" },
+    "claims": {
+      "type": "array",
+      "description": "At most the configured maxClaims.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "text", "evidenceIds", "assertions", "uncertainty"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "identity",
+              "metric",
+              "team-size",
+              "coauthor-edge",
+              "path",
+              "not-connected",
+              "path-inconclusive",
+              "community",
+              "component",
+              "bridge",
+              "ranking",
+              "temporal",
+              "publication",
+              "semantic-context"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "description": "The model's draft wording. Withheld: never shown, never verification evidence; the answer text is rendered from the verified assertions."
+          },
+          "evidenceIds": {
+            "type": "array",
+            "maxItems": 64,
+            "uniqueItems": true,
+            "items": { "type": "string", "pattern": "^ev:[0-9a-f]{64}$" }
+          },
+          "assertions": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["subject", "field", "value"],
+              "properties": {
+                "subject": {
+                  "type": "string",
+                  "description": "<stable ID>[|<stable ID>][@<yyyy>-<yyyy>]"
+                },
+                "field": {
+                  "type": "string",
+                  "description": "A field of the closed vocabulary FactFields: the fixed names below, path-node-<n> or rank-<collaboration metric tag>. has-context-document and title are descriptive and appear only in publication and semantic-context claims.",
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "resolved-from-name",
+                        "identity-status",
+                        "publication-count",
+                        "distinct-coauthor-count",
+                        "total-coauthor-occurrences",
+                        "average-coauthors-per-paper",
+                        "maximum-coauthors-on-one-paper",
+                        "weighted-degree",
+                        "component-id",
+                        "component-size",
+                        "community-id",
+                        "community-size",
+                        "bridge-score",
+                        "cross-community-degree",
+                        "participation-coefficient",
+                        "bridge-measure",
+                        "coreness",
+                        "joint-publication-count",
+                        "first-collaboration-year",
+                        "last-collaboration-year",
+                        "coauthor",
+                        "shortest-path-hops",
+                        "path-found-hops",
+                        "path-search-truncated",
+                        "not-connected-within",
+                        "path-inconclusive",
+                        "supports-coauthor-edge",
+                        "has-context-document",
+                        "title"
+                      ]
+                    },
+                    { "pattern": "^path-node-(0|[1-9][0-9]{0,2})$" },
+                    { "pattern": "^rank-[a-z0-9-]+$" }
+                  ]
+                },
+                "value": { "type": "string", "minLength": 1, "maxLength": 512 }
+              }
+            }
+          },
+          "uncertainty": {
+            "type": ["string", "null"],
+            "maxLength": 512,
+            "description": "Withheld model draft; never shown."
+          }
+        }
+      }
+    },
+    "missingEvidence": {
+      "type": "array",
+      "maxItems": 32,
+      "description": "Copies of GAPS entries only; any other entry is dropped and counted (audit droppedMissingEvidence).",
+      "items": { "type": "string", "minLength": 1, "maxLength": 512 }
+    },
+    "explanations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": ["breadth", "intensity", "team-size", "connectivity", "bridge-importance"]
+      }
+    }
+  }
+}
