@@ -3,9 +3,9 @@
 Records state only; approves nothing. Phase 10 scope delivered: LOCAL services with in-memory fakes. Nothing is deployed, packaged or connected to AWS.
 
 ## Pending human decisions at closeout
-- Logging fix (BE-P10-01, CR-P10-01 APPROVE): minor finding m1 and nits n1-n3 (review-report.md, CR-P10-01). Choose one: accept as residuals, or route to build-engineer later.
+- Logging fix (BE-P10-01, CR-P10-01 APPROVE): minor finding m1 and nits n1-n3 accepted by the human (2026-11-22) as documented residuals for local Phase 10.
 - Repair 05 (SE-P10-06) passed `sbt check` but was not code-reviewed (human decision). Disclose it in human-gate.md.
-- CR-REL-01 release-scan findings F1-F11 (release-scan-cr-rel-01.md). Unchanged and out of Phase 10 scope; preserved for remediation. Note: release-scan-cr-rel-01.md itself quotes the real AWS account ID (line 30, in a `git log -S` command), so committing it adds an occurrence of finding F1.
+- CR-REL-01 release-scan findings F1-F11 (release-scan-cr-rel-01.md). Unchanged and out of Phase 10 scope; preserved for remediation. The literal account ID in release-scan-cr-rel-01.md's `git log -S` command was replaced with the placeholder `<AWS_ACCOUNT_ID>` (human instruction, 2026-11-22); the finding and its meaning are unchanged. This does not resolve the existing account-ID exposure elsewhere (finding F1: 15 files, 29 occurrences).
 - Phase 9 residual R1 (an ID-shaped subject token inside a PARTIALLY SUPPORTED label) now reaches API clients through answerText and claims. It must be reassessed before real-LLM integration and before deployment.
 
 ## Accepted residuals (not fixed)
@@ -27,7 +27,7 @@ Records state only; approves nothing. Phase 10 scope delivered: LOCAL services w
 | Query constraints | Any `constraints` key gets 422; the rag workflow accepts the question only. | rag-engineer |
 | U-c (CR-P10-03) | rag gap lines can contain the `maxRetrievals` configuration value in abstention bodies (no stored text). | rag-engineer |
 | X5 | The evidence response shape (shared identity plus caller-only `occurrences[] {bundleId, score, content}`, `occurrencesTruncated`) diverges from the README example at README.md:2500-2516. | documentation-engineer |
-| Logging (CR-P10-01) | m1 (runtime reconfiguration not guarded), n1-n3. Pending the human decision above. | build-engineer |
+| Logging (CR-P10-01) | m1: runtime reconfiguration (for example setLogLevel("DEBUG") inside a test) is not detected by verifyTestLogging, which runs before the tests. n1: two DEBUG shorthand forms in build-owned configs are not flagged. n2: the build.sbt environment header omits the probe JVMs. n3: a comma in the repository path splits log4j2.configurationFile (fails closed). Accepted by the human as documented residuals. | build-engineer |
 
 ## Deferred work (mandatory, not waived)
 - **Separate deployables** (QueryJobsMain, EvidenceExplainMain, GraphMain exist and are tested in one JVM). No production ServiceProvider exists, so each main exits 1 with "no scholarchain.services.ServiceProvider on the classpath". Needed:
