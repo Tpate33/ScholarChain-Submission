@@ -1,14 +1,15 @@
 # Phase 10 human acceptance — local scope
 
-DRAFT prepared by the orchestrator for the human's review. Not signed. Edit every bracketed item; remove this line when you accept.
+Date: [Date: 2026-11-22]
+Decision: Accept the LOCAL development scope only.
+Accepted implementation commit: dcdd534b78da58b45aee9319e57bc4499a989344
 
-Date: [2026-11-__]
-Decision: [Accept / Reject] the LOCAL development scope only.
-Accepted implementation commit: [40-character SHA of the Phase 10 implementation commit]
+Record note: this replaces the unsigned orchestrator draft committed in closeout a49317a, which still held placeholders. The acceptance decision itself was made at that closeout. This corrected record is committed together with the Phase 11 closeout [on the date you commit it].
 
 ## What was reviewed
-Agent reports (agent-report.md; repair-01.md to repair-05.md), test report (test-report.md), review reports (review-report.md: CR-P10-01 APPROVE; CR-P10-02 and CR-P10-03 REQUEST_CHANGES; CR-P10-04, CR-P10-05 and CR-P10-06 APPROVE), outstanding.md and prompt.md. [State whether you did a personal line-by-line source review; the Phase 9 record said it did not.]
-Manual implementation changes during acceptance: [none / describe].
+Agent reports (agent-report.md; repair-01.md to repair-05.md), test report (test-report.md), review reports (review-report.md: CR-P10-01 APPROVE; CR-P10-02 and CR-P10-03 REQUEST_CHANGES; CR-P10-04, CR-P10-05 and CR-P10-06 APPROVE), outstanding.md and prompt.md.
+[State whether you did a personal line-by-line source review. If you did not, write: "This does not claim a personal line-by-line source review."]
+Manual implementation changes during acceptance: [none].
 
 ## Final verification
 - sbt check exit 0; 194 suites; 2331 passed; 0 failed; 0 errored; 1 skipped (orchestrator read of the run output, shell b91m6puid, 410 s).
@@ -41,7 +42,7 @@ See outstanding.md, "Deployment prerequisites".
 
 ## Remaining risk (see outstanding.md)
 - Accepted residuals: F1, F2, N5, owner eviction, m-A jitter, U-1 and U-3 (CR-P10-06), U2 and the JDK-internal U-1 to U-3 (CR-P10-04), graph scope, query constraints.
-- Phase 9 R1 now reaches API clients; it must be reassessed before real-LLM integration and before deployment.
+- Phase 9 R1 now reaches API clients; it must be reassessed before real-LLM integration and before deployment. (Later status: reassessed and repaired in Phase 11, CR-P11-01-1 closed by CR-P11-02. See docs/agent-runs/phase-11/.)
 - CR-REL-01 release-scan findings F1-F11 are unchanged. release-scan-cr-rel-01.md is committed with the literal account ID in its `git log -S` command replaced by `<AWS_ACCOUNT_ID>`; this does not resolve the existing account-ID exposure elsewhere in the repository (F1).
 
 This acceptance does not authorize deployment, paid calls, AWS operations, publication, deletions or hook changes.
