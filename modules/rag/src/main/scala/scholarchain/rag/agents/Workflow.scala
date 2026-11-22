@@ -716,7 +716,9 @@ final class CollaborationWorkflow(
       report.map(_.counts).getOrElse(Map.empty),
       report.map(_.overall.tag),
       report.map(_.droppedMissingEvidence).getOrElse(0),
-      answerText.map(Canonical.sha256HexUtf8)
+      answerText.map(Canonical.sha256HexUtf8),
+      // RG-P11-02: the claim-verification version, whenever claims were verified.
+      report.map(_ => ClaimVerificationAgent.Version)
     )
     val stepStatus: Map[Int, String] = plan.toVector
       .flatMap(_.steps)

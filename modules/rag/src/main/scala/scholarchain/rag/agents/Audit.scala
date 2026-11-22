@@ -1,7 +1,7 @@
 package scholarchain.rag.agents
 
 import upickle.default.ReadWriter
-import upickle.implicits.allowUnknownKeys
+import upickle.implicits.{allowUnknownKeys, serializeDefaults}
 
 import scholarchain.core.{Canonical, EvidenceBundle, Json, QueryPlan}
 import scholarchain.storage.model.{
@@ -136,7 +136,7 @@ object AuditPlan {
 }
 
 /**
- * The audit record of one question (README stage 10; schema `prompts/schemas/audit-record.v2`).
+ * The audit record of one question (README stage 10; schema `prompts/schemas/audit-record.v3`).
  * Only IDs, versions, counts, hashes and tags: no question text and no researcher name (the plan is
  * audited as its structure with resolved IDs and hashed filter values, see [[AuditPlan]]), no
  * retrieved text, no model output, and never hidden reasoning.
@@ -160,8 +160,13 @@ object AuditPlan {
  *   wall time of the workflow on the injected clock
  * @param answerSha256
  *   SHA-256 of the returned answer text
+ * @param verifierVersion
+ *   v3 (RG-P11-02): the claim-verification version ([[ClaimVerificationAgent.Version]]) that
+ *   verified the answer's claims; None when no claim was verified (refused, or abstained before
+ *   verification). Always serialized (`null` when None).
  */
 @allowUnknownKeys(false)
+@serializeDefaults(true)
 final case class AuditRecord(
     schemaVersion: String,
     queryId: String,
@@ -190,14 +195,18 @@ final case class AuditRecord(
     verification: Map[String, Int],
     overallVerification: Option[String],
     droppedMissingEvidence: Int,
-    answerSha256: Option[String]
+    answerSha256: Option[String],
+    verifierVersion: Option[String] = None
 ) derives ReadWriter
 
 object AuditRecord {
 
-  /** v2 (RE-P9-04): adds `plan` (m5) and `droppedMissingEvidence` (M3, m2). */
-  val SchemaVersion = "scholarchain.rag.audit-record.v2"
-  val SchemaFile = "prompts/schemas/audit-record.v2.schema.json"
+  /**
+   * v3 (RG-P11-02): adds `verifierVersion` (the claim-verification version, v4). v2 (RE-P9-04):
+   * adds `plan` (m5) and `droppedMissingEvidence` (M3, m2).
+   */
+  val SchemaVersion = "scholarchain.rag.audit-record.v3"
+  val SchemaFile = "prompts/schemas/audit-record.v3.schema.json"
 
   def json(a: AuditRecord): String = upickle.default.write(a)
   def sha256(a: AuditRecord): String = Canonical.sha256HexUtf8(json(a))

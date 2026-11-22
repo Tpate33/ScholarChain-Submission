@@ -71,11 +71,12 @@ final case class VerificationReport(
 }
 
 /**
- * RE-P9-02 stage 9, ClaimVerificationAgent (v3, RE-P9-05). Deterministic checks of every claim's
- * structured assertions against the evidence bundle's facts ([[BundleFacts]]), never against model
- * text:
+ * RE-P9-02 stage 9, ClaimVerificationAgent (v4, RG-P11-02; v3, RE-P9-05). Deterministic checks of
+ * every claim's structured assertions against the evidence bundle's facts ([[BundleFacts]]), never
+ * against model text:
  *
- *   1. cited evidence must exist in the bundle (IDs not in it are reported as fabricated);
+ *   1. cited evidence must exist in the bundle (IDs not in it are reported as fabricated, shown
+ *      only as a count);
  *   2. every assertion (identity, title, count, team size, path hop and node, community, component,
  *      bridge score, rank, window) must equal a fact of a cited item; a fact of an uncited item is
  *      partial support; another value for the same subject and field is a conflict; a value
@@ -96,6 +97,11 @@ final case class VerificationReport(
  * and attributed as descriptive retrieved context. A rendered text that fails the
  * [[ClaimRendering.safe]] guard (non-ASCII outside quoted tokens, or a non-letter non-ASCII
  * character anywhere) is never kept.
+ *
+ * Problem labels (the `[PARTIALLY SUPPORTED: ...]` and `[CONFLICTING WITH EVIDENCE ...]` text and
+ * the claim's `uncertainty`) are built only from fixed wording, closed-vocabulary field and kind
+ * tags, subjects of bundle facts and counts (v4): a model-chosen subject that no bundle fact has is
+ * shown as [[ClaimVerificationAgent.SubjectNotInEvidence]].
  *
  * Identity: `resolved-from-name` is checked by the surface-form hash of the stated name against the
  * cited entity-link row (the name is never stored).
@@ -145,6 +151,13 @@ final class ClaimVerificationAgent(serving: ServingContext) {
       Some(modelVersion),
       Some(promptVersion)
     )
+    // v4 (RG-P11-02, CR-P11-01-1): a label shows a subject only when it is the subject of a
+    // bundle fact; any other subject (a model-chosen ID, an ID with a window outside the plan,
+    // free text inside an ID body) is replaced by a fixed placeholder, so no identity, number or
+    // window the verifier did not check reaches claim text or uncertainty.
+    val knownSubjects = facts.iterator.map(_.subject).toSet
+    def subjectLabel(s: String): String =
+      if (s != null && knownSubjects.contains(s)) show(s) else SubjectNotInEvidence
     var ordinal = 0
     def keep(
         text: String,
@@ -168,7 +181,7 @@ final class ClaimVerificationAgent(serving: ServingContext) {
       def kindProblem(a: ModelAssertion): Option[String] =
         if (!descriptiveKind && FactFields.descriptive.contains(a.field))
           Some(
-            s"a ${c.kind} claim states ${a.field} of ${show(a.subject)}, a descriptive field " +
+            s"a ${c.kind} claim states ${a.field} of ${subjectLabel(a.subject)}, a descriptive field " +
               "that can never support it"
           )
         else if (descriptiveKind && !FactFields.descriptive.contains(a.field))
@@ -181,21 +194,23 @@ final class ClaimVerificationAgent(serving: ServingContext) {
         .flatMap(a =>
           ClaimRendering
             .problem(a, allowedWindows)
-            .map(p => a -> s"${a.field} of ${show(a.subject)}: $p")
+            .map(p => a -> s"${a.field} of ${subjectLabel(a.subject)}: $p")
         )
       val usable =
         supported.filter(a => kindProblem(a).isEmpty && !renderProblems.exists(_._1 == a))
+      // v4 (CR-P11-01-2): fabricated evidence IDs are reported as a count only; the IDs stay in
+      // ClaimResult.fabricatedEvidenceIds and are never shown.
       val problems =
-        fabricated.map(e => s"cites ${show(e)}, which is not in the evidence bundle") ++
+        (if (fabricated.isEmpty) Vector.empty else Vector(fabricatedLabel(fabricated.size))) ++
           checks.collect {
             case (a, AssertionCheck.SupportedUncited(_)) =>
-              s"${a.field} of ${show(a.subject)} is supported only by uncited evidence"
+              s"${a.field} of ${subjectLabel(a.subject)} is supported only by uncited evidence"
             case (a, AssertionCheck.Conflicting(_)) =>
-              s"${a.field} of ${show(a.subject)} differs from the evidence"
+              s"${a.field} of ${subjectLabel(a.subject)} differs from the evidence"
             case (a, AssertionCheck.NotProof) =>
-              s"${a.field} of ${show(a.subject)} is backed only by semantic context, which is not proof"
+              s"${a.field} of ${subjectLabel(a.subject)} is backed only by semantic context, which is not proof"
             case (a, AssertionCheck.Missing) =>
-              s"${a.field} of ${show(a.subject)} is not in the evidence"
+              s"${a.field} of ${subjectLabel(a.subject)} is not in the evidence"
           } ++
           c.assertions.flatMap(kindProblem).distinct ++
           renderProblems.map(_._2)
@@ -277,11 +292,20 @@ final class ClaimVerificationAgent(serving: ServingContext) {
 object ClaimVerificationAgent {
 
   /**
-   * v3 (RE-P9-05, CR-P9-02 F1): claim text rendered from verified structured assertions
-   * ([[ClaimRendering.Version]]); model wording withheld; descriptive fields never support a
-   * deterministic claim. v2 (RE-P9-04) had the closed-wording licence, now removed.
+   * v4 (RG-P11-02, CR-P11-01-1 and -2, Phase 9 residual R1): problem labels show a subject only
+   * when it is the subject of a bundle fact (else [[SubjectNotInEvidence]]), and fabricated
+   * evidence IDs only as a count ([[fabricatedLabel]]). v3 (RE-P9-05, CR-P9-02 F1): claim text
+   * rendered from verified structured assertions ([[ClaimRendering.Version]]); model wording
+   * withheld; descriptive fields never support a deterministic claim. v2 (RE-P9-04) had the
+   * closed-wording licence, now removed.
    */
-  val Version = "scholarchain.rag.claim-verification.v3"
+  val Version = "scholarchain.rag.claim-verification.v4"
+
+  /** The fixed placeholder for a subject that is not the subject of any bundle fact. */
+  val SubjectNotInEvidence = "(a subject not in the evidence)"
+
+  /** The label of `n` cited evidence IDs that are not in the bundle (the IDs are never shown). */
+  def fabricatedLabel(n: Int): String = s"cites $n evidence ID(s) not in the evidence bundle"
 
   /** `s` when it is a printable-ASCII token safe to show in a label, else a fixed placeholder. */
   private[agents] def show(s: String): String =

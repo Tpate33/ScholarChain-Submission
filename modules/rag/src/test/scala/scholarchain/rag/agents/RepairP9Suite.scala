@@ -351,7 +351,8 @@ class RepairP9Suite extends munit.FunSuite {
       rank.audit.plan.get.steps.find(_.operation == "rank-researchers").flatMap(_.rankingRule),
       Some(QueryPlanner.RankingRules.DistinctCoauthors)
     )
-    // The v2 schema pins the nested step and argument keys; the storage row carries v2.
+    // The schema (v3 since RG-P11-02, which adds verifierVersion; nested keys unchanged since v2)
+    // pins the nested step and argument keys; the storage row carries the current version.
     val schema = ujson.read(Files.readString(root.resolve(AuditRecord.SchemaFile)))
     assertEquals(schema("$id").str, AuditRecord.SchemaVersion)
     val stepJs = ujson.read(upickle.default.write(plan.steps(1)))
@@ -370,7 +371,7 @@ class RepairP9Suite extends munit.FunSuite {
     ): @unchecked
     assertEquals(
       ItemCodecs.QueryAuditCodec.decode(row).toOption.get.auditSchemaVersion,
-      "scholarchain.rag.audit-record.v2"
+      "scholarchain.rag.audit-record.v3"
     )
   }
 

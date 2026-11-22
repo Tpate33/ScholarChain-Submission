@@ -6,6 +6,7 @@ import scholarchain.core.{
   CommunityMembership,
   ComponentMembership,
   Coreness as CorenessRecord,
+  DocumentType,
   EvidenceBundle,
   EvidenceItem,
   EvidenceType,
@@ -14,7 +15,7 @@ import scholarchain.core.{
   SchemaVersions,
   TimeWindow
 }
-import scholarchain.rag.semantic.SemanticContextItem
+import scholarchain.rag.semantic.{Excerpts, SemanticContextItem}
 import scholarchain.storage.model.EntityLinkRecord
 
 /**
@@ -257,13 +258,26 @@ object BundleFacts {
         )
       case EvidenceSchemas.SemanticItem =>
         read[SemanticContextItem](it, "semantic item").map { si =>
-          f(si.subjectId, HasContextDocument, si.documentType) +: titles(si.excerpt).map(t =>
+          f(si.subjectId, HasContextDocument, si.documentType) +: titlesOf(si).map(t =>
             f(si.subjectId, Title, t)
           )
         }
       case other => Left(s"$id: unknown evidence text schema $other")
     }
   }
+
+  /**
+   * RG-P11-02 (CR-P11-01-3): the `title` facts of a semantic item. Only a `work-summary` item has
+   * titles: its excerpt is a validated context document rendered by `Excerpts.ofDocument`, whose
+   * fact lines are JSON string literals. Every other item, in particular a free-text
+   * `work-abstract` chunk whose excerpt is the raw chunk text, has none, so abstract text can never
+   * pose as a work title. A title is read only when `Excerpts.shown` would show it (the
+   * `ShownFacts` allowlist and no stable-ID-shaped part), the same rule `ofDocument` applies.
+   */
+  private def titlesOf(si: SemanticContextItem): Vector[String] =
+    if (si.documentType != DocumentType.WorkSummary.tag) Vector.empty
+    else
+      titles(si.excerpt).filter(t => Excerpts.shown(DocumentType.WorkSummary, Title, t))
 
   /** `- "title": "<value>"` lines of an excerpt (JSON string literals; nothing else is read). */
   private def titles(excerpt: String): Vector[String] =

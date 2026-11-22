@@ -293,7 +293,8 @@ class RepairP9bSuite extends munit.FunSuite {
       a.response.answerText.contains(s"The name \"Ada Lovelace\" resolves to $ada."),
       a.response.answerText
     )
-    assertEquals(ClaimVerificationAgent.Version, "scholarchain.rag.claim-verification.v3")
+    // RG-P11-02: v4 (labels never echo out-of-bundle subjects or fabricated evidence IDs).
+    assertEquals(ClaimVerificationAgent.Version, "scholarchain.rag.claim-verification.v4")
     assertEquals(ClaimRendering.Version, "scholarchain.rag.claim-rendering.v1")
   }
 

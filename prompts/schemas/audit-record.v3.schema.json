@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "scholarchain.rag.audit-record.v3",
+  "title": "ScholarChain runtime audit record (README Phase 9 stage 10)",
+  "description": "One audit record per question: IDs, versions, counts, hashes, tags and the structured plan only. No question text and no researcher name: the plan is persisted as its structure (operations, metrics, intent, window, compared window, window source, ranking rule), its researcher arguments as resolved researcher IDs or explicit unresolved entries, and its topic, venue and institution filters as key plus SHA-256 of the value. No retrieved text, no model output and never hidden reasoning. v3 (RG-P11-02): adds verifierVersion, the claim-verification version that verified the answer's claims (scholarchain.rag.claim-verification.v4), null when no claim was verified. v2 (RE-P9-04): adds plan (CR-P9-01 m5) and droppedMissingEvidence (M3, m2); bundleId names only a bundle written with the query's rows (m3); the audit row is the commit point, so a stored audit's outcome is the outcome returned (m4). The whole record is persisted as the query's QuerySession audit row (storage record named in x-persistedAs, sort key audit, create-once, auditSha256 = SHA-256 of the UTF-8 compact JSON), so x-notPersisted is empty. Refused and abstained questions are audited too. Pinned to AuditRecord by WorkflowSuite and RepairR1Suite.",
+  "x-persistedAs": "scholarchain.storage.query-audit.v1",
+  "x-notPersisted": [],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "queryId",
+    "outcome",
+    "reason",
+    "planSha256",
+    "planVersion",
+    "operations",
+    "plan",
+    "resolvedResearcherIds",
+    "abstainedNames",
+    "evidenceIds",
+    "bundleId",
+    "metricVersions",
+    "graphRunId",
+    "executedTemplates",
+    "promptVersion",
+    "outputSchemaVersion",
+    "modelVersion",
+    "nonProductionModel",
+    "synthesisAttempts",
+    "synthesisOutputSha256",
+    "inputTokens",
+    "outputTokens",
+    "latencyMillis",
+    "verification",
+    "overallVerification",
+    "droppedMissingEvidence",
+    "answerSha256",
+    "verifierVersion"
+  ],
+  "$defs": {
+    "researcherArg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nameIndex", "researcherId", "status"],
+      "properties": {
+        "nameIndex": { "type": "integer", "minimum": 0 },
+        "researcherId": { "type": ["string", "null"], "pattern": "^researcher:" },
+        "status": { "enum": ["resolved", "unresolved", "not-run"] }
+      }
+    },
+    "filter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "valueSha256", "applied"],
+      "properties": {
+        "key": { "enum": ["filter.topic", "filter.venue", "filter.institution"] },
+        "valueSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "applied": { "type": "boolean" }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ordinal",
+        "operation",
+        "metrics",
+        "intent",
+        "researchers",
+        "compareWindow",
+        "windowSource",
+        "rankingRule",
+        "filters",
+        "unresolvedArguments"
+      ],
+      "properties": {
+        "ordinal": { "type": "integer", "minimum": 0 },
+        "operation": { "type": "string" },
+        "metrics": { "type": "array", "items": { "type": "string" } },
+        "intent": { "type": ["string", "null"] },
+        "researchers": { "type": "array", "items": { "$ref": "#/$defs/researcherArg" } },
+        "compareWindow": { "type": ["string", "null"], "pattern": "^[0-9]{4}-[0-9]{4}$" },
+        "windowSource": { "type": ["string", "null"] },
+        "rankingRule": { "type": ["string", "null"] },
+        "filters": { "type": "array", "items": { "$ref": "#/$defs/filter" } },
+        "unresolvedArguments": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "properties": {
+    "schemaVersion": { "const": "scholarchain.rag.audit-record.v3" },
+    "queryId": { "type": "string", "pattern": "^query:[A-Za-z0-9._-]{1,128}$" },
+    "outcome": { "enum": ["answered", "abstained", "refused"] },
+    "reason": { "type": ["string", "null"], "description": "Abstention reason or plan refusal tag." },
+    "planSha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+    "planVersion": { "type": ["string", "null"] },
+    "operations": { "type": "array", "items": { "type": "string" } },
+    "plan": {
+      "description": "The structured QueryPlan (null for a refused question).",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["planVersion", "window", "steps"],
+          "properties": {
+            "planVersion": { "type": "string" },
+            "window": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{4}$" },
+            "steps": { "type": "array", "items": { "$ref": "#/$defs/step" } }
+          }
+        }
+      ]
+    },
+    "resolvedResearcherIds": { "type": "array", "items": { "type": "string" } },
+    "abstainedNames": { "type": "integer", "minimum": 0 },
+    "evidenceIds": { "type": "array", "items": { "type": "string", "pattern": "^ev:[0-9a-f]{64}$" } },
+    "bundleId": { "type": ["string", "null"], "description": "Only a bundle written with the query's rows." },
+    "metricVersions": {
+      "type": "array",
+      "items": { "type": "string", "description": "<record schema>|<graph policy>" }
+    },
+    "graphRunId": { "type": "string", "pattern": "^run:[0-9a-f]{64}$" },
+    "executedTemplates": { "type": "array", "items": { "type": "string" } },
+    "promptVersion": { "type": ["string", "null"], "description": "Set whenever synthesis was attempted, also on failure." },
+    "outputSchemaVersion": { "type": ["string", "null"] },
+    "modelVersion": { "type": ["string", "null"] },
+    "nonProductionModel": { "type": "boolean" },
+    "synthesisAttempts": { "type": "integer", "minimum": 0, "description": "Model calls made, also on failure." },
+    "synthesisOutputSha256": { "type": ["string", "null"] },
+    "inputTokens": { "type": ["integer", "null"] },
+    "outputTokens": { "type": ["integer", "null"] },
+    "latencyMillis": { "type": "integer", "minimum": 0 },
+    "verification": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 },
+      "propertyNames": { "enum": ["VERIFIED", "PARTIALLY_SUPPORTED", "UNSUPPORTED", "CONFLICTING"] }
+    },
+    "overallVerification": {
+      "enum": ["VERIFIED", "PARTIALLY_SUPPORTED", "UNSUPPORTED", "CONFLICTING", null]
+    },
+    "droppedMissingEvidence": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Model missingEvidence lines dropped because they are not a workflow-detected gap."
+    },
+    "answerSha256": { "type": ["string", "null"] },
+    "verifierVersion": {
+      "type": ["string", "null"],
+      "pattern": "^scholarchain\\.rag\\.claim-verification\\.v[0-9]+$",
+      "description": "The claim-verification version that verified the claims; null when no claim was verified."
+    }
+  }
+}

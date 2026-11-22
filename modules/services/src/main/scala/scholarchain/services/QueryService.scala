@@ -57,9 +57,17 @@ enum QueryMode(val tag: String) {
  */
 final case class QueryRequest(question: String, mode: QueryMode) {
 
-  /** SHA-256 of the canonical request (idempotency binding). */
+  /**
+   * SHA-256 of the canonical request (idempotency binding). U1 (CR-P11-01): every non-ASCII UTF-16
+   * code unit is rendered as a `\uXXXX` escape before hashing, so the hashed text is pure ASCII and
+   * `getBytes(UTF_8)` can never map an unpaired surrogate to `?`: distinct questions always have
+   * distinct canonical texts. (parse already refuses unpaired surrogates; this keeps the digest
+   * injective for any directly constructed request.)
+   */
   def digest: String =
-    Canonical.sha256HexUtf8(ujson.Obj("question" -> question, "mode" -> mode.tag).render())
+    Canonical.sha256HexUtf8(
+      ujson.Obj("question" -> question, "mode" -> mode.tag).render(escapeUnicode = true)
+    )
 }
 
 object QueryRequest {
@@ -110,18 +118,117 @@ object QueryRequest {
     max
   }
 
+  /** CR-P11-01-4: the fixed message of a repeated member name (the name is never echoed). */
+  val DuplicateName = "the request body repeats a member name within one object"
+
+  /** CR-P11-01-5: the fixed message of an ill-formed UTF-16 string (the text is never echoed). */
+  val UnpairedSurrogate = "the request body holds a string with an unpaired UTF-16 surrogate"
+
+  /** One open array (`names` null) or object of [[strictProblem]]. */
+  private final class Frame(val names: scala.collection.mutable.HashSet[String]) {
+    var expectName: Boolean = names != null
+  }
+
+  /** True when every surrogate code unit of `s` is part of a high-low pair. */
+  private[services] def wellFormedUtf16(s: String): Boolean = {
+    var i = 0
+    var ok = true
+    while (ok && i < s.length) {
+      val c = s.charAt(i)
+      if (Character.isHighSurrogate(c)) {
+        if (i + 1 < s.length && Character.isLowSurrogate(s.charAt(i + 1))) i += 2
+        else ok = false
+      } else if (Character.isLowSurrogate(c)) ok = false
+      else i += 1
+    }
+    ok
+  }
+
+  /** The decoded string literal whose body starts at `from` and the index after its quote. */
+  private def literal(t: String, from: Int): (String, Int) = {
+    val b = new java.lang.StringBuilder
+    var j = from
+    var open = true
+    while (open && j < t.length) {
+      val c = t.charAt(j)
+      if (c == '"') { open = false; j += 1 }
+      else if (c == '\\' && j + 1 < t.length) {
+        t.charAt(j + 1) match {
+          case 'u' if j + 5 < t.length =>
+            b.append(Integer.parseInt(t.substring(j + 2, j + 6), 16).toChar); j += 6
+          case 'b' => b.append('\b'); j += 2
+          case 'f' => b.append('\f'); j += 2
+          case 'n' => b.append('\n'); j += 2
+          case 'r' => b.append('\r'); j += 2
+          case 't' => b.append('\t'); j += 2
+          case other => b.append(other); j += 2
+        }
+      } else { b.append(c); j += 1 }
+    }
+    (b.toString, j)
+  }
+
+  /**
+   * CR-P11-01-4 and CR-P11-01-5: one linear scan of a body that ujson has ALREADY parsed (so `t` is
+   * well-formed JSON), at every nesting level. Its first problem, if any:
+   *
+   *   - a member name repeated within one object, compared after escape decoding (`"question"` and
+   *     `"question"` are the same name). ujson keeps the last value of a repeated name, so a
+   *     validating intermediary and this service could read different requests (RFC 8259 §4 leaves
+   *     the behaviour undefined; rejecting is the safe reading);
+   *   - a string, member name or value, holding an unpaired UTF-16 surrogate. The UTF-8 decoder
+   *     already refuses raw ill-formed bytes, so this can only arrive as a `\uXXXX` escape. Such
+   *     text would otherwise enter the workflow and the audit, and `String.getBytes(UTF_8)` maps it
+   *     to `?`, so two distinct questions could share one digest and byte length (U1).
+   *
+   * Both are `400 invalid-request` with a fixed message: neither the name nor the text is echoed.
+   */
+  private[services] def strictProblem(t: String): Option[String] = {
+    val stack = new java.util.ArrayDeque[Frame]()
+    var problem: Option[String] = None
+    var i = 0
+    while (problem.isEmpty && i < t.length) {
+      t.charAt(i) match {
+        case '"' =>
+          val (s, next) = literal(t, i + 1)
+          if (!wellFormedUtf16(s)) problem = Some(UnpairedSurrogate)
+          else {
+            val top = stack.peek()
+            if (top != null && top.expectName) {
+              top.expectName = false
+              if (!top.names.add(s)) problem = Some(DuplicateName)
+            }
+          }
+          i = next
+        case '{' => stack.push(new Frame(scala.collection.mutable.HashSet.empty)); i += 1
+        case '[' => stack.push(new Frame(null)); i += 1
+        case '}' | ']' =>
+          if (!stack.isEmpty) stack.pop()
+          i += 1
+        case ',' =>
+          val top = stack.peek()
+          if (top != null && top.names != null) top.expectName = true
+          i += 1
+        case _ => i += 1
+      }
+    }
+    problem
+  }
+
   def parse(body: Array[Byte], maxQuestionBytes: Int): Either[ApiError, QueryRequest] = {
-    val json: Option[ujson.Value] =
+    // Right(value) or Left(strict problem) of a well-formed body; None: not UTF-8 JSON.
+    val json: Option[Either[String, ujson.Value]] =
       utf8(body)
         .filter(nesting(_) <= MaxNesting)
         .flatMap(t =>
-          try Some(ujson.read(t))
+          try Some(ujson.read(t)).map(v => strictProblem(t).toLeft(v))
           catch { case NonFatal(_) => None }
         )
     json match {
       case None =>
         Left(ApiError(ErrorCode.InvalidJson, "the request body is not well-formed UTF-8 JSON"))
-      case Some(o: ujson.Obj) =>
+      case Some(Left(problem)) => invalid(problem)
+      case Some(Right(o: ujson.Obj)) =>
         val unknown = o.value.keySet.diff(Fields).toVector.sorted
         if (unknown.nonEmpty) invalid(s"unknown field(s): ${unknown.mkString(", ")}")
         else

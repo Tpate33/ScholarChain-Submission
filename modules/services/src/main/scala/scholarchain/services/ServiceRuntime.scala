@@ -56,11 +56,13 @@ object ServiceRuntime {
       ownership: QueryOwnership = null
   ): Either[String, ServiceRuntime] = {
     val problems = ServiceConfig.problems(config)
-    val needsWorkflow = kind.serves(ServiceKind.QueryJobs)
+    // CR-P11-01-6: `kind` is checked before any call on it, so a null kind is a Left, never an NPE.
     if (problems.nonEmpty) Left(problems.mkString("; "))
-    else if (Vector(keys, access, accessLog, clock, ids, kind).contains(null))
+    else if (kind == null) Left("kind: required (the ServiceKind to compose)")
+    else if (Vector(keys, access, accessLog, clock, ids).contains(null))
       Left("every port is required")
-    else if (needsWorkflow && workflow == null) Left("workflow: required by query-jobs")
+    else if (kind.serves(ServiceKind.QueryJobs) && workflow == null)
+      Left("workflow: required by query-jobs")
     else if (
       (kind.serves(ServiceKind.EvidenceExplain) || kind.serves(ServiceKind.Graph)) &&
       runtime == null
@@ -70,6 +72,7 @@ object ServiceRuntime {
     else if (ownership == null && kind != ServiceKind.All && kind != ServiceKind.Graph)
       Left(s"ownership: a shared QueryOwnership is required by ${kind.tag}")
     else {
+      val needsWorkflow = kind.serves(ServiceKind.QueryJobs)
       // Only the single-process composition may default to an in-memory record.
       val owners =
         Option(ownership).getOrElse(new InMemoryQueryOwnership(config.queryOwnershipCapacity))
