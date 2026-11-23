@@ -1,0 +1,42 @@
+{
+  "result": "PASS",
+  "profile": "pipeline-demo; DBLP-DERIVED; NON-PRODUCTION",
+  "analysisRunId": "run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40",
+  "limitations": [
+    "in-memory stores",
+    "template answer model",
+    "hashed-token stand-in embeddings",
+    "bounded dev sample, not full corpus or cloud deployment"
+  ],
+  "checks": [
+    {
+      "check": "health",
+      "httpStatus": 200
+    },
+    {
+      "check": "query",
+      "httpStatus": 200
+    },
+    {
+      "check": "graph",
+      "httpStatus": 200
+    },
+    {
+      "check": "evidence",
+      "httpStatus": 200
+    },
+    {
+      "check": "explain",
+      "httpStatus": 200
+    },
+    {
+      "check": "replay",
+      "httpStatus": 200
+    },
+    {
+      "check": "unauthorized",
+      "httpStatus": 401
+    }
+  ],
+  "queryId": "query:858f6f88c6b901e652c389b6684470a7"
+}

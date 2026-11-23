@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "unauthenticated",
+    "message": "an Authorization: Bearer API key is required",
+    "requestId": "req-a0cfdfd87af33a3b2bebe77f630a7599",
+    "traceId": "9afd00845c0bdd6af391fc78fddb264a"
+  }
+}

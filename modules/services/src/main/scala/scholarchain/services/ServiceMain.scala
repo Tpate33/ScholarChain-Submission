@@ -45,16 +45,48 @@ final case class ServicePorts(
 
 /**
  * Supplies settings and ports to a service main (SE-P10-03 Part B). SV-INT-02: the production
- * composition is [[ProductionServiceProvider]] (core `ProductionSettings.forProcess`, the DynamoDB
- * adapter through an injected client factory, explicit injection points for every adapter that does
- * not exist yet, failing closed when one is missing). It has no no-argument entry point yet: a main
- * finds a provider with `java.util.ServiceLoader` (one
- * `META-INF/services/scholarchain.services.ServiceProvider` entry on the classpath,
- * build-engineer), which needs the remaining production adapters first; tests pass one directly.
+ * composition is [[ProductionServiceProvider]]. SV-INT-03: the three production mains use
+ * [[ProductionLauncher]] directly (core `ProductionSettings.forLauncher`, one storage
+ * `StorageClients` bundle, released on stop and on a failed start); they do not search the
+ * classpath, so no other provider (and never the NON-PRODUCTION local demo) can be selected.
+ * [[ServiceMain.loadProvider]] (`java.util.ServiceLoader`) remains for tests and tools only.
  */
 trait ServiceProvider {
   def settings(kind: ServiceKind): Either[String, ServiceSettings]
   def ports(kind: ServiceKind): Either[String, ServicePorts]
+
+  /**
+   * Composes and starts `kind`. Default: [[settings]], [[ports]], then [[ServiceMain.start]]. A
+   * provider that owns resources (clients, pools) overrides it to release them exactly once, on a
+   * failed start and when the process stops.
+   */
+  def start(kind: ServiceKind): Either[String, RunningService] =
+    ServiceMain.startComposed(kind, this)
+}
+
+/**
+ * SV-INT-03 (G5): an idempotent release action. [[run]] runs every action once, in order, each
+ * attempted even when an earlier one throws; later calls do nothing.
+ */
+final class Release private (actions: Vector[() => Unit]) {
+  private val done = new java.util.concurrent.atomic.AtomicBoolean(false)
+
+  def run(): Unit =
+    if (done.compareAndSet(false, true))
+      actions.foreach(a =>
+        try a()
+        catch { case NonFatal(_) => () }
+      )
+
+  def hasRun: Boolean = done.get
+
+  /** This release, then `next` (each still at most once). */
+  def andThen(next: Release): Release = new Release(Vector(() => run(), () => next.run()))
+}
+
+object Release {
+  def none: Release = new Release(Vector.empty)
+  def of(actions: (() => Unit)*): Release = new Release(actions.toVector)
 }
 
 /** One started service process: its runtime and its HTTP server. */
@@ -63,7 +95,10 @@ final class RunningService private[services] (
     val runtime: ServiceRuntime,
     server: HttpServerAdapter,
     drainMillis: Long,
-    graceSeconds: Int
+    graceSeconds: Int,
+    // SV-INT-03 (G5): what the process owns besides its runtime (the launcher's storage clients);
+    // run once, after the runtime closed.
+    release: Release = Release.none
 ) {
   def port: Int = server.port
 
@@ -74,7 +109,8 @@ final class RunningService private[services] (
    *   2. the server stops accepting and waits at most `graceSeconds` for in-flight exchanges;
    *   3. the HTTP worker pool and then the admission pool each get at most `graceSeconds` to finish
    *      before they are interrupted;
-   *   4. the service pools are interrupted.
+   *   4. the service pools are interrupted;
+   *   5. SV-INT-03: the process's other resources are released (the storage clients), once.
    *
    * Worst case: `drainMillis + 3 x graceSeconds` (plus thread scheduling), with an exchange that
    * never ends; an interrupt-ignoring workflow call may keep running on a daemon thread after that,
@@ -86,8 +122,10 @@ final class RunningService private[services] (
       val drained = new java.util.concurrent.CountDownLatch(1)
       drained.await(drainMillis, java.util.concurrent.TimeUnit.MILLISECONDS)
     }
-    server.stop(graceSeconds)
-    runtime.close()
+    try {
+      server.stop(graceSeconds)
+      runtime.close()
+    } finally release.run()
   }
 }
 
@@ -98,44 +136,70 @@ object ServiceMain {
       kind: ServiceKind,
       settings: ServiceSettings,
       ports: ServicePorts
-  ): Either[String, RunningService] =
-    if (settings.graceSeconds < 0) Left("graceSeconds: must be >= 0")
-    else if (settings.drainMillis < 0) Left("drainMillis: must be >= 0")
-    else
-      for {
-        runtime <- ServiceRuntime.build(
-          ports.stores.orNull,
-          ports.workflow.orNull,
-          ports.keys,
-          settings.config,
-          ports.access,
-          ports.accessLog,
-          ports.clock,
-          ports.ids,
-          kind,
-          ports.ownership,
-          ports.state.orNull
-        )
-        server <- HttpServerAdapter.start(runtime.router, settings.server).left.map { e =>
-          runtime.close(); e
-        }
-      } yield new RunningService(
-        kind,
-        runtime,
-        server,
-        settings.drainMillis,
-        settings.graceSeconds
-      )
+  ): Either[String, RunningService] = start(kind, settings, ports, Release.none)
 
-  /** Starts one service from a provider. */
+  /**
+   * SV-INT-03 (G5): as above; `release` runs exactly once: at once when the start fails (refused
+   * settings, runtime or bind), else when the started process stops.
+   */
+  private[services] def start(
+      kind: ServiceKind,
+      settings: ServiceSettings,
+      ports: ServicePorts,
+      release: Release
+  ): Either[String, RunningService] = {
+    val started =
+      if (settings.graceSeconds < 0) Left("graceSeconds: must be >= 0")
+      else if (settings.drainMillis < 0) Left("drainMillis: must be >= 0")
+      else
+        for {
+          runtime <- ServiceRuntime.build(
+            ports.stores.orNull,
+            ports.workflow.orNull,
+            ports.keys,
+            settings.config,
+            ports.access,
+            ports.accessLog,
+            ports.clock,
+            ports.ids,
+            kind,
+            ports.ownership,
+            ports.state.orNull
+          )
+          server <- HttpServerAdapter.start(runtime.router, settings.server).left.map { e =>
+            runtime.close(); e
+          }
+        } yield new RunningService(
+          kind,
+          runtime,
+          server,
+          settings.drainMillis,
+          settings.graceSeconds,
+          release
+        )
+    started.left.foreach(_ => release.run())
+    started
+  }
+
+  /** Starts one service from a provider ([[ServiceProvider.start]]). */
   def start(kind: ServiceKind, provider: ServiceProvider): Either[String, RunningService] =
+    provider.start(kind)
+
+  /** The default [[ServiceProvider.start]]: settings, ports, then start. */
+  private[services] def startComposed(
+      kind: ServiceKind,
+      provider: ServiceProvider
+  ): Either[String, RunningService] =
     for {
       s <- provider.settings(kind)
       p <- provider.ports(kind)
       r <- start(kind, s, p)
     } yield r
 
-  /** The one provider registered on the classpath. */
+  /**
+   * The one provider registered on the classpath (`java.util.ServiceLoader`). Tests and tools only:
+   * since SV-INT-03 the production mains name their provider ([[productionProvider]]).
+   */
   def loadProvider(loader: ClassLoader): Either[String, ServiceProvider] =
     try
       ServiceLoader.load(classOf[ServiceProvider], loader).iterator().asScala.toList match {
@@ -173,28 +237,41 @@ object ServiceMain {
           0
       }
 
+  /**
+   * SV-INT-03: the provider of the three production mains: [[ProductionLauncher]] over the process
+   * environment (`SCHOLARCHAIN_CONFIG_FILES` and `SCHOLARCHAIN_CFG_*`), core `forLauncher`, and
+   * storage `StorageClients.open()`.
+   */
+  private[services] val productionProvider: () => Either[String, ServiceProvider] =
+    () => Right(new ProductionLauncher())
+
   private[services] def mainOf(kind: ServiceKind, args: Array[String]): Unit = {
-    val code = launch(
-      kind,
-      args,
-      () => loadProvider(getClass.getClassLoader),
-      m => System.err.println(m)
-    )
+    val code = launch(kind, args, productionProvider, m => System.err.println(m))
     if (code != 0) sys.exit(code)
   }
 }
 
-/** QueryJobs: POST /v1/query, GET /v1/jobs/{jobId}, GET /v1/jobs/{jobId}/result, plus ops. */
+/**
+ * QueryJobs: POST /v1/query, GET /v1/jobs/{jobId}, GET /v1/jobs/{jobId}/result, plus ops.
+ * Production entry point ([[ProductionLauncher]]); exit code 1 with a value-free reason on stderr
+ * when the configuration or a production dependency is missing.
+ */
 object QueryJobsMain {
   def main(args: Array[String]): Unit = ServiceMain.mainOf(ServiceKind.QueryJobs, args)
 }
 
-/** EvidenceExplain: GET /v1/evidence/{evidenceId}, GET /v1/explain/{queryId}, plus ops. */
+/**
+ * EvidenceExplain: GET /v1/evidence/{evidenceId}, GET /v1/explain/{queryId}, plus ops. Production
+ * entry point ([[ProductionLauncher]]).
+ */
 object EvidenceExplainMain {
   def main(args: Array[String]): Unit = ServiceMain.mainOf(ServiceKind.EvidenceExplain, args)
 }
 
-/** Graph: GET /v1/graph/nodes/{nodeId}, GET /v1/graph/nodes/{nodeId}/neighbors, plus ops. */
+/**
+ * Graph: GET /v1/graph/nodes/{nodeId}, GET /v1/graph/nodes/{nodeId}/neighbors, plus ops. Production
+ * entry point ([[ProductionLauncher]]).
+ */
 object GraphMain {
   def main(args: Array[String]): Unit = ServiceMain.mainOf(ServiceKind.Graph, args)
 }

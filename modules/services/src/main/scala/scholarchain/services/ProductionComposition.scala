@@ -3,6 +3,7 @@ package scholarchain.services
 import scholarchain.core.config.{
   DurableStateSettings,
   DynamoDbConnectionSettings,
+  LauncherSettings,
   ProcessSettings,
   ProductionSettings,
   ScholarChainConfig,
@@ -169,39 +170,59 @@ object ProductionMapping {
     } yield DynamoDbParts(client, adapter, names)
   }
 
-  /** Core's resolution of one process; Left with core's value-free messages. */
+  /**
+   * Core's `forProcess` resolution of one process; Left with core's value-free messages. Used by a
+   * [[ProductionServiceProvider]] built from a configuration (tests, compositions without adapter
+   * sections). The production mains never use it: they resolve through [[resolveLauncher]].
+   */
   def resolve(c: ScholarChainConfig, kind: ServiceKind): Either[String, ProcessSettings] =
     keyOf(kind).flatMap(k =>
       ProductionSettings.forProcess(c, k).left.map(_.map(_.message).mkString("; "))
     )
+
+  /**
+   * SV-INT-03 (criterion A1): core's `ProductionSettings.forLauncher` resolution of one process,
+   * the ONLY resolution the production mains use ([[ProductionLauncher]]). It refuses everything
+   * `forProcess` refuses and, in addition, a configuration without the process's adapter and
+   * API-key source sections. Left with core's value-free messages.
+   */
+  def resolveLauncher(c: ScholarChainConfig, kind: ServiceKind): Either[String, LauncherSettings] =
+    keyOf(kind).flatMap(k =>
+      ProductionSettings.forLauncher(c, k).left.map(_.map(_.message).mkString("; "))
+    )
 }
 
 /**
- * SV-INT-02: the production dependencies of a service process, each an EXPLICIT injection point.
- * Only the DynamoDB adapter exists in this repository (storage `DynamoDbKeyValueStore`, built here
- * from `storage.dynamodb.*` over the injected SDK-call factory). Every other production adapter is
- * not built yet and MUST be injected; a process that needs one that is `None` does not start (fail
- * closed). No in-memory fake is ever substituted, and an injected `scholarchain.storage.fake.*`
- * store is refused.
+ * SV-INT-02: the production dependencies of a service process, each an EXPLICIT injection point. A
+ * process that needs one that is `None` does not start (fail closed), naming it. No in-memory fake
+ * is ever substituted: an injected `scholarchain.storage.fake.*` store and any object of a
+ * sub-package of `scholarchain.services` (the only one is the NON-PRODUCTION local demo of
+ * SV-INT-03a) are refused. SV-INT-03: the production mains fill these from ONE storage
+ * `StorageClients` bundle ([[ProductionLauncher]], mapping core `LauncherSettings` 1:1), which they
+ * close on shutdown and on a failed start.
  *
  * @param dynamoDb
  *   builds the five-operation DynamoDB seam from the validated client settings (production: storage
- *   `DynamoDbCalls.of(DynamoDbClients.build(settings, credentials))` with the deployment's
- *   credentials provider; tests: a stub). Required by query-jobs and evidence-explain.
+ *   `StorageClients.dynamoDbFactory(RetrySetting.of(storage.dynamodb.retryMaxAttempts))`, a
+ *   `DynamoDbClientFactory` sharing the bundle's credentials provider and its explicit retry
+ *   setting, CR-INT-07-3; tests: a stub). Required by query-jobs and evidence-explain.
  * @param apiKeys
- *   the client key digests (production: an AWS Secrets Manager-backed source, NOT BUILT). Required.
+ *   the client key digests (production: the AWS Secrets Manager-backed source of SV-INT-03b, NOT
+ *   BUILT: the secretsmanager SDK module is not on the services classpath). Required.
  * @param objects
- *   ordinary S3 reads (S3 adapter, NOT BUILT). Required by query-jobs.
+ *   ordinary S3 reads (production: `StorageClients.objectReader`). Required by query-jobs.
  * @param graph
- *   Neptune reads (Neptune adapter, NOT BUILT). Required by query-jobs and graph.
+ *   Neptune reads (production: `StorageClients.graphReader`). Required by query-jobs and graph.
  * @param vectors
- *   S3 Vectors reads (S3 Vectors adapter, NOT BUILT). Required by query-jobs.
+ *   S3 Vectors reads (production: `StorageClients.vectorReader`). Required by query-jobs.
  * @param vectorIndexes
- *   S3 Vectors index inspection (same adapter, NOT BUILT). Required by query-jobs.
+ *   S3 Vectors index inspection (production: the SAME `StorageClients.vectorReader` instance).
+ *   Required by query-jobs.
  * @param workflow
  *   builds the Graph-RAG workflow over the composed runtime stores (production: rag
  *   `CollaborationWorkflow` with the production AnswerModel and query embedder, NOT BUILT; only
- *   non-production ones exist). Required by query-jobs.
+ *   non-production ones exist). Required by query-jobs. The stores it receives are bounded by the
+ *   query-jobs read policy ([[WorkflowStoreBounds]], G4).
  */
 final case class ProductionDependencies(
     dynamoDb: Option[DynamoDbClientSettings => Either[String, DynamoDbCalls]] = None,
@@ -216,13 +237,18 @@ final case class ProductionDependencies(
     ids: IdSource = IdSource.secure()
 )
 
-/** One composed production process: its settings, its ports and the reported attempt budgets. */
+/**
+ * One composed production process: its settings, its ports and the reported attempt budgets.
+ * `resources` are what the composition itself started (query-jobs: the [[WorkflowStoreBounds]]
+ * pool); [[ProductionServiceProvider.start]] releases them with the process.
+ */
 final case class ProductionComposition(
     kind: ServiceKind,
     settings: ServiceSettings,
     ports: ServicePorts,
     stateSettings: Option[ServiceStateSettings],
-    attemptBudgets: Option[CompositeAttemptBudgets]
+    attemptBudgets: Option[CompositeAttemptBudgets],
+    resources: Vector[AutoCloseable] = Vector.empty
 )
 
 /**
@@ -238,22 +264,43 @@ final case class ProductionComposition(
  *   - evidence-explain: DynamoDB (durable ownership reads; runtime table reads), API keys; S3,
  *     Neptune, S3 Vectors and the runtime writers are not composed (they refuse);
  *   - graph: Neptune, API keys; DynamoDB, S3 and S3 Vectors are not composed (they refuse).
+ *
+ * SV-INT-03: built from a configuration (`new ProductionServiceProvider(config, deps)`) it resolves
+ * through core `forProcess` (compositions and tests); the production mains build it through
+ * [[ProductionServiceProvider.launcher]] from core `forLauncher`'s `LauncherSettings` instead
+ * ([[ProductionLauncher]]), so `forProcess` is never on their path.
  */
-final class ProductionServiceProvider(config: ScholarChainConfig, deps: ProductionDependencies)
-    extends ServiceProvider {
+final class ProductionServiceProvider private (
+    resolveProcess: ServiceKind => Either[String, ProcessSettings],
+    deps: ProductionDependencies
+) extends ServiceProvider {
+
+  /** Resolves through core `ProductionSettings.forProcess` ([[ProductionMapping.resolve]]). */
+  def this(config: ScholarChainConfig, deps: ProductionDependencies) =
+    this((k: ServiceKind) => ProductionMapping.resolve(config, k), deps)
 
   def settings(kind: ServiceKind): Either[String, ServiceSettings] =
-    ProductionMapping.resolve(config, kind).map(p => ProductionMapping.serviceSettings(p.service))
+    resolveProcess(kind).map(p => ProductionMapping.serviceSettings(p.service))
 
   def ports(kind: ServiceKind): Either[String, ServicePorts] = compose(kind).map(_.ports)
 
   private def required[A](what: String, a: Option[A]): Either[String, A] =
     a.filter(_ != null).toRight(s"$what: not provided (production dependency, fail closed)")
 
-  /** An in-memory store of storage is never a production dependency. */
+  /**
+   * An in-memory store of storage is never a production dependency, and neither is any object of a
+   * SUB-PACKAGE of `scholarchain.services` (SV-INT-03a hardening): the only such package is the
+   * NON-PRODUCTION local demo, and every production class of services lives in the package itself.
+   * The rule is structural, so this source does not name the demo package (the demo's own isolation
+   * test forbids that). Checked by class and package name: a wrapper of such an object defined
+   * elsewhere passes (CR-INT-06-4, recorded); ownership of the production entry points is the
+   * primary control.
+   */
   private def notFake[A](what: String, a: A): Either[String, A] =
-    if (a.getClass.getName.startsWith("scholarchain.storage.fake."))
+    if (a.getClass.getName.startsWith(ProductionServiceProvider.StorageFakePrefix))
       Left(s"$what: an in-memory fake is not a production dependency")
+    else if (ProductionServiceProvider.servicesSubPackage(a.getClass))
+      Left(s"$what: a NON-PRODUCTION local-demo object is not a production dependency")
     else Right(a)
 
   private def injected[A](what: String, a: Option[A]): Either[String, A] =
@@ -263,7 +310,7 @@ final class ProductionServiceProvider(config: ScholarChainConfig, deps: Producti
     for {
       d <- p.dynamoDb.toRight("storage.dynamodb: not resolved")
       parts <- ProductionMapping.dynamoDbParts(d)
-      factory <- required("dynamoDb (DynamoDB SDK client factory)", deps.dynamoDb)
+      factory <- injected("dynamoDb (DynamoDB SDK client factory)", deps.dynamoDb)
       calls <- factory(parts.client).flatMap(c =>
         Option(c).toRight("dynamoDb: the client factory returned no client")
       )
@@ -293,12 +340,12 @@ final class ProductionServiceProvider(config: ScholarChainConfig, deps: Producti
 
   def compose(kind: ServiceKind): Either[String, ProductionComposition] =
     for {
-      p <- ProductionMapping.resolve(config, kind)
+      p <- resolveProcess(kind)
       settings = ProductionMapping.serviceSettings(p.service)
       keys <- injected("apiKeys (Secrets Manager ApiKeyDigestSource)", deps.apiKeys)
-      log <- required("accessLog", Option(deps.accessLog))
-      clock <- required("clock", Option(deps.clock))
-      ids <- required("ids", Option(deps.ids))
+      log <- injected("accessLog", Option(deps.accessLog))
+      clock <- injected("clock", Option(deps.clock))
+      ids <- injected("ids", Option(deps.ids))
       composed <- kind match {
         case ServiceKind.QueryJobs =>
           for {
@@ -308,20 +355,32 @@ final class ProductionServiceProvider(config: ScholarChainConfig, deps: Producti
             graph <- injected("graph (Neptune GraphReader)", deps.graph)
             vectors <- injected("vectors (S3 Vectors VectorReader)", deps.vectors)
             indexes <- injected("vectorIndexes (S3 Vectors IndexInspector)", deps.vectorIndexes)
-            stores = RuntimeStores(
-              objects,
-              kv,
-              kv,
-              graph,
-              vectors,
-              indexes,
-              EmbeddingPolicy.RealModelsOnly
-            )
-            factory <- required(
+            factory <- injected(
               "workflow (rag CollaborationWorkflow with the production AnswerModel and embedder)",
               deps.workflow
             )
-            wf <- factory(stores).flatMap(w => Option(w).toRight("workflow: none was built"))
+            // G4: every store call of the workflow runs under the query-jobs read policy. The
+            // service-state stores (durable ownership, jobs, idempotency) are not wrapped: they
+            // already run under the key-value policy (writeTracked).
+            bounds = WorkflowStoreBounds(settings.config, clock)
+            stores = RuntimeStores(
+              bounds.objects(objects),
+              bounds.keyValues(kv),
+              bounds.writer(kv),
+              bounds.graph(graph),
+              bounds.vectors(vectors),
+              bounds.indexes(indexes),
+              EmbeddingPolicy.RealModelsOnly
+            )
+            wf <- ProductionLauncher
+              .guard("workflow")(factory(stores))
+              .flatMap(identity)
+              .flatMap(w => Option(w).toRight("workflow: none was built"))
+              .flatMap(notFake("workflow", _))
+              .left
+              .map { e =>
+                bounds.close(); e
+              }
           } yield (
             ServicePorts(
               Some(stores),
@@ -334,7 +393,8 @@ final class ProductionServiceProvider(config: ScholarChainConfig, deps: Producti
               ids,
               Some(st.ports)
             ),
-            Some(st.settings)
+            Some(st.settings),
+            Vector[AutoCloseable](bounds)
           )
         case ServiceKind.EvidenceExplain =>
           for {
@@ -360,7 +420,8 @@ final class ProductionServiceProvider(config: ScholarChainConfig, deps: Producti
               clock,
               ids
             ),
-            Some(st.settings)
+            Some(st.settings),
+            Vector.empty[AutoCloseable]
           )
         case _ =>
           for {
@@ -385,17 +446,75 @@ final class ProductionServiceProvider(config: ScholarChainConfig, deps: Producti
               clock,
               ids
             ),
-            None
+            None,
+            Vector.empty[AutoCloseable]
           )
       }
-    } yield ProductionComposition(kind, settings, composed._1, composed._2, budgets(p))
+    } yield ProductionComposition(
+      kind,
+      settings,
+      composed._1,
+      composed._2,
+      budgets(p),
+      composed._3
+    )
 
   /**
    * Composes and starts `kind`. Attempt IDs are the runtime's `AttemptTokens.secureRandom()` (128
-   * random bits per logical request).
+   * random bits per logical request). The composition's own resources are released when the process
+   * stops or when the start fails.
    */
-  def start(kind: ServiceKind): Either[String, RunningService] =
-    compose(kind).flatMap(c => ServiceMain.start(kind, c.settings, c.ports))
+  override def start(kind: ServiceKind): Either[String, RunningService] =
+    startReleasing(kind, Release.none)
+
+  /**
+   * SV-INT-03 (G5): as [[start]], and `release` (the launcher's storage clients) runs EXACTLY ONCE:
+   * at once when composing or starting fails, else when the started process stops, after its
+   * runtime closed.
+   */
+  private[services] def startReleasing(
+      kind: ServiceKind,
+      release: Release
+  ): Either[String, RunningService] =
+    compose(kind) match {
+      case Left(e) =>
+        release.run()
+        Left(e)
+      case Right(c) =>
+        ServiceMain.start(
+          kind,
+          c.settings,
+          c.ports,
+          Release.of(c.resources.map(r => () => r.close())*).andThen(release)
+        )
+    }
+}
+
+object ProductionServiceProvider {
+  val StorageFakePrefix = "scholarchain.storage.fake."
+
+  /** This package (the services production package). */
+  val ServicesPackage: String = classOf[ProductionServiceProvider].getPackageName
+
+  /** True when `c` lives in a strict sub-package of [[ServicesPackage]] (NON-PRODUCTION). */
+  def servicesSubPackage(c: Class[?]): Boolean =
+    c != null && c.getPackageName.startsWith(ServicesPackage + ".")
+
+  /**
+   * SV-INT-03: the provider of ONE process resolved by core `forLauncher` (`settings.process` is
+   * exactly `forProcess`'s result for that kind); every other kind is refused.
+   */
+  private[services] def launcher(
+      kind: ServiceKind,
+      settings: LauncherSettings,
+      deps: ProductionDependencies
+  ): ProductionServiceProvider =
+    new ProductionServiceProvider(
+      (k: ServiceKind) =>
+        if (k == kind && settings != null && settings.process != null) Right(settings.process)
+        else Left(s"kind: this launcher composes ${kind.tag} only"),
+      deps
+    )
 }
 
 /**

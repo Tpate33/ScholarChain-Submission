@@ -1,0 +1,41 @@
+{
+  "baseCommit": "bdbf5df02133a0cb5f7493fcd1fd08b98469db60",
+  "scope": "Integration 02 implementation; independent local-checkpoint reviews plus SV-INT-04 repair re-review",
+  "reviewers": [
+    "code_reviewer_services",
+    "code_reviewer_local"
+  ],
+  "sha256": {
+    "build.sbt": "56e694fe6cc596c1d0fe7e2185bb979e6f7a47accfc7f8de43712be6ac9a86e1",
+    "modules/services/src/main/resources/scholarchain/local-demo/api-keys.v1.json": "10b3c775b80e62b00595b1e8b94bb4eb8b7224622212caa2d608da095affba2a",
+    "modules/services/src/main/resources/scholarchain/local-demo/world.v1.json": "effb6a47b788b5925e2a4fe856f1e6e97d2a8797cfbf34a904f0d78ac323bf4b",
+    "modules/services/src/main/scala/scholarchain/services/HttpServerAdapter.scala": "8eb55a740dbf5f0af8054ef5a5aa29b46af3c707441180c6e834163b30e16308",
+    "modules/services/src/main/scala/scholarchain/services/ProductionComposition.scala": "1d06fd313b0ee84ceb4080fa433ef8ae13cb0268fce8c0161ff4bcb90b2056c6",
+    "modules/services/src/main/scala/scholarchain/services/ProductionLauncher.scala": "59f681cd37c94338e94050dd3ef22aacc83ccd8d3fef7c0dd23ee970af42f94e",
+    "modules/services/src/main/scala/scholarchain/services/ServiceMain.scala": "6c15037419683f2182aba21c2a43f2e71b6f8ba71c1118e376a370e59767805b",
+    "modules/services/src/main/scala/scholarchain/services/WorkflowStoreBounds.scala": "f1174b3698853e5851468bfef5bdc11f62a523084e357bf7fd5672dc39b99c3c",
+    "modules/services/src/main/scala/scholarchain/services/localdemo/LocalDemo.scala": "6fe984342cff7b1b0b7dc822afd29b466639d11a0f3b522979d3e13f464ef257",
+    "modules/services/src/main/scala/scholarchain/services/localdemo/LocalDemoWorld.scala": "54694c0e57e016ba41b571fedc7a60df5e5efa2c6dfa1f2071bd499c9063bc5c",
+    "modules/services/src/main/scala/scholarchain/services/localdemo/PipelineDemo.scala": "20c2ce3dac9f49c47fa71643c1a301446b9885e2a25c4e2f067d4b4c010c4c1e",
+    "modules/services/src/test/scala/scholarchain/services/LauncherFixture.scala": "ad4b20f29196e9a8d62231772e3474899fc7fa1c38049c34418ca1a6b8a337ad",
+    "modules/services/src/test/scala/scholarchain/services/ProductionLauncherSuite.scala": "4a188f0b5d353d889ebc060e773c1b7e011ed4b585c219ff145b40c8c7b180c4",
+    "modules/services/src/test/scala/scholarchain/services/WorkflowStoreBoundsSuite.scala": "afeb37707effa433fdfb7d6542ce019fdff4d1b7f7f562b35e38b1aed64e88c9",
+    "modules/services/src/test/scala/scholarchain/services/localdemo/LocalDemoIsolationSuite.scala": "4a36113066c3119ccc36153fedea8fec2d09b77f2271ebfcb9a30ad60c43b0fe",
+    "modules/services/src/test/scala/scholarchain/services/localdemo/LocalDemoSuite.scala": "ce557342564d2a3c3123dabb64f3275315837fce30bae0673bc10d39fbf18de6",
+    "scripts/demo-smoke.py": "6539d85c783a90f169422ce62283b39693f2505f39f89291ac65a4b2a4382142",
+    "scripts/emr/check-submit-args.sh": "dbd661d9f08775d8505216d4e3ca7e004e396c92d668a36cd4143c676cf33f33",
+    "scripts/emr/submit-collaboration-job.sh": "8ae6952b68fe2c0fc1c6fa269b7cfc9cb8038e4190357c2ece58fa74635f8d05",
+    "scripts/local-demo.sh": "cfb41ea1e223b0efdbbbbc327b07e84647dbb72ce5d1e1a9aab12f9d7d6494cb",
+    "scripts/pipeline-demo-smoke.py": "a13d5769c83963dd1ecac90da6a5764dd832ba52cb2c5794e1a3ce00e9736fb0",
+    "scripts/pipeline-demo.sh": "4f2322122e734bcfa4dd2e0edd5a7e6d81306fffb75c42b4b01c6593dcf0e0d5",
+    "tests/src/test/scala/scholarchain/tests/services/PipelineDemoSuite.scala": "28d41f0576377a2af52585220d941660327d9cf3fb5ec94663cb9153b3a8e5f7"
+  },
+  "executable": {
+    "scripts/demo-smoke.py": true,
+    "scripts/emr/check-submit-args.sh": true,
+    "scripts/emr/submit-collaboration-job.sh": true,
+    "scripts/local-demo.sh": true,
+    "scripts/pipeline-demo-smoke.py": true,
+    "scripts/pipeline-demo.sh": true
+  }
+}

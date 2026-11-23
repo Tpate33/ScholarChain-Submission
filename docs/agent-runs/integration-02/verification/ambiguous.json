@@ -1,0 +1,23 @@
+{
+  "queryId": "query:da84c843116c2a077bba544a283d8495",
+  "status": "abstained",
+  "abstention": {
+    "reason": "identity-unresolved",
+    "gaps": [],
+    "names": [
+      {
+        "ordinal": 0,
+        "reason": "multiple-candidates",
+        "candidateIds": [
+          "researcher:sc:v1:1ce2675b268fc61199282100a43a1759d791e7724070f2be2a4b205ba196911b",
+          "researcher:sc:v1:bc253780821431f7fcb236a74d070f3494ca76ecc43cf061588cb22bb4818fc8"
+        ],
+        "truncated": false
+      }
+    ]
+  },
+  "auditPersisted": true,
+  "links": {
+    "explain": "/v1/explain/query:da84c843116c2a077bba544a283d8495"
+  }
+}

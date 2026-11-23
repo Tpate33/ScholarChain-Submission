@@ -1,0 +1,28 @@
+==============================================================================
+  ScholarChain LOCAL DEMO -- NON-PRODUCTION
+  In-memory fixture world (Phase 9 rag fixture), NON-PRODUCTION template synthesizer and
+  stand-in embedder, local API-key digest fixture. No AWS, no model call, no real data.
+  profile=local-demo listening=http://127.0.0.1:50676 (loopback only)
+  demo API key (documented, NOT A SECRET): scholarchain-local-demo-key-NOT-A-SECRET
+  researchers (graph node IDs):
+    ada Ada Lovelace: researcher:sc:v1:7dcacfaeb4145283f3a65fc3aaf65fd43ddcbd0f90c074be957a08fc227d5fac
+    bob John Smith (1): researcher:sc:v1:1ce2675b268fc61199282100a43a1759d791e7724070f2be2a4b205ba196911b
+    cyd John Smith (2): researcher:sc:v1:bc253780821431f7fcb236a74d070f3494ca76ecc43cf061588cb22bb4818fc8
+    dan Dan Brown: researcher:sc:v1:3a37e5c9bf561f442e0ddce09b21ecee61925384738ddf9d0b94649da022aa70
+    eve Eve Adams: researcher:sc:v1:3bc655f3d9f18095ab196ae3641e1a7a353da9e25c2e257012f46bd28a46bd16
+  example questions:
+    Who are the coauthors of Ada Lovelace?
+    What is the shortest path between Ada Lovelace and Dan Brown?
+    Which researchers bridge communities?
+    Who has the most distinct coauthors?
+    Who are the coauthors of John Smith?
+  stop: Ctrl-C or SIGTERM
+==============================================================================
+2026-11-23 11:40:58,293 INFO  scholarchain.services.access - http method=GET route=GET /healthz status=200 durationMs=6 requestId=req-3ff014a65c2258854a2f3739983a3473 traceId=05d458508773ce9fa14815583c663ef6 client=- error=-
+2026-11-23 11:40:58,431 INFO  scholarchain.services.access - http method=POST route=POST /v1/query status=200 durationMs=124 requestId=req-3ff1034b4aff4c2a76774e9ec198169b traceId=f691b00675f1f192575eed6a75e581aa client=local-demo-client error=-
+2026-11-23 11:40:58,437 INFO  scholarchain.services.access - http method=GET route=GET /v1/evidence/{evidenceId} status=200 durationMs=3 requestId=req-5d9b0309e34eaa7f01d47f601bffb29f traceId=ecbe7a1e8bd66428e4f867df90557073 client=local-demo-client error=-
+2026-11-23 11:40:58,446 INFO  scholarchain.services.access - http method=GET route=GET /v1/explain/{queryId} status=200 durationMs=7 requestId=req-1d6b21ed1cab770e72ea335f7ecdb682 traceId=d675d602e714d28dc3effd46c796f044 client=local-demo-client error=-
+2026-11-23 11:40:58,452 INFO  scholarchain.services.access - http method=GET route=GET /v1/graph/nodes/{nodeId}/neighbors status=200 durationMs=4 requestId=req-13dc777b287a52d84fc99ff735d66902 traceId=8f995643eb4cedba2e66cfec72ce0be9 client=local-demo-client error=-
+2026-11-23 11:40:58,456 INFO  scholarchain.services.access - http method=POST route=POST /v1/query status=401 durationMs=1 requestId=req-a0cfdfd87af33a3b2bebe77f630a7599 traceId=9afd00845c0bdd6af391fc78fddb264a client=- error=unauthenticated
+2026-11-23 11:40:58,458 INFO  scholarchain.services.access - http method=POST route=POST /v1/query status=200 durationMs=0 requestId=req-34b03928c08a0095fd86d216d6236019 traceId=6b5133dd309cd4a08064b0020293a47f client=local-demo-client error=-
+2026-11-23 11:40:58,470 INFO  scholarchain.services.access - http method=POST route=POST /v1/query status=200 durationMs=10 requestId=req-4705bd3d5b3bd8cd5e798789ce956ccd traceId=c40acc8ead443a3ff88a2c88a32b138b client=local-demo-client error=-

@@ -115,7 +115,12 @@ object HttpServerAdapter {
     )
   }
 
-  private def handle(router: Router, maxBodyBytes: Int, ex: HttpExchange): Unit =
+  private def handle(
+      router: Router,
+      maxBodyBytes: Int,
+      extraHeaders: Vector[(String, String)],
+      ex: HttpExchange
+  ): Unit =
     try {
       val res =
         if (Admission.get().booleanValue)
@@ -125,14 +130,25 @@ object HttpServerAdapter {
           router.handle(requestOf(ex, body, tooLarge))
         }
       res.headers.foreach { case (k, v) => ex.getResponseHeaders.add(k, v) }
+      extraHeaders.foreach { case (k, v) => ex.getResponseHeaders.add(k, v) }
       ex.sendResponseHeaders(res.status, if (res.body.isEmpty) -1L else res.body.length.toLong)
       if (res.body.nonEmpty) ex.getResponseBody.write(res.body)
     } catch {
       case NonFatal(_) => () // the exchange is closed below; the client sees a reset
     } finally ex.close()
 
-  def start(router: Router, s: Settings): Either[String, HttpServerAdapter] =
+  /**
+   * Binds and starts the server. `extraHeaders` are added to EVERY response (admission and router
+   * responses alike); production composition passes none. SV-INT-03a: the NON-PRODUCTION local demo
+   * passes its profile header here.
+   */
+  def start(
+      router: Router,
+      s: Settings,
+      extraHeaders: Vector[(String, String)] = Vector.empty
+  ): Either[String, HttpServerAdapter] =
     if (s.host == null || s.host.isEmpty) Left("host: missing")
+    else if (extraHeaders == null) Left("extraHeaders: null")
     else if (s.port < 0 || s.port > 65535) Left("port: must be 0..65535")
     else if (
       s.backlog < 1 || s.workers < 1 || s.queueCapacity < 1 || s.maxBodyBytes < 1 ||
@@ -152,7 +168,10 @@ object HttpServerAdapter {
           })
         val workers = Pools.bounded("http", s.workers, s.queueCapacity, toAdmission)
         server.setExecutor(workers)
-        server.createContext("/", (ex: HttpExchange) => handle(router, s.maxBodyBytes, ex))
+        server.createContext(
+          "/",
+          (ex: HttpExchange) => handle(router, s.maxBodyBytes, extraHeaders, ex)
+        )
         server.start()
         Right(new HttpServerAdapter(server, workers, admission))
       } catch { case NonFatal(e) => Left(s"could not bind: ${e.getClass.getSimpleName}") }

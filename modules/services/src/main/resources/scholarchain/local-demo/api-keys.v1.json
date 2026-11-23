@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "scholarchain.services.local-demo-api-keys.v1",
+  "nonProduction": true,
+  "description": "NON-PRODUCTION local demo API-key digests (SV-INT-03a). SHA-256 digests only; the demo key is a documented, non-secret value (see LocalDemo.DemoApiKey). Never a production credential source.",
+  "clients": [
+    {
+      "clientId": "local-demo-client",
+      "keySha256Hex": "4b7ca96fd268ae0e0f04108a866de5259641cc2ca3554adf1eea0be4d82608e4",
+      "scopes": ["query", "read", "ops"]
+    }
+  ]
+}

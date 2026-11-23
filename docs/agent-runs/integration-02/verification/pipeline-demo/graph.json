@@ -1,0 +1,46 @@
+{
+  "nodeId": "researcher:orcid:0000-0002-3783-0679",
+  "edgeType": "coauthored-with",
+  "depth": 1,
+  "window": "1970-2026",
+  "items": [
+    {
+      "nodeId": "researcher:orcid:0000-0001-6747-126X",
+      "edgeType": "coauthored-with",
+      "hop": 1,
+      "properties": {
+        "jointPublicationCount": 1,
+        "firstCollaborationYear": 2023,
+        "lastCollaborationYear": 2023,
+        "sourceEvidence": "coauthor:0086e976ea3f4ac5cbeeeb19ec262d14f8f58dc9cfe9f2eca9e571f39757d1a8"
+      }
+    },
+    {
+      "nodeId": "researcher:sc:v1:16f0b1e72bb44dc6c1d231e6ae1a7d11d340a481ed6641f666cd4c9a99d8c34e",
+      "edgeType": "coauthored-with",
+      "hop": 1,
+      "properties": {
+        "jointPublicationCount": 1,
+        "firstCollaborationYear": 2023,
+        "lastCollaborationYear": 2023,
+        "sourceEvidence": "coauthor:484d244c0563500917df0fb61a50c13cdd99d6786524ce133ed038bde53c416d"
+      }
+    },
+    {
+      "nodeId": "researcher:sc:v1:2e518a51bfc969e27e3edc08cbca3bff64e13aa45d9b3953bbaca61e00199bf0",
+      "edgeType": "coauthored-with",
+      "hop": 1,
+      "properties": {
+        "jointPublicationCount": 1,
+        "firstCollaborationYear": 2023,
+        "lastCollaborationYear": 2023,
+        "sourceEvidence": "coauthor:c3df75c0e6057eec3cf4888d3ff39fd23651d4ec55098eb5314f265feb94e89b"
+      }
+    }
+  ],
+  "page": {
+    "limit": 10,
+    "cursor": null,
+    "nextCursor": null
+  }
+}

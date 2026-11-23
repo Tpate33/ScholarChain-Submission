@@ -1,0 +1,215 @@
+{
+  "queryId": "query:5b15b366f36add2beee79724ac5b42ea",
+  "status": "answered",
+  "answer": {
+    "schemaVersion": "scholarchain.answer-response.v1",
+    "responseId": "answer:8808b7407238fb812557fcc1f4c282a6550ffab472fb568f9b8d6374e634e97b",
+    "queryId": "query:5b15b366f36add2beee79724ac5b42ea",
+    "window": {
+      "startYear": 2018,
+      "endYear": 2022
+    },
+    "answerText": "[NON-PRODUCTION template synthesizer: deterministic test stand-in, not a language model]\nThe name \"Ada Lovelace\" resolves to researcher:sc:v1:7dcacfaeb4145283f3a65fc3aaf65fd43ddcbd0f90c074be957a08fc227d5fac. In 2018-2022, researcher:sc:v1:7dcacfaeb4145283f3a65fc3aaf65fd43ddcbd0f90c074be957a08fc227d5fac has identity-status resolved.\nIn 2018-2022, researcher:sc:v1:7dcacfaeb4145283f3a65fc3aaf65fd43ddcbd0f90c074be957a08fc227d5fac has coauthor researcher:sc:v1:1ce2675b268fc61199282100a43a1759d791e7724070f2be2a4b205ba196911b. In 2018-2022, the coauthor pair researcher:sc:v1:1ce2675b268fc61199282100a43a1759d791e7724070f2be2a4b205ba196911b and researcher:sc:v1:7dcacfaeb4145283f3a65fc3aaf65fd43ddcbd0f90c074be957a08fc227d5fac has joint-publication-count 2.\nCollaboration intensity is repeated work with the same coauthors: the joint publication count of a coauthor edge and the weighted degree W_r (the sum of joint publication counts).",
+    "claims": [
+      {
+        "schemaVersion": "scholarchain.answer-claim.v1",
+        "claimId": "claim:020959beb9fc06429d88b471c68413098be398eb8832ed9f7b66ab033bcd5dbf",
+        "text": "The name \"Ada Lovelace\" resolves to researcher:sc:v1:7dcacfaeb4145283f3a65fc3aaf65fd43ddcbd0f90c074be957a08fc227d5fac. In 2018-2022, researcher:sc:v1:7dcacfaeb4145283f3a65fc3aaf65fd43ddcbd0f90c074be957a08fc227d5fac has identity-status resolved.",
+        "evidenceIds": [
+          "ev:fd0f197bd326649901c12c7311575e0a5ecd495a1758b0576a61ca3ddb864b67",
+          "ev:36f814e69887da0c3e43c595d64a6c9732bfad9eb08427dcb4ae2bc094baf45d"
+        ],
+        "verificationStatus": "supported",
+        "confidence": null,
+        "uncertainty": null,
+        "provenance": {
+          "sourceDataset": "scholarchain-runtime",
+          "sourceRecordId": "query:5b15b366f36add2beee79724ac5b42ea",
+          "snapshot": "local-demo-nonproduction",
+          "runId": "run:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sourceSchemaVersion": "scholarchain.query-plan.v1",
+          "policyVersion": "scholarchain.rag.claim-verification.v4",
+          "modelVersion": "nonproduction-template-synthesizer.v1",
+          "promptVersion": "scholarchain.rag.prompt.answer-synthesis.v3"
+        }
+      },
+      {
+        "schemaVersion": "scholarchain.answer-claim.v1",
+        "claimId": "claim:33ea5aa5c8a28ef769409776fbcde471a9766ecc1b7c5891b5809b24890a26d7",
+        "text": "In 2018-2022, researcher:sc:v1:7dcacfaeb4145283f3a65fc3aaf65fd43ddcbd0f90c074be957a08fc227d5fac has coauthor researcher:sc:v1:1ce2675b268fc61199282100a43a1759d791e7724070f2be2a4b205ba196911b. In 2018-2022, the coauthor pair researcher:sc:v1:1ce2675b268fc61199282100a43a1759d791e7724070f2be2a4b205ba196911b and researcher:sc:v1:7dcacfaeb4145283f3a65fc3aaf65fd43ddcbd0f90c074be957a08fc227d5fac has joint-publication-count 2.",
+        "evidenceIds": [
+          "ev:22fd8a77f774c96a6d92bb94990f3aee2a84cf93e29e2bebf83cd69df61e156a"
+        ],
+        "verificationStatus": "supported",
+        "confidence": null,
+        "uncertainty": null,
+        "provenance": {
+          "sourceDataset": "scholarchain-runtime",
+          "sourceRecordId": "query:5b15b366f36add2beee79724ac5b42ea",
+          "snapshot": "local-demo-nonproduction",
+          "runId": "run:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sourceSchemaVersion": "scholarchain.query-plan.v1",
+          "policyVersion": "scholarchain.rag.claim-verification.v4",
+          "modelVersion": "nonproduction-template-synthesizer.v1",
+          "promptVersion": "scholarchain.rag.prompt.answer-synthesis.v3"
+        }
+      }
+    ],
+    "evidenceBundle": {
+      "schemaVersion": "scholarchain.evidence-bundle.v1",
+      "bundleId": "bundle:b913dcef2cf2470c6e18eba14a5d16838126cd14c192f7d56f30e09d036a6376",
+      "queryId": "query:5b15b366f36add2beee79724ac5b42ea",
+      "items": [
+        {
+          "schemaVersion": "scholarchain.evidence-item.v1",
+          "evidenceId": "ev:fd0f197bd326649901c12c7311575e0a5ecd495a1758b0576a61ca3ddb864b67",
+          "evidenceType": "match-decision",
+          "workId": null,
+          "sourceUri": "scholarchain-kv://EntityLinkCache/surface%23177f85df57ad121d5aaac8076a4a0554a673182fe06cf65ee7d9f7d0961f947d/researcher%23researcher%3Asc%3Av1%3A7dcacfaeb4145283f3a65fc3aaf65fd43ddcbd0f90c074be957a08fc227d5fac",
+          "chunkId": null,
+          "graphPath": null,
+          "score": 0,
+          "text": "{\"schemaVersion\":\"scholarchain.storage.entity-link.v1\",\"surfaceSha256\":\"177f85df57ad121d5aaac8076a4a0554a673182fe06cf65ee7d9f7d0961f947d\",\"researcherId\":\"researcher:sc:v1:7dcacfaeb4145283f3a65fc3aaf65fd43ddcbd0f90c074be957a08fc227d5fac\",\"matchedBy\":\"exact-name\",\"candidateRank\":1,\"sourceRunId\":\"run:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"expiresAtEpochSeconds\":1900000000}",
+          "provenance": {
+            "sourceDataset": "scholarchain-derived",
+            "sourceRecordId": "researcher:sc:v1:7dcacfaeb4145283f3a65fc3aaf65fd43ddcbd0f90c074be957a08fc227d5fac",
+            "snapshot": "local-demo-nonproduction",
+            "runId": "run:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sourceSchemaVersion": "scholarchain.rag-entity-link.v1",
+            "policyVersion": "scholarchain.rag.surface-form.v1",
+            "modelVersion": null,
+            "promptVersion": null
+          }
+        },
+        {
+          "schemaVersion": "scholarchain.evidence-item.v1",
+          "evidenceId": "ev:36f814e69887da0c3e43c595d64a6c9732bfad9eb08427dcb4ae2bc094baf45d",
+          "evidenceType": "metric",
+          "workId": null,
+          "sourceUri": "scholarchain-kv://ResearcherMetricCache/subject%23researcher%3Asc%3Av1%3A7dcacfaeb4145283f3a65fc3aaf65fd43ddcbd0f90c074be957a08fc227d5fac/metric%23researcher-metrics%232018-2022",
+          "chunkId": null,
+          "graphPath": null,
+          "score": 0,
+          "text": "{\"schemaVersion\":\"scholarchain.researcher-metrics.v2\",\"researcherId\":\"researcher:sc:v1:7dcacfaeb4145283f3a65fc3aaf65fd43ddcbd0f90c074be957a08fc227d5fac\",\"window\":{\"startYear\":2018,\"endYear\":2022},\"publicationCount\":2,\"distinctCoauthorCount\":1,\"totalCoauthorOccurrences\":2,\"unresolvedCoauthorOccurrences\":0,\"worksWithUnresolvedCoauthors\":0,\"averageCoauthorsPerPaper\":1,\"maximumCoauthorsOnOnePaper\":1,\"maximumTeamWorkIds\":[\"work:dblp:conf/demo/W1\"],\"weightedDegree\":2,\"identity\":{\"status\":\"resolved\",\"anchorNamespace\":\"dblp-pid\",\"memberCount\":2,\"collisionCodes\":[],\"lowestDecisionConfidence\":{\"kind\":\"measured\",\"value\":0.93,\"unknownReason\":null}},\"lineage\":{\"groupingRunId\":\"run:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"decisionRunId\":\"run:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"inputRunId\":\"run:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"codeVersion\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"configDigest\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"groupingPolicyVersion\":\"er-grouping.v1\",\"matchPolicyVersion\":\"er-policy.v8\",\"identityVersion\":\"v1\",\"groupingEvaluation\":\"unevaluated\"},\"provenance\":{\"sourceDataset\":\"scholarchain-derived\",\"sourceRecordId\":\"researcher:sc:v1:7dcacfaeb4145283f3a65fc3aaf65fd43ddcbd0f90c074be957a08fc227d5fac\",\"snapshot\":\"local-demo-nonproduction\",\"runId\":\"run:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"sourceSchemaVersion\":\"scholarchain.researcher-assignment.v1\",\"policyVersion\":\"graph-policy.v1\",\"modelVersion\":null,\"promptVersion\":null}}",
+          "provenance": {
+            "sourceDataset": "scholarchain-derived",
+            "sourceRecordId": "researcher:sc:v1:7dcacfaeb4145283f3a65fc3aaf65fd43ddcbd0f90c074be957a08fc227d5fac",
+            "snapshot": "local-demo-nonproduction",
+            "runId": "run:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sourceSchemaVersion": "scholarchain.researcher-metrics.v2",
+            "policyVersion": "graph-policy.v1",
+            "modelVersion": null,
+            "promptVersion": null
+          }
+        },
+        {
+          "schemaVersion": "scholarchain.evidence-item.v1",
+          "evidenceId": "ev:22fd8a77f774c96a6d92bb94990f3aee2a84cf93e29e2bebf83cd69df61e156a",
+          "evidenceType": "coauthor-edge",
+          "workId": null,
+          "sourceUri": "scholarchain-kv://ResearcherMetricCache/subject%23coauthor%3Af0fd3a6b43ee6144030630369fd1dcf1b6dc8e21e6c5b571f6821a9ba11d879f/metric%23coauthor-edges%232018-2022",
+          "chunkId": null,
+          "graphPath": [
+            "researcher:sc:v1:1ce2675b268fc61199282100a43a1759d791e7724070f2be2a4b205ba196911b",
+            "researcher:sc:v1:7dcacfaeb4145283f3a65fc3aaf65fd43ddcbd0f90c074be957a08fc227d5fac"
+          ],
+          "score": 0,
+          "text": "{\"schemaVersion\":\"scholarchain.coauthor-edge.v2\",\"edgeId\":\"coauthor:f0fd3a6b43ee6144030630369fd1dcf1b6dc8e21e6c5b571f6821a9ba11d879f\",\"researcherA\":\"researcher:sc:v1:1ce2675b268fc61199282100a43a1759d791e7724070f2be2a4b205ba196911b\",\"researcherB\":\"researcher:sc:v1:7dcacfaeb4145283f3a65fc3aaf65fd43ddcbd0f90c074be957a08fc227d5fac\",\"window\":{\"startYear\":2018,\"endYear\":2022},\"jointPublicationCount\":2,\"firstCollaborationYear\":2019,\"lastCollaborationYear\":2021,\"publicationsByYear\":[{\"year\":2019,\"count\":1},{\"year\":2021,\"count\":1}],\"supportingWorkIds\":[\"work:dblp:conf/demo/W1\",\"work:dblp:conf/demo/W2\"],\"lineage\":{\"groupingRunId\":\"run:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"decisionRunId\":\"run:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"inputRunId\":\"run:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"codeVersion\":\"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"configDigest\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"groupingPolicyVersion\":\"er-grouping.v1\",\"matchPolicyVersion\":\"er-policy.v8\",\"identityVersion\":\"v1\",\"groupingEvaluation\":\"unevaluated\"},\"provenance\":{\"sourceDataset\":\"scholarchain-derived\",\"sourceRecordId\":\"coauthor:f0fd3a6b43ee6144030630369fd1dcf1b6dc8e21e6c5b571f6821a9ba11d879f\",\"snapshot\":\"local-demo-nonproduction\",\"runId\":\"run:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"sourceSchemaVersion\":\"scholarchain.researcher-assignment.v1\",\"policyVersion\":\"graph-policy.v1\",\"modelVersion\":null,\"promptVersion\":null}}",
+          "provenance": {
+            "sourceDataset": "scholarchain-derived",
+            "sourceRecordId": "coauthor:f0fd3a6b43ee6144030630369fd1dcf1b6dc8e21e6c5b571f6821a9ba11d879f",
+            "snapshot": "local-demo-nonproduction",
+            "runId": "run:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sourceSchemaVersion": "scholarchain.coauthor-edge.v2",
+            "policyVersion": "graph-policy.v1",
+            "modelVersion": null,
+            "promptVersion": null
+          }
+        },
+        {
+          "schemaVersion": "scholarchain.evidence-item.v1",
+          "evidenceId": "ev:5bdf130d5818f3a56a27e07bb011c7bea87a15f7f65481d4f29fdf27fdb4906c",
+          "evidenceType": "source-record",
+          "workId": "work:dblp:conf/demo/W1",
+          "sourceUri": "scholarchain-kv://ResearcherMetricCache/subject%23coauthor%3Af0fd3a6b43ee6144030630369fd1dcf1b6dc8e21e6c5b571f6821a9ba11d879f/metric%23coauthor-edges%232018-2022",
+          "chunkId": null,
+          "graphPath": null,
+          "score": 0,
+          "text": "{\"schemaVersion\":\"scholarchain.rag-publication-support.v1\",\"workId\":\"work:dblp:conf/demo/W1\",\"coauthorEdgeId\":\"coauthor:f0fd3a6b43ee6144030630369fd1dcf1b6dc8e21e6c5b571f6821a9ba11d879f\",\"researcherA\":\"researcher:sc:v1:1ce2675b268fc61199282100a43a1759d791e7724070f2be2a4b205ba196911b\",\"researcherB\":\"researcher:sc:v1:7dcacfaeb4145283f3a65fc3aaf65fd43ddcbd0f90c074be957a08fc227d5fac\",\"window\":\"2018-2022\"}",
+          "provenance": {
+            "sourceDataset": "scholarchain-derived",
+            "sourceRecordId": "work:dblp:conf/demo/W1",
+            "snapshot": "local-demo-nonproduction",
+            "runId": "run:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sourceSchemaVersion": "scholarchain.rag-publication-support.v1",
+            "policyVersion": "graph-policy.v1",
+            "modelVersion": null,
+            "promptVersion": null
+          }
+        },
+        {
+          "schemaVersion": "scholarchain.evidence-item.v1",
+          "evidenceId": "ev:bf133844fbb333a7b5e1084541b4a5e49f634c520620df2dc16cd211fb8899a7",
+          "evidenceType": "source-record",
+          "workId": "work:dblp:conf/demo/W2",
+          "sourceUri": "scholarchain-kv://ResearcherMetricCache/subject%23coauthor%3Af0fd3a6b43ee6144030630369fd1dcf1b6dc8e21e6c5b571f6821a9ba11d879f/metric%23coauthor-edges%232018-2022",
+          "chunkId": null,
+          "graphPath": null,
+          "score": 0,
+          "text": "{\"schemaVersion\":\"scholarchain.rag-publication-support.v1\",\"workId\":\"work:dblp:conf/demo/W2\",\"coauthorEdgeId\":\"coauthor:f0fd3a6b43ee6144030630369fd1dcf1b6dc8e21e6c5b571f6821a9ba11d879f\",\"researcherA\":\"researcher:sc:v1:1ce2675b268fc61199282100a43a1759d791e7724070f2be2a4b205ba196911b\",\"researcherB\":\"researcher:sc:v1:7dcacfaeb4145283f3a65fc3aaf65fd43ddcbd0f90c074be957a08fc227d5fac\",\"window\":\"2018-2022\"}",
+          "provenance": {
+            "sourceDataset": "scholarchain-derived",
+            "sourceRecordId": "work:dblp:conf/demo/W2",
+            "snapshot": "local-demo-nonproduction",
+            "runId": "run:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "sourceSchemaVersion": "scholarchain.rag-publication-support.v1",
+            "policyVersion": "graph-policy.v1",
+            "modelVersion": null,
+            "promptVersion": null
+          }
+        }
+      ],
+      "provenance": {
+        "sourceDataset": "scholarchain-runtime",
+        "sourceRecordId": "query:5b15b366f36add2beee79724ac5b42ea",
+        "snapshot": "local-demo-nonproduction",
+        "runId": "run:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sourceSchemaVersion": "scholarchain.query-plan.v1",
+        "policyVersion": "scholarchain.rag.evidence-builder.v1",
+        "modelVersion": null,
+        "promptVersion": null
+      }
+    },
+    "provenance": {
+      "sourceDataset": "scholarchain-runtime",
+      "sourceRecordId": "query:5b15b366f36add2beee79724ac5b42ea",
+      "snapshot": "local-demo-nonproduction",
+      "runId": "run:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sourceSchemaVersion": "scholarchain.query-plan.v1",
+      "policyVersion": "scholarchain.rag.claim-verification.v4",
+      "modelVersion": "nonproduction-template-synthesizer.v1",
+      "promptVersion": "scholarchain.rag.prompt.answer-synthesis.v3"
+    }
+  },
+  "verification": {
+    "overall": "VERIFIED",
+    "counts": {
+      "CONFLICTING": 0,
+      "PARTIALLY_SUPPORTED": 0,
+      "UNSUPPORTED": 0,
+      "VERIFIED": 2
+    }
+  },
+  "nonProductionModel": true,
+  "auditPersisted": true,
+  "links": {
+    "explain": "/v1/explain/query:5b15b366f36add2beee79724ac5b42ea",
+    "evidence": [
+      "/v1/evidence/ev:fd0f197bd326649901c12c7311575e0a5ecd495a1758b0576a61ca3ddb864b67",
+      "/v1/evidence/ev:36f814e69887da0c3e43c595d64a6c9732bfad9eb08427dcb4ae2bc094baf45d",
+      "/v1/evidence/ev:22fd8a77f774c96a6d92bb94990f3aee2a84cf93e29e2bebf83cd69df61e156a",
+      "/v1/evidence/ev:5bdf130d5818f3a56a27e07bb011c7bea87a15f7f65481d4f29fdf27fdb4906c",
+      "/v1/evidence/ev:bf133844fbb333a7b5e1084541b4a5e49f634c520620df2dc16cd211fb8899a7"
+    ]
+  }
+}

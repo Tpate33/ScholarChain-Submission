@@ -1,0 +1,24 @@
+{
+  "nodeId": "researcher:sc:v1:7dcacfaeb4145283f3a65fc3aaf65fd43ddcbd0f90c074be957a08fc227d5fac",
+  "edgeType": "coauthored-with",
+  "depth": 1,
+  "window": "2018-2022",
+  "items": [
+    {
+      "nodeId": "researcher:sc:v1:1ce2675b268fc61199282100a43a1759d791e7724070f2be2a4b205ba196911b",
+      "edgeType": "coauthored-with",
+      "hop": 1,
+      "properties": {
+        "jointPublicationCount": 2,
+        "firstCollaborationYear": 2019,
+        "lastCollaborationYear": 2021,
+        "sourceEvidence": "coauthor:f0fd3a6b43ee6144030630369fd1dcf1b6dc8e21e6c5b571f6821a9ba11d879f"
+      }
+    }
+  ],
+  "page": {
+    "limit": 10,
+    "cursor": null,
+    "nextCursor": null
+  }
+}

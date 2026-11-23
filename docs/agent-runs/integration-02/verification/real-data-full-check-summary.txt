@@ -1,0 +1,42 @@
+Command: sbt check services/stage
+Exit: 0
+Full log SHA-256: 953aaf888f632941566f40cc05d880e129841dbc2de40a6b218189a9035909be
+
+[success] Total time: 0 s, completed Nov 23, 2026, 12:30:27 PM
+[success] Total time: 0 s, completed Nov 23, 2026, 12:30:27 PM
+[success] Total time: 1 s, completed Nov 23, 2026, 12:30:28 PM
+[success] Total time: 4 s, completed Nov 23, 2026, 12:30:31 PM
+[success] Total time: 0 s, completed Nov 23, 2026, 12:30:32 PM
+[success] Total time: 0 s, completed Nov 23, 2026, 12:30:32 PM
+[success] Total time: 2 s, completed Nov 23, 2026, 12:30:34 PM
+[success] Total time: 0 s, completed Nov 23, 2026, 12:30:34 PM
+[success] Total time: 5 s, completed Nov 23, 2026, 12:30:39 PM
+[success] Total time: 4 s, completed Nov 23, 2026, 12:30:42 PM
+[success] Total time: 13 s, completed Nov 23, 2026, 12:30:55 PM
+[success] Total time: 1 s, completed Nov 23, 2026, 12:30:56 PM
+[success] Total time: 5 s, completed Nov 23, 2026, 12:31:02 PM
+[success] Total time: 2 s, completed Nov 23, 2026, 12:31:03 PM
+[success] Total time: 1 s, completed Nov 23, 2026, 12:31:05 PM
+[success] Total time: 0 s, completed Nov 23, 2026, 12:31:05 PM
+==> s scholarchain.tests.rag.SemanticRetrievalCorpusSmokeSuite.(b) neighbours: researcher ID -> community summaries naming it skipped 0.005s
+[info] Passed: Total 657, Failed 0, Errors 0, Passed 657
+[info] Passed: Total 464, Failed 0, Errors 0, Passed 464
+[info] Passed: Total 85, Failed 0, Errors 0, Passed 85
+[info] Passed: Total 141, Failed 0, Errors 0, Passed 141
+[info] Passed: Total 0, Failed 0, Errors 0, Passed 0
+[info] Passed: Total 173, Failed 0, Errors 0, Passed 173
+[info] Passed: Total 263, Failed 0, Errors 0, Passed 263
+[info] Passed: Total 795, Failed 0, Errors 0, Passed 795
+[info] Passed: Total 273, Failed 0, Errors 0, Passed 272, Skipped 1
+[info] markTestRun: core: production sources=30, test sources=34, passed=657
+[info] markTestRun: entityResolution: production sources=40, test sources=41, passed=464
+[info] markTestRun: hadoop: production sources=18, test sources=13, passed=85
+[info] markTestRun: rag: production sources=19, test sources=16, passed=141
+[info] markTestRun: root: production sources=0, test sources=0, passed=0
+[info] markTestRun: services: production sources=20, test sources=24, passed=173
+[info] markTestRun: sparkAnalytics: production sources=26, test sources=32, passed=263
+[info] markTestRun: storage: production sources=60, test sources=67, passed=795
+[info] markTestRun: tests: production sources=0, test sources=44, passed=272
+[info] markTestRun: wrote /Users/taufeeqpatel/Desktop/ScholarChain/.claude/.last-test-run (git_head=bdbf5df02133a0cb5f7493fcd1fd08b98469db60, worktree=dirty, suites=233, passed=2850, skipped=1)
+[success] Total time: 473 s (0:07:53.0), completed Nov 23, 2026, 12:38:58 PM
+[success] Total time: 4 s, completed Nov 23, 2026, 12:39:01 PM

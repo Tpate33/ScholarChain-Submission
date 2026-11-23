@@ -1,3 +1,65 @@
+# ScholarChain — local implementation status
+
+Student: **Taufeeq Patel** (`tpate33@uic.edu`). November 23, 2026.
+
+ScholarChain traces collaboration questions through researcher identities, graph
+metrics and cited evidence. A local API now serves **real DBLP-derived Phase 6
+pipeline output**. It uses in-memory stores, a template answer model and hashed-token
+stand-in embeddings; it is **NON-PRODUCTION**, not a successful AWS deployment or
+real-model RAG evaluation. The separate five-researcher synthetic demo is preserved.
+
+## Reproduce the DBLP-derived query
+
+Prerequisites: JDK 17, sbt 1.11.7 and Python 3. The first build may require Maven
+access. From the repository root:
+
+```sh
+bash scripts/pipeline-demo.sh --stage
+python3 scripts/pipeline-demo-smoke.py
+```
+
+Expect `DBLP PIPELINE DEMO PASS`. The replay checks a query about Ailing Zeng,
+three coauthor edges tied to DBLP paper `conf/aaai/ZengCZ023`, the graph route,
+a resolving citation, explain, replay and authentication. Responses and startup
+logs go to `target/pipeline-demo-evidence/`; the server stops automatically.
+The input is the existing human-copied Phase 6 dev artifact under storage's fixture
+directory, verified by the existing loaders, not newly invented collaboration data.
+
+For an interactive loopback service:
+
+```sh
+bash scripts/pipeline-demo.sh --port 8080
+```
+
+Use the public demo key and API example in [the demo instructions](docs/demo-script.md).
+Stop with Ctrl-C. No AWS credentials or paid model calls are needed.
+The local launcher combines services and storage's optional reader classpaths;
+normal service packaging remains free of Hadoop/Parquet dependencies.
+
+## Checks, evidence and submission documents
+
+```sh
+sbt scalafmtAll scalafmtSbt
+sbt compile Test/compile
+sbt check
+sbt services/stage
+```
+
+The original synthetic profile remains available with
+`bash scripts/local-demo.sh --stage` and `python3 scripts/demo-smoke.py`.
+Preserve generated evidence before `sbt clean`; restage after source changes.
+Historical cloud configuration keys are in `infra/terraform/environments/dev/env.conf`;
+runtime deployment is incomplete. No new deployment, scaling or model result is claimed.
+
+Read the [verification record](docs/verification.md), [architecture](docs/architecture.md),
+[API reference](docs/api-reference.md), [data lineage](docs/data-lineage.md),
+[runbook](docs/runbook.md), [deliverable index](docs/deliverable-index.md),
+[cloud preparation](docs/cloud-preparation.md) and [report](reports/final-report.md).
+The [release manifest](release-manifest.json) describes uncommitted work; a final
+submission tag and video are still outstanding. The original assignment is preserved below.
+
+---
+
 # CS441 Course Project: ScholarChain
 
 Project type: AWS cloud computing, distributed big data processing, AI agentic software engineering, Graph-RAG, Infrastructure as Code, elasticity, and empirical evaluation

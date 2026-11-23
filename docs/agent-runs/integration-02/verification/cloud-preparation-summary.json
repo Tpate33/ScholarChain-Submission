@@ -1,0 +1,28 @@
+{
+  "observedAt": "2026-11-23T12:12:00.308052-06:00",
+  "scope": "local preparation only; no AWS plan, API calls, mutations, or paid model calls",
+  "checks": {
+    "terraformFmt": "PASS",
+    "terraformValidate": {
+      "bootstrap": "PASS",
+      "base": "PASS",
+      "emr-run": "PASS"
+    },
+    "shellcheckChangedScripts": "PASS",
+    "bashSyntaxChangedScripts": "PASS",
+    "emrWrapperRegression": "PASS",
+    "codecProbe": "Archived EMR LZO configuration fails with ClassNotFoundException; built-in Hadoop codec control passes"
+  },
+  "knownLintFinding": "Existing run-bounded-pipeline.sh reports SC2154 for dynamically assigned PARAM_/SCAN_ variables plus SC2016/SC2329; not changed or declared clean.",
+  "modifiedScriptSha256": {
+    "scripts/emr/submit-collaboration-job.sh": "8ae6952b68fe2c0fc1c6fa269b7cfc9cb8038e4190357c2ece58fa74635f8d05",
+    "scripts/emr/check-submit-args.sh": "dbd661d9f08775d8505216d4e3ca7e004e396c92d668a36cd4143c676cf33f33"
+  },
+  "notVerified": [
+    "new wrapper on EMR",
+    "runtime deployment",
+    "live store loads",
+    "model inference",
+    "cost bound for a new deployment"
+  ]
+}

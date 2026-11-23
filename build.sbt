@@ -48,6 +48,10 @@ lazy val testOutcome =
   taskKey[TestMarker.Outcome]("Runs this project's tests and returns the raw outcome")
 lazy val markTestRun =
   taskKey[File]("Runs all tests and writes .claude/.last-test-run only if they all pass")
+lazy val pipelineDemoClasspath =
+  taskKey[File](
+    "Stages a separate local DBLP demo classpath with storage's optional reader libraries"
+  )
 lazy val verifyVersionLedger =
   taskKey[Unit]("Checks the version ledger, its tool-mandated mirrors, and literal versions")
 lazy val verifyBuildSources =
@@ -539,6 +543,8 @@ lazy val services = project
   .settings(commonSettings)
   .settings(
     name := "scholarchain-services",
+    Compile / mainClass := Some("scholarchain.services.QueryJobsMain"),
+    Compile / run / fork := true,
     libraryDependencies ++= Seq(slf4jApi.value, logbackClassic.value % Runtime),
     // BE-P7-06 (DU-P7-04): services resolves the SDK (and its Netty) itself; same pin as storage.
     dependencyOverrides ++= nettyOverrides.value,
@@ -605,6 +611,15 @@ lazy val root = project
   .settings(
     name := "scholarchain",
     publish / skip := true,
+    pipelineDemoClasspath := {
+      // Local loader only. Normal services classpaths and packaging keep their dependency fences.
+      val cp = (services / Runtime / fullClasspath).value.map(_.data) ++
+        (storage / Runtime / fullClasspath).value.map(_.data)
+      val out = (ThisBuild / baseDirectory).value / "target" / "pipeline-demo" / "classpath.txt"
+      IO.write(out, cp.distinct.map(_.getAbsolutePath).mkString(java.io.File.pathSeparator))
+      streams.value.log.info("Local DBLP demo classpath: " + out)
+      out
+    },
     verifyBuildSources := {
       val log = streams.value.log
       val base = (ThisBuild / baseDirectory).value.getCanonicalFile

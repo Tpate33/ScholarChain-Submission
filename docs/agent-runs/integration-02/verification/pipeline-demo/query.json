@@ -1,0 +1,329 @@
+{
+  "queryId": "query:858f6f88c6b901e652c389b6684470a7",
+  "status": "answered",
+  "answer": {
+    "schemaVersion": "scholarchain.answer-response.v1",
+    "responseId": "answer:3d9f517e9baa3e5c60afc168465380e1495a2ef0825c2481ad71d36d9056fc05",
+    "queryId": "query:858f6f88c6b901e652c389b6684470a7",
+    "window": {
+      "startYear": 1970,
+      "endYear": 2026
+    },
+    "answerText": "[NON-PRODUCTION template synthesizer: deterministic test stand-in, not a language model]\nThe name \"Ailing Zeng\" resolves to researcher:orcid:0000-0002-3783-0679. In 1970-2026, researcher:orcid:0000-0002-3783-0679 has identity-status resolved.\nIn 1970-2026, researcher:orcid:0000-0002-3783-0679 has coauthor researcher:orcid:0000-0001-6747-126X. In 1970-2026, the coauthor pair researcher:orcid:0000-0001-6747-126X and researcher:orcid:0000-0002-3783-0679 has joint-publication-count 1.\nIn 1970-2026, researcher:orcid:0000-0002-3783-0679 has coauthor researcher:sc:v1:16f0b1e72bb44dc6c1d231e6ae1a7d11d340a481ed6641f666cd4c9a99d8c34e. In 1970-2026, the coauthor pair researcher:orcid:0000-0002-3783-0679 and researcher:sc:v1:16f0b1e72bb44dc6c1d231e6ae1a7d11d340a481ed6641f666cd4c9a99d8c34e has joint-publication-count 1.\nIn 1970-2026, researcher:orcid:0000-0002-3783-0679 has coauthor researcher:sc:v1:2e518a51bfc969e27e3edc08cbca3bff64e13aa45d9b3953bbaca61e00199bf0. In 1970-2026, the coauthor pair researcher:orcid:0000-0002-3783-0679 and researcher:sc:v1:2e518a51bfc969e27e3edc08cbca3bff64e13aa45d9b3953bbaca61e00199bf0 has joint-publication-count 1.\nCollaboration intensity is repeated work with the same coauthors: the joint publication count of a coauthor edge and the weighted degree W_r (the sum of joint publication counts).",
+    "claims": [
+      {
+        "schemaVersion": "scholarchain.answer-claim.v1",
+        "claimId": "claim:037767ef77876a8fe47bf8a317d9d7528d6d400b3dac2c03da9aa8abde8c5d2f",
+        "text": "The name \"Ailing Zeng\" resolves to researcher:orcid:0000-0002-3783-0679. In 1970-2026, researcher:orcid:0000-0002-3783-0679 has identity-status resolved.",
+        "evidenceIds": [
+          "ev:10b5e1a76667a1b3fe0652978e0b4800829239646c30aba32e35458c40a97368",
+          "ev:4d64c99866aaf921420b24a9906e7d1007bc2bb9ac783d236c7ee494799f97bf"
+        ],
+        "verificationStatus": "supported",
+        "confidence": null,
+        "uncertainty": null,
+        "provenance": {
+          "sourceDataset": "scholarchain-runtime",
+          "sourceRecordId": "query:858f6f88c6b901e652c389b6684470a7",
+          "snapshot": "dblp-2026-10-03",
+          "runId": "run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40",
+          "sourceSchemaVersion": "scholarchain.query-plan.v1",
+          "policyVersion": "scholarchain.rag.claim-verification.v4",
+          "modelVersion": "nonproduction-template-synthesizer.v1",
+          "promptVersion": "scholarchain.rag.prompt.answer-synthesis.v3"
+        }
+      },
+      {
+        "schemaVersion": "scholarchain.answer-claim.v1",
+        "claimId": "claim:bef1f922c5d618bade6e540a7d724a758576f65ffe12f1d4744c4287cea118f3",
+        "text": "In 1970-2026, researcher:orcid:0000-0002-3783-0679 has coauthor researcher:orcid:0000-0001-6747-126X. In 1970-2026, the coauthor pair researcher:orcid:0000-0001-6747-126X and researcher:orcid:0000-0002-3783-0679 has joint-publication-count 1.",
+        "evidenceIds": [
+          "ev:5c04304d70963897c83003c68da8ad9ff0b89f048b205b86ff1b848181545d31"
+        ],
+        "verificationStatus": "supported",
+        "confidence": null,
+        "uncertainty": null,
+        "provenance": {
+          "sourceDataset": "scholarchain-runtime",
+          "sourceRecordId": "query:858f6f88c6b901e652c389b6684470a7",
+          "snapshot": "dblp-2026-10-03",
+          "runId": "run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40",
+          "sourceSchemaVersion": "scholarchain.query-plan.v1",
+          "policyVersion": "scholarchain.rag.claim-verification.v4",
+          "modelVersion": "nonproduction-template-synthesizer.v1",
+          "promptVersion": "scholarchain.rag.prompt.answer-synthesis.v3"
+        }
+      },
+      {
+        "schemaVersion": "scholarchain.answer-claim.v1",
+        "claimId": "claim:2671a5eb7730fd8b422e6831cbe6d83cdd803d4bb7262928d350431aa2a38197",
+        "text": "In 1970-2026, researcher:orcid:0000-0002-3783-0679 has coauthor researcher:sc:v1:16f0b1e72bb44dc6c1d231e6ae1a7d11d340a481ed6641f666cd4c9a99d8c34e. In 1970-2026, the coauthor pair researcher:orcid:0000-0002-3783-0679 and researcher:sc:v1:16f0b1e72bb44dc6c1d231e6ae1a7d11d340a481ed6641f666cd4c9a99d8c34e has joint-publication-count 1.",
+        "evidenceIds": [
+          "ev:b098ee9dc3629cdcb9d14c3848550236e51e556d6b45bcf2eeb45481d3156af9"
+        ],
+        "verificationStatus": "supported",
+        "confidence": null,
+        "uncertainty": null,
+        "provenance": {
+          "sourceDataset": "scholarchain-runtime",
+          "sourceRecordId": "query:858f6f88c6b901e652c389b6684470a7",
+          "snapshot": "dblp-2026-10-03",
+          "runId": "run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40",
+          "sourceSchemaVersion": "scholarchain.query-plan.v1",
+          "policyVersion": "scholarchain.rag.claim-verification.v4",
+          "modelVersion": "nonproduction-template-synthesizer.v1",
+          "promptVersion": "scholarchain.rag.prompt.answer-synthesis.v3"
+        }
+      },
+      {
+        "schemaVersion": "scholarchain.answer-claim.v1",
+        "claimId": "claim:e2eee7bd530f2407d1185f4043486635353d59926664e37f53a9105a2fedc339",
+        "text": "In 1970-2026, researcher:orcid:0000-0002-3783-0679 has coauthor researcher:sc:v1:2e518a51bfc969e27e3edc08cbca3bff64e13aa45d9b3953bbaca61e00199bf0. In 1970-2026, the coauthor pair researcher:orcid:0000-0002-3783-0679 and researcher:sc:v1:2e518a51bfc969e27e3edc08cbca3bff64e13aa45d9b3953bbaca61e00199bf0 has joint-publication-count 1.",
+        "evidenceIds": [
+          "ev:919c3b883c037acf25c5efeb56337f243a0b10f933772de1a4569225c0ae8d86"
+        ],
+        "verificationStatus": "supported",
+        "confidence": null,
+        "uncertainty": null,
+        "provenance": {
+          "sourceDataset": "scholarchain-runtime",
+          "sourceRecordId": "query:858f6f88c6b901e652c389b6684470a7",
+          "snapshot": "dblp-2026-10-03",
+          "runId": "run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40",
+          "sourceSchemaVersion": "scholarchain.query-plan.v1",
+          "policyVersion": "scholarchain.rag.claim-verification.v4",
+          "modelVersion": "nonproduction-template-synthesizer.v1",
+          "promptVersion": "scholarchain.rag.prompt.answer-synthesis.v3"
+        }
+      }
+    ],
+    "evidenceBundle": {
+      "schemaVersion": "scholarchain.evidence-bundle.v1",
+      "bundleId": "bundle:516af1adfb730147f165f9366b812c3dd4073e27d12741b9b79cc8403c545084",
+      "queryId": "query:858f6f88c6b901e652c389b6684470a7",
+      "items": [
+        {
+          "schemaVersion": "scholarchain.evidence-item.v1",
+          "evidenceId": "ev:10b5e1a76667a1b3fe0652978e0b4800829239646c30aba32e35458c40a97368",
+          "evidenceType": "match-decision",
+          "workId": null,
+          "sourceUri": "scholarchain-kv://EntityLinkCache/surface%232ecc8b74a32a348fafad860aef5f41fd136ec07b8cf4cd9cb05b416e6fceb38e/researcher%23researcher%3Aorcid%3A0000-0002-3783-0679",
+          "chunkId": null,
+          "graphPath": null,
+          "score": 0,
+          "text": "{\"schemaVersion\":\"scholarchain.storage.entity-link.v1\",\"surfaceSha256\":\"2ecc8b74a32a348fafad860aef5f41fd136ec07b8cf4cd9cb05b416e6fceb38e\",\"researcherId\":\"researcher:orcid:0000-0002-3783-0679\",\"matchedBy\":\"er-mention-raw-name\",\"candidateRank\":1,\"sourceRunId\":\"run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40\",\"expiresAtEpochSeconds\":1795545008,\"evidence\":{\"schemaVersion\":\"scholarchain.storage.entity-link-evidence.v1\",\"surfaceFormVersion\":\"scholarchain.rag.surface-form.v1\",\"loadId\":\"load:5ed51c8bc7fa80db2b22d2b93f16fca0f2fb38d3c6d70b82b2edd32721b1b44b\",\"groupingRunId\":\"run:84dd896fda43977b934008f10955191e78c2b93b80ec57c00f55dbb137dbd7d2\",\"curatedRunId\":\"run:2881724b5c86b561a235836d51946fbd884beed36a14f929b27c278cb5de8baa\",\"groupingPolicyVersion\":\"er-grouping.v1\",\"matchPolicyVersion\":\"er-policy.v8\",\"sourceDatasets\":[\"dblp\",\"openalex\"],\"snapshots\":[\"dblp-2026-10-03\",\"openalex-api-2026-11-05\"],\"mentionCount\":2,\"mentionIds\":[\"mention:76b6b10456d82226b0df1ebbe018169090a029200521078ed3afde8d7cd3390b\",\"mention:78ad57ed7095d6b1bcb2ae777d19b03fde2a573432496eb17b3444c7fdb7cad7\"],\"mentionIdsSha256\":\"5f9afc1ee2e13361459247541c0bcb8ea5429218fa69a150158822b0f34d96b9\"}}",
+          "provenance": {
+            "sourceDataset": "scholarchain-derived",
+            "sourceRecordId": "researcher:orcid:0000-0002-3783-0679",
+            "snapshot": "dblp-2026-10-03",
+            "runId": "run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40",
+            "sourceSchemaVersion": "scholarchain.rag-entity-link.v1",
+            "policyVersion": "scholarchain.rag.surface-form.v1",
+            "modelVersion": null,
+            "promptVersion": null
+          }
+        },
+        {
+          "schemaVersion": "scholarchain.evidence-item.v1",
+          "evidenceId": "ev:4d64c99866aaf921420b24a9906e7d1007bc2bb9ac783d236c7ee494799f97bf",
+          "evidenceType": "metric",
+          "workId": null,
+          "sourceUri": "scholarchain-kv://ResearcherMetricCache/subject%23researcher%3Aorcid%3A0000-0002-3783-0679/metric%23researcher-metrics%231970-2026",
+          "chunkId": null,
+          "graphPath": null,
+          "score": 0,
+          "text": "{\"schemaVersion\":\"scholarchain.researcher-metrics.v2\",\"researcherId\":\"researcher:orcid:0000-0002-3783-0679\",\"window\":{\"startYear\":1970,\"endYear\":2026},\"publicationCount\":1,\"distinctCoauthorCount\":3,\"totalCoauthorOccurrences\":3,\"unresolvedCoauthorOccurrences\":0,\"worksWithUnresolvedCoauthors\":0,\"averageCoauthorsPerPaper\":3,\"maximumCoauthorsOnOnePaper\":3,\"maximumTeamWorkIds\":[\"work:dblp:conf/aaai/ZengCZ023\"],\"weightedDegree\":3,\"identity\":{\"status\":\"resolved\",\"anchorNamespace\":\"orcid\",\"memberCount\":2,\"collisionCodes\":[],\"lowestDecisionConfidence\":{\"kind\":\"measured\",\"value\":0.95,\"unknownReason\":null}},\"lineage\":{\"groupingRunId\":\"run:84dd896fda43977b934008f10955191e78c2b93b80ec57c00f55dbb137dbd7d2\",\"decisionRunId\":\"run:736cb1706210a34f0958e658c061054c4e6b27b80847528db8619da84495b76a\",\"inputRunId\":\"run:2881724b5c86b561a235836d51946fbd884beed36a14f929b27c278cb5de8baa\",\"codeVersion\":\"148b4b91bc904a63680b94f91f275173f743c4b6\",\"configDigest\":\"e37c32b115c82cbedc56e2407b8a322b52505eabbd800dfb5dade372b47800df\",\"groupingPolicyVersion\":\"er-grouping.v1\",\"matchPolicyVersion\":\"er-policy.v8\",\"identityVersion\":\"v1\",\"groupingEvaluation\":\"unevaluated\"},\"provenance\":{\"sourceDataset\":\"scholarchain-derived\",\"sourceRecordId\":\"researcher:orcid:0000-0002-3783-0679\",\"snapshot\":\"dblp-2026-10-03\",\"runId\":\"run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40\",\"sourceSchemaVersion\":\"scholarchain.publication-team.v1\",\"policyVersion\":\"sc-graph.v1\",\"modelVersion\":null,\"promptVersion\":null}}",
+          "provenance": {
+            "sourceDataset": "scholarchain-derived",
+            "sourceRecordId": "researcher:orcid:0000-0002-3783-0679",
+            "snapshot": "dblp-2026-10-03",
+            "runId": "run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40",
+            "sourceSchemaVersion": "scholarchain.researcher-metrics.v2",
+            "policyVersion": "sc-graph.v1",
+            "modelVersion": null,
+            "promptVersion": null
+          }
+        },
+        {
+          "schemaVersion": "scholarchain.evidence-item.v1",
+          "evidenceId": "ev:5c04304d70963897c83003c68da8ad9ff0b89f048b205b86ff1b848181545d31",
+          "evidenceType": "coauthor-edge",
+          "workId": null,
+          "sourceUri": "scholarchain-kv://ResearcherMetricCache/subject%23coauthor%3A0086e976ea3f4ac5cbeeeb19ec262d14f8f58dc9cfe9f2eca9e571f39757d1a8/metric%23coauthor-edges%231970-2026",
+          "chunkId": null,
+          "graphPath": [
+            "researcher:orcid:0000-0001-6747-126X",
+            "researcher:orcid:0000-0002-3783-0679"
+          ],
+          "score": 0,
+          "text": "{\"schemaVersion\":\"scholarchain.coauthor-edge.v2\",\"edgeId\":\"coauthor:0086e976ea3f4ac5cbeeeb19ec262d14f8f58dc9cfe9f2eca9e571f39757d1a8\",\"researcherA\":\"researcher:orcid:0000-0001-6747-126X\",\"researcherB\":\"researcher:orcid:0000-0002-3783-0679\",\"window\":{\"startYear\":1970,\"endYear\":2026},\"jointPublicationCount\":1,\"firstCollaborationYear\":2023,\"lastCollaborationYear\":2023,\"publicationsByYear\":[{\"year\":2023,\"count\":1}],\"supportingWorkIds\":[\"work:dblp:conf/aaai/ZengCZ023\"],\"lineage\":{\"groupingRunId\":\"run:84dd896fda43977b934008f10955191e78c2b93b80ec57c00f55dbb137dbd7d2\",\"decisionRunId\":\"run:736cb1706210a34f0958e658c061054c4e6b27b80847528db8619da84495b76a\",\"inputRunId\":\"run:2881724b5c86b561a235836d51946fbd884beed36a14f929b27c278cb5de8baa\",\"codeVersion\":\"148b4b91bc904a63680b94f91f275173f743c4b6\",\"configDigest\":\"e37c32b115c82cbedc56e2407b8a322b52505eabbd800dfb5dade372b47800df\",\"groupingPolicyVersion\":\"er-grouping.v1\",\"matchPolicyVersion\":\"er-policy.v8\",\"identityVersion\":\"v1\",\"groupingEvaluation\":\"unevaluated\"},\"provenance\":{\"sourceDataset\":\"scholarchain-derived\",\"sourceRecordId\":\"coauthor:0086e976ea3f4ac5cbeeeb19ec262d14f8f58dc9cfe9f2eca9e571f39757d1a8\",\"snapshot\":\"dblp-2026-10-03\",\"runId\":\"run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40\",\"sourceSchemaVersion\":\"scholarchain.publication-team.v1\",\"policyVersion\":\"sc-graph.v1\",\"modelVersion\":null,\"promptVersion\":null}}",
+          "provenance": {
+            "sourceDataset": "scholarchain-derived",
+            "sourceRecordId": "coauthor:0086e976ea3f4ac5cbeeeb19ec262d14f8f58dc9cfe9f2eca9e571f39757d1a8",
+            "snapshot": "dblp-2026-10-03",
+            "runId": "run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40",
+            "sourceSchemaVersion": "scholarchain.coauthor-edge.v2",
+            "policyVersion": "sc-graph.v1",
+            "modelVersion": null,
+            "promptVersion": null
+          }
+        },
+        {
+          "schemaVersion": "scholarchain.evidence-item.v1",
+          "evidenceId": "ev:535825329124f6f652c5e2dd65e5a665dc6c9271048ba86a80afe4ab0544e181",
+          "evidenceType": "source-record",
+          "workId": "work:dblp:conf/aaai/ZengCZ023",
+          "sourceUri": "scholarchain-kv://ResearcherMetricCache/subject%23coauthor%3A0086e976ea3f4ac5cbeeeb19ec262d14f8f58dc9cfe9f2eca9e571f39757d1a8/metric%23coauthor-edges%231970-2026",
+          "chunkId": null,
+          "graphPath": null,
+          "score": 0,
+          "text": "{\"schemaVersion\":\"scholarchain.rag-publication-support.v1\",\"workId\":\"work:dblp:conf/aaai/ZengCZ023\",\"coauthorEdgeId\":\"coauthor:0086e976ea3f4ac5cbeeeb19ec262d14f8f58dc9cfe9f2eca9e571f39757d1a8\",\"researcherA\":\"researcher:orcid:0000-0001-6747-126X\",\"researcherB\":\"researcher:orcid:0000-0002-3783-0679\",\"window\":\"1970-2026\"}",
+          "provenance": {
+            "sourceDataset": "scholarchain-derived",
+            "sourceRecordId": "work:dblp:conf/aaai/ZengCZ023",
+            "snapshot": "dblp-2026-10-03",
+            "runId": "run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40",
+            "sourceSchemaVersion": "scholarchain.rag-publication-support.v1",
+            "policyVersion": "sc-graph.v1",
+            "modelVersion": null,
+            "promptVersion": null
+          }
+        },
+        {
+          "schemaVersion": "scholarchain.evidence-item.v1",
+          "evidenceId": "ev:b098ee9dc3629cdcb9d14c3848550236e51e556d6b45bcf2eeb45481d3156af9",
+          "evidenceType": "coauthor-edge",
+          "workId": null,
+          "sourceUri": "scholarchain-kv://ResearcherMetricCache/subject%23coauthor%3A484d244c0563500917df0fb61a50c13cdd99d6786524ce133ed038bde53c416d/metric%23coauthor-edges%231970-2026",
+          "chunkId": null,
+          "graphPath": [
+            "researcher:orcid:0000-0002-3783-0679",
+            "researcher:sc:v1:16f0b1e72bb44dc6c1d231e6ae1a7d11d340a481ed6641f666cd4c9a99d8c34e"
+          ],
+          "score": 0,
+          "text": "{\"schemaVersion\":\"scholarchain.coauthor-edge.v2\",\"edgeId\":\"coauthor:484d244c0563500917df0fb61a50c13cdd99d6786524ce133ed038bde53c416d\",\"researcherA\":\"researcher:orcid:0000-0002-3783-0679\",\"researcherB\":\"researcher:sc:v1:16f0b1e72bb44dc6c1d231e6ae1a7d11d340a481ed6641f666cd4c9a99d8c34e\",\"window\":{\"startYear\":1970,\"endYear\":2026},\"jointPublicationCount\":1,\"firstCollaborationYear\":2023,\"lastCollaborationYear\":2023,\"publicationsByYear\":[{\"year\":2023,\"count\":1}],\"supportingWorkIds\":[\"work:dblp:conf/aaai/ZengCZ023\"],\"lineage\":{\"groupingRunId\":\"run:84dd896fda43977b934008f10955191e78c2b93b80ec57c00f55dbb137dbd7d2\",\"decisionRunId\":\"run:736cb1706210a34f0958e658c061054c4e6b27b80847528db8619da84495b76a\",\"inputRunId\":\"run:2881724b5c86b561a235836d51946fbd884beed36a14f929b27c278cb5de8baa\",\"codeVersion\":\"148b4b91bc904a63680b94f91f275173f743c4b6\",\"configDigest\":\"e37c32b115c82cbedc56e2407b8a322b52505eabbd800dfb5dade372b47800df\",\"groupingPolicyVersion\":\"er-grouping.v1\",\"matchPolicyVersion\":\"er-policy.v8\",\"identityVersion\":\"v1\",\"groupingEvaluation\":\"unevaluated\"},\"provenance\":{\"sourceDataset\":\"scholarchain-derived\",\"sourceRecordId\":\"coauthor:484d244c0563500917df0fb61a50c13cdd99d6786524ce133ed038bde53c416d\",\"snapshot\":\"dblp-2026-10-03\",\"runId\":\"run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40\",\"sourceSchemaVersion\":\"scholarchain.publication-team.v1\",\"policyVersion\":\"sc-graph.v1\",\"modelVersion\":null,\"promptVersion\":null}}",
+          "provenance": {
+            "sourceDataset": "scholarchain-derived",
+            "sourceRecordId": "coauthor:484d244c0563500917df0fb61a50c13cdd99d6786524ce133ed038bde53c416d",
+            "snapshot": "dblp-2026-10-03",
+            "runId": "run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40",
+            "sourceSchemaVersion": "scholarchain.coauthor-edge.v2",
+            "policyVersion": "sc-graph.v1",
+            "modelVersion": null,
+            "promptVersion": null
+          }
+        },
+        {
+          "schemaVersion": "scholarchain.evidence-item.v1",
+          "evidenceId": "ev:08c0ebc46117a3c402ae7b931fa5f125e1059138ed4675dfaa447ea3bbb6c598",
+          "evidenceType": "source-record",
+          "workId": "work:dblp:conf/aaai/ZengCZ023",
+          "sourceUri": "scholarchain-kv://ResearcherMetricCache/subject%23coauthor%3A484d244c0563500917df0fb61a50c13cdd99d6786524ce133ed038bde53c416d/metric%23coauthor-edges%231970-2026",
+          "chunkId": null,
+          "graphPath": null,
+          "score": 0,
+          "text": "{\"schemaVersion\":\"scholarchain.rag-publication-support.v1\",\"workId\":\"work:dblp:conf/aaai/ZengCZ023\",\"coauthorEdgeId\":\"coauthor:484d244c0563500917df0fb61a50c13cdd99d6786524ce133ed038bde53c416d\",\"researcherA\":\"researcher:orcid:0000-0002-3783-0679\",\"researcherB\":\"researcher:sc:v1:16f0b1e72bb44dc6c1d231e6ae1a7d11d340a481ed6641f666cd4c9a99d8c34e\",\"window\":\"1970-2026\"}",
+          "provenance": {
+            "sourceDataset": "scholarchain-derived",
+            "sourceRecordId": "work:dblp:conf/aaai/ZengCZ023",
+            "snapshot": "dblp-2026-10-03",
+            "runId": "run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40",
+            "sourceSchemaVersion": "scholarchain.rag-publication-support.v1",
+            "policyVersion": "sc-graph.v1",
+            "modelVersion": null,
+            "promptVersion": null
+          }
+        },
+        {
+          "schemaVersion": "scholarchain.evidence-item.v1",
+          "evidenceId": "ev:919c3b883c037acf25c5efeb56337f243a0b10f933772de1a4569225c0ae8d86",
+          "evidenceType": "coauthor-edge",
+          "workId": null,
+          "sourceUri": "scholarchain-kv://ResearcherMetricCache/subject%23coauthor%3Ac3df75c0e6057eec3cf4888d3ff39fd23651d4ec55098eb5314f265feb94e89b/metric%23coauthor-edges%231970-2026",
+          "chunkId": null,
+          "graphPath": [
+            "researcher:orcid:0000-0002-3783-0679",
+            "researcher:sc:v1:2e518a51bfc969e27e3edc08cbca3bff64e13aa45d9b3953bbaca61e00199bf0"
+          ],
+          "score": 0,
+          "text": "{\"schemaVersion\":\"scholarchain.coauthor-edge.v2\",\"edgeId\":\"coauthor:c3df75c0e6057eec3cf4888d3ff39fd23651d4ec55098eb5314f265feb94e89b\",\"researcherA\":\"researcher:orcid:0000-0002-3783-0679\",\"researcherB\":\"researcher:sc:v1:2e518a51bfc969e27e3edc08cbca3bff64e13aa45d9b3953bbaca61e00199bf0\",\"window\":{\"startYear\":1970,\"endYear\":2026},\"jointPublicationCount\":1,\"firstCollaborationYear\":2023,\"lastCollaborationYear\":2023,\"publicationsByYear\":[{\"year\":2023,\"count\":1}],\"supportingWorkIds\":[\"work:dblp:conf/aaai/ZengCZ023\"],\"lineage\":{\"groupingRunId\":\"run:84dd896fda43977b934008f10955191e78c2b93b80ec57c00f55dbb137dbd7d2\",\"decisionRunId\":\"run:736cb1706210a34f0958e658c061054c4e6b27b80847528db8619da84495b76a\",\"inputRunId\":\"run:2881724b5c86b561a235836d51946fbd884beed36a14f929b27c278cb5de8baa\",\"codeVersion\":\"148b4b91bc904a63680b94f91f275173f743c4b6\",\"configDigest\":\"e37c32b115c82cbedc56e2407b8a322b52505eabbd800dfb5dade372b47800df\",\"groupingPolicyVersion\":\"er-grouping.v1\",\"matchPolicyVersion\":\"er-policy.v8\",\"identityVersion\":\"v1\",\"groupingEvaluation\":\"unevaluated\"},\"provenance\":{\"sourceDataset\":\"scholarchain-derived\",\"sourceRecordId\":\"coauthor:c3df75c0e6057eec3cf4888d3ff39fd23651d4ec55098eb5314f265feb94e89b\",\"snapshot\":\"dblp-2026-10-03\",\"runId\":\"run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40\",\"sourceSchemaVersion\":\"scholarchain.publication-team.v1\",\"policyVersion\":\"sc-graph.v1\",\"modelVersion\":null,\"promptVersion\":null}}",
+          "provenance": {
+            "sourceDataset": "scholarchain-derived",
+            "sourceRecordId": "coauthor:c3df75c0e6057eec3cf4888d3ff39fd23651d4ec55098eb5314f265feb94e89b",
+            "snapshot": "dblp-2026-10-03",
+            "runId": "run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40",
+            "sourceSchemaVersion": "scholarchain.coauthor-edge.v2",
+            "policyVersion": "sc-graph.v1",
+            "modelVersion": null,
+            "promptVersion": null
+          }
+        },
+        {
+          "schemaVersion": "scholarchain.evidence-item.v1",
+          "evidenceId": "ev:d6baa7c35e937ab12ecbf45d4bfda8b43431beded73c952ee6466a3ed42cb09d",
+          "evidenceType": "source-record",
+          "workId": "work:dblp:conf/aaai/ZengCZ023",
+          "sourceUri": "scholarchain-kv://ResearcherMetricCache/subject%23coauthor%3Ac3df75c0e6057eec3cf4888d3ff39fd23651d4ec55098eb5314f265feb94e89b/metric%23coauthor-edges%231970-2026",
+          "chunkId": null,
+          "graphPath": null,
+          "score": 0,
+          "text": "{\"schemaVersion\":\"scholarchain.rag-publication-support.v1\",\"workId\":\"work:dblp:conf/aaai/ZengCZ023\",\"coauthorEdgeId\":\"coauthor:c3df75c0e6057eec3cf4888d3ff39fd23651d4ec55098eb5314f265feb94e89b\",\"researcherA\":\"researcher:orcid:0000-0002-3783-0679\",\"researcherB\":\"researcher:sc:v1:2e518a51bfc969e27e3edc08cbca3bff64e13aa45d9b3953bbaca61e00199bf0\",\"window\":\"1970-2026\"}",
+          "provenance": {
+            "sourceDataset": "scholarchain-derived",
+            "sourceRecordId": "work:dblp:conf/aaai/ZengCZ023",
+            "snapshot": "dblp-2026-10-03",
+            "runId": "run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40",
+            "sourceSchemaVersion": "scholarchain.rag-publication-support.v1",
+            "policyVersion": "sc-graph.v1",
+            "modelVersion": null,
+            "promptVersion": null
+          }
+        }
+      ],
+      "provenance": {
+        "sourceDataset": "scholarchain-runtime",
+        "sourceRecordId": "query:858f6f88c6b901e652c389b6684470a7",
+        "snapshot": "dblp-2026-10-03",
+        "runId": "run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40",
+        "sourceSchemaVersion": "scholarchain.query-plan.v1",
+        "policyVersion": "scholarchain.rag.evidence-builder.v1",
+        "modelVersion": null,
+        "promptVersion": null
+      }
+    },
+    "provenance": {
+      "sourceDataset": "scholarchain-runtime",
+      "sourceRecordId": "query:858f6f88c6b901e652c389b6684470a7",
+      "snapshot": "dblp-2026-10-03",
+      "runId": "run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40",
+      "sourceSchemaVersion": "scholarchain.query-plan.v1",
+      "policyVersion": "scholarchain.rag.claim-verification.v4",
+      "modelVersion": "nonproduction-template-synthesizer.v1",
+      "promptVersion": "scholarchain.rag.prompt.answer-synthesis.v3"
+    }
+  },
+  "verification": {
+    "overall": "VERIFIED",
+    "counts": {
+      "CONFLICTING": 0,
+      "PARTIALLY_SUPPORTED": 0,
+      "UNSUPPORTED": 0,
+      "VERIFIED": 4
+    }
+  },
+  "nonProductionModel": true,
+  "auditPersisted": true,
+  "links": {
+    "explain": "/v1/explain/query:858f6f88c6b901e652c389b6684470a7",
+    "evidence": [
+      "/v1/evidence/ev:10b5e1a76667a1b3fe0652978e0b4800829239646c30aba32e35458c40a97368",
+      "/v1/evidence/ev:4d64c99866aaf921420b24a9906e7d1007bc2bb9ac783d236c7ee494799f97bf",
+      "/v1/evidence/ev:5c04304d70963897c83003c68da8ad9ff0b89f048b205b86ff1b848181545d31",
+      "/v1/evidence/ev:535825329124f6f652c5e2dd65e5a665dc6c9271048ba86a80afe4ab0544e181",
+      "/v1/evidence/ev:b098ee9dc3629cdcb9d14c3848550236e51e556d6b45bcf2eeb45481d3156af9",
+      "/v1/evidence/ev:08c0ebc46117a3c402ae7b931fa5f125e1059138ed4675dfaa447ea3bbb6c598",
+      "/v1/evidence/ev:919c3b883c037acf25c5efeb56337f243a0b10f933772de1a4569225c0ae8d86",
+      "/v1/evidence/ev:d6baa7c35e937ab12ecbf45d4bfda8b43431beded73c952ee6466a3ed42cb09d"
+    ]
+  }
+}

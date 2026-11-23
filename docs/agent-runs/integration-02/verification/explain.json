@@ -1,0 +1,160 @@
+{
+  "queryId": "query:5b15b366f36add2beee79724ac5b42ea",
+  "outcome": "answered",
+  "reason": null,
+  "plan": {
+    "planVersion": "scholarchain.rag.query-planner.v1",
+    "window": "2018-2022",
+    "steps": [
+      {
+        "ordinal": 0,
+        "operation": "resolve-researcher",
+        "metrics": [],
+        "intent": null,
+        "researchers": [
+          {
+            "nameIndex": 0,
+            "researcherId": "researcher:sc:v1:7dcacfaeb4145283f3a65fc3aaf65fd43ddcbd0f90c074be957a08fc227d5fac",
+            "status": "resolved"
+          }
+        ],
+        "compareWindow": null,
+        "windowSource": null,
+        "rankingRule": null,
+        "filters": [],
+        "unresolvedArguments": []
+      },
+      {
+        "ordinal": 1,
+        "operation": "direct-collaborators",
+        "metrics": [
+          "joint-publication-count"
+        ],
+        "intent": "direct-coauthors",
+        "researchers": [
+          {
+            "nameIndex": 0,
+            "researcherId": "researcher:sc:v1:7dcacfaeb4145283f3a65fc3aaf65fd43ddcbd0f90c074be957a08fc227d5fac",
+            "status": "resolved"
+          }
+        ],
+        "compareWindow": null,
+        "windowSource": "configured-default",
+        "rankingRule": null,
+        "filters": [],
+        "unresolvedArguments": []
+      },
+      {
+        "ordinal": 2,
+        "operation": "verify-claims",
+        "metrics": [],
+        "intent": null,
+        "researchers": [],
+        "compareWindow": null,
+        "windowSource": null,
+        "rankingRule": null,
+        "filters": [],
+        "unresolvedArguments": []
+      }
+    ]
+  },
+  "planVersion": "scholarchain.rag.query-planner.v1",
+  "planSha256": "36437178be58b9c53271661cbbd99e090a510d2946e45a26c62adc28e6dbdf70",
+  "stagesExecuted": [
+    {
+      "ordinal": 0,
+      "operation": "resolve-researcher",
+      "status": "evidenced",
+      "evidenceIds": [
+        "ev:fd0f197bd326649901c12c7311575e0a5ecd495a1758b0576a61ca3ddb864b67",
+        "ev:36f814e69887da0c3e43c595d64a6c9732bfad9eb08427dcb4ae2bc094baf45d"
+      ]
+    },
+    {
+      "ordinal": 1,
+      "operation": "direct-collaborators",
+      "status": "evidenced",
+      "evidenceIds": [
+        "ev:22fd8a77f774c96a6d92bb94990f3aee2a84cf93e29e2bebf83cd69df61e156a",
+        "ev:5bdf130d5818f3a56a27e07bb011c7bea87a15f7f65481d4f29fdf27fdb4906c",
+        "ev:bf133844fbb333a7b5e1084541b4a5e49f634c520620df2dc16cd211fb8899a7"
+      ]
+    },
+    {
+      "ordinal": 2,
+      "operation": "verify-claims",
+      "status": "VERIFIED",
+      "evidenceIds": []
+    }
+  ],
+  "stepsTruncated": false,
+  "promptVersions": {
+    "answerSynthesis": "scholarchain.rag.prompt.answer-synthesis.v3",
+    "outputSchema": "scholarchain.rag.answer-synthesis-output.v3"
+  },
+  "modelVersions": {
+    "answerModel": "nonproduction-template-synthesizer.v1",
+    "nonProductionModel": true
+  },
+  "evidenceIds": [
+    "ev:fd0f197bd326649901c12c7311575e0a5ecd495a1758b0576a61ca3ddb864b67",
+    "ev:36f814e69887da0c3e43c595d64a6c9732bfad9eb08427dcb4ae2bc094baf45d",
+    "ev:22fd8a77f774c96a6d92bb94990f3aee2a84cf93e29e2bebf83cd69df61e156a",
+    "ev:5bdf130d5818f3a56a27e07bb011c7bea87a15f7f65481d4f29fdf27fdb4906c",
+    "ev:bf133844fbb333a7b5e1084541b4a5e49f634c520620df2dc16cd211fb8899a7"
+  ],
+  "bundleId": "bundle:b913dcef2cf2470c6e18eba14a5d16838126cd14c192f7d56f30e09d036a6376",
+  "metricVersions": [
+    "scholarchain.coauthor-edge.v2|graph-policy.v1",
+    "scholarchain.researcher-metrics.v2|graph-policy.v1"
+  ],
+  "graphRunId": "run:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "executedTemplates": [],
+  "scoreComponents": [
+    {
+      "evidenceId": "ev:fd0f197bd326649901c12c7311575e0a5ecd495a1758b0576a61ca3ddb864b67",
+      "evidenceType": "match-decision",
+      "score": 0
+    },
+    {
+      "evidenceId": "ev:36f814e69887da0c3e43c595d64a6c9732bfad9eb08427dcb4ae2bc094baf45d",
+      "evidenceType": "metric",
+      "score": 0
+    },
+    {
+      "evidenceId": "ev:22fd8a77f774c96a6d92bb94990f3aee2a84cf93e29e2bebf83cd69df61e156a",
+      "evidenceType": "coauthor-edge",
+      "score": 0
+    },
+    {
+      "evidenceId": "ev:5bdf130d5818f3a56a27e07bb011c7bea87a15f7f65481d4f29fdf27fdb4906c",
+      "evidenceType": "source-record",
+      "score": 0
+    },
+    {
+      "evidenceId": "ev:bf133844fbb333a7b5e1084541b4a5e49f634c520620df2dc16cd211fb8899a7",
+      "evidenceType": "source-record",
+      "score": 0
+    }
+  ],
+  "counters": {
+    "latencyMillis": 101,
+    "synthesisAttempts": 1,
+    "inputTokens": null,
+    "outputTokens": null,
+    "abstainedNames": 0,
+    "droppedMissingEvidence": 0,
+    "evidenceItems": 5
+  },
+  "verification": {
+    "overall": "VERIFIED",
+    "counts": {
+      "CONFLICTING": 0,
+      "PARTIALLY_SUPPORTED": 0,
+      "UNSUPPORTED": 0,
+      "VERIFIED": 2
+    }
+  },
+  "auditSha256": "3edcc8c86bf01176e2da7f61147f66c615d6bfd022ab4895b7004674e60033ce",
+  "notice": "the audit stores no hidden reasoning, question text or researcher names"
+}

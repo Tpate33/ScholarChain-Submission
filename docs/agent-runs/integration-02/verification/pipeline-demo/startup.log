@@ -1,0 +1,17 @@
+ScholarChain DBLP-DERIVED LOCAL DEMO -- NON-PRODUCTION
+Real bounded Phase 6 dev data; in-memory stores, template answer model and hashed-token stand-in embeddings.
+No AWS, no paid model calls. This is not a production deployment or corpus-scale evaluation.
+profile=pipeline-demo listening=http://127.0.0.1:51115
+analysisRunId=run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40 window=TimeWindow(1970,2026)
+load=neptune-bulk-load status=loaded written=1258
+load=dynamodb status=loaded written=1459
+load=s3 status=loaded written=31
+load=s3-vectors status=loaded written=249
+Example: Who are the coauthors of Ailing Zeng?
+2026-11-23 12:30:10,118 INFO  scholarchain.services.access - http method=GET route=GET /healthz status=200 durationMs=3 requestId=req-ca41e64f4566cd8e7bdc981c42046cc0 traceId=97223d31cb944f2c45490b6c2a09fb2f client=- error=-
+2026-11-23 12:30:10,271 INFO  scholarchain.services.access - http method=POST route=POST /v1/query status=200 durationMs=142 requestId=req-8fac66c65be40d224b8ff7576ff9f9b4 traceId=edbfb552d1117227f3f76f345f435d8f client=local-demo-client error=-
+2026-11-23 12:30:10,279 INFO  scholarchain.services.access - http method=GET route=GET /v1/graph/nodes/{nodeId}/neighbors status=200 durationMs=4 requestId=req-14f7aa07a1754875ee1e43554fe52537 traceId=78ae4ab996473b45872bda86d9826021 client=local-demo-client error=-
+2026-11-23 12:30:10,283 INFO  scholarchain.services.access - http method=GET route=GET /v1/evidence/{evidenceId} status=200 durationMs=2 requestId=req-769b0e1e1039fcfbfba64793dffebdad traceId=3577404c11654506b1ac46ed4cc8f171 client=local-demo-client error=-
+2026-11-23 12:30:10,290 INFO  scholarchain.services.access - http method=GET route=GET /v1/explain/{queryId} status=200 durationMs=5 requestId=req-f40e4e80d2a928d8a50422262f35f771 traceId=f497717a57ab8a195d62008474d58ddc client=local-demo-client error=-
+2026-11-23 12:30:10,293 INFO  scholarchain.services.access - http method=POST route=POST /v1/query status=200 durationMs=0 requestId=req-8d23006ba5506e8c3f453362ffba2870 traceId=b633675e890fbaae062357f68aeeb93a client=local-demo-client error=-
+2026-11-23 12:30:10,298 INFO  scholarchain.services.access - http method=POST route=POST /v1/query status=401 durationMs=3 requestId=req-0273f170f7dd31802753646334f94017 traceId=e9415e21d84e6e9a95c6266cceb5b4dc client=- error=unauthenticated

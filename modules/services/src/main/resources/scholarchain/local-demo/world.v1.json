@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "scholarchain.services.local-demo-world.v1",
+  "nonProduction": true,
+  "description": "NON-PRODUCTION local demo seed (SV-INT-03a). The hand-built Phase 9 rag fixture world (rag AgentWorld/WorkflowWorld, mirrored by the services ServiceWorld test fixture): five researchers; coauthor edges Ada-Bob (2 works), Bob-Cyd, Cyd-Dan in 2018-2022; communities {Ada, Bob}, {Cyd, Dan}, {Eve}; components {Ada, Bob, Cyd, Dan}, {Eve}. Synthetic values only; no real researcher, dataset record or AWS resource.",
+  "window": {"startYear": 2018, "endYear": 2022},
+  "researchers": [
+    {"alias": "ada", "label": "Ada Lovelace", "dblpPid": "11/1", "identityStatus": "resolved", "vertexMemberCount": 2, "identityMemberCount": 2, "publications": 2, "distinctCoauthors": 1, "coauthorOccurrences": 2, "maxCoauthorsOnOnePaper": 1, "community": "c1", "communitySize": 2, "component": "k1", "componentSize": 4},
+    {"alias": "bob", "label": "John Smith (1)", "dblpPid": "22/2", "identityStatus": "resolved", "vertexMemberCount": 2, "identityMemberCount": 3, "publications": 3, "distinctCoauthors": 2, "coauthorOccurrences": 3, "maxCoauthorsOnOnePaper": 1, "community": "c1", "communitySize": 2, "component": "k1", "componentSize": 4},
+    {"alias": "cyd", "label": "John Smith (2)", "dblpPid": "33/3", "identityStatus": "resolved", "vertexMemberCount": 2, "identityMemberCount": 2, "publications": 2, "distinctCoauthors": 2, "coauthorOccurrences": 2, "maxCoauthorsOnOnePaper": 1, "community": "c2", "communitySize": 2, "component": "k1", "componentSize": 4},
+    {"alias": "dan", "label": "Dan Brown", "dblpPid": "44/4", "identityStatus": "resolved", "vertexMemberCount": 2, "identityMemberCount": 2, "publications": 1, "distinctCoauthors": 1, "coauthorOccurrences": 1, "maxCoauthorsOnOnePaper": 1, "community": "c2", "communitySize": 2, "component": "k1", "componentSize": 4},
+    {"alias": "eve", "label": "Eve Adams", "dblpPid": "55/5", "identityStatus": "singleton", "vertexMemberCount": 1, "identityMemberCount": 1, "publications": 1, "distinctCoauthors": 0, "coauthorOccurrences": 0, "maxCoauthorsOnOnePaper": 0, "community": "c3", "communitySize": 1, "component": "k2", "componentSize": 1}
+  ],
+  "institutions": [
+    {"id": "institution:openalex:I97018004", "name": "Stanford University"},
+    {"id": "institution:openalex:I185261750", "name": "University of Toronto"}
+  ],
+  "affiliations": [
+    {"researcher": "bob", "institution": "institution:openalex:I97018004", "mentionSeed": "m1"},
+    {"researcher": "cyd", "institution": "institution:openalex:I185261750", "mentionSeed": "m2"}
+  ],
+  "coauthorships": [
+    {"a": "ada", "b": "bob", "years": [{"year": 2019, "count": 1}, {"year": 2021, "count": 1}], "works": [1, 2]},
+    {"a": "bob", "b": "cyd", "years": [{"year": 2020, "count": 1}], "works": [3]},
+    {"a": "cyd", "b": "dan", "years": [{"year": 2022, "count": 1}], "works": [4]}
+  ],
+  "bridges": [
+    {"researcher": "bob", "community": "c1", "degree": 2, "crossCommunityDegree": 1, "communitiesReached": 1, "sumOfSquares": 2},
+    {"researcher": "cyd", "community": "c2", "degree": 2, "crossCommunityDegree": 1, "communitiesReached": 1, "sumOfSquares": 2},
+    {"researcher": "ada", "community": "c1", "degree": 1, "crossCommunityDegree": 0, "communitiesReached": 0, "sumOfSquares": 1},
+    {"researcher": "dan", "community": "c2", "degree": 1, "crossCommunityDegree": 0, "communitiesReached": 0, "sumOfSquares": 1}
+  ],
+  "coreness": [
+    {"researcher": "bob", "k": 1, "degree": 2},
+    {"researcher": "cyd", "k": 1, "degree": 2},
+    {"researcher": "ada", "k": 1, "degree": 1},
+    {"researcher": "dan", "k": 1, "degree": 1}
+  ],
+  "entityLinks": [
+    {"name": "Ada Lovelace", "researcher": "ada", "rank": 1},
+    {"name": "John Smith", "researcher": "bob", "rank": 1},
+    {"name": "John Smith", "researcher": "cyd", "rank": 2},
+    {"name": "Dan Brown", "researcher": "dan", "rank": 1},
+    {"name": "Eve Adams", "researcher": "eve", "rank": 1}
+  ],
+  "exampleQuestions": [
+    {"question": "Who are the coauthors of Ada Lovelace?", "expectedStatus": "answered"},
+    {"question": "What is the shortest path between Ada Lovelace and Dan Brown?", "expectedStatus": "answered"},
+    {"question": "Which researchers bridge communities?", "expectedStatus": "answered"},
+    {"question": "Who has the most distinct coauthors?", "expectedStatus": "answered"},
+    {"question": "Who are the coauthors of John Smith?", "expectedStatus": "abstained"}
+  ]
+}

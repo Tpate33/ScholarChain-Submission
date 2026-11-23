@@ -1,0 +1,29 @@
+[info] welcome to sbt 1.11.7 (Eclipse Adoptium Java 17.0.17)
+[info] loading settings for project scholarchain-build from plugins.sbt...
+[info] loading project definition from /Users/taufeeqpatel/Desktop/ScholarChain/project
+[info] loading settings for project root from build.sbt...
+[info] set current project to scholarchain (in build file:/Users/taufeeqpatel/Desktop/ScholarChain/)
+[info] scalafmt: Formatting 1 Scala sources (/Users/taufeeqpatel/Desktop/ScholarChain/modules/services)...
+[success] Total time: 2 s, completed Nov 23, 2026, 3:10:53 PM
+[info] scalafmt: Formatting 1 Scala sources (/Users/taufeeqpatel/Desktop/ScholarChain/modules/services)...
+[success] Total time: 0 s, completed Nov 23, 2026, 3:10:54 PM
+[info] compiling 1 Scala source to /Users/taufeeqpatel/Desktop/ScholarChain/modules/services/target/scala-3.3.6/classes ...
+[info] done compiling
+scholarchain.services.ProductionLauncherSuite:
+  + A1: a config without the adapter sections is refused before any key source or client 0.223s
+  + A1: with the sections, the launcher's settings are exactly forProcess's for that kind 0.043s
+  + A1: the three mains use ProductionLauncher; without configuration they refuse, no client 0.087s
+  + A2: LauncherSettings map 1:1 into one StorageClients bundle; one vector reader for both 0.052s
+  + A2/A5: a missing workflow fails closed, names itself, and closes the bundle once 0.064s
+  + A5: the production seams build no key source and no workflow: refused before any client 0.018s
+  + G5: failures after the bundle opened close it once; a key source is closed too 0.256s
+  + G5: a started process closes the bundle exactly once, on stop, after serving 0.182s
+  + G5: a throwing workflow factory refuses safely and releases every opened resource 0.009s
+  + G4: the query-jobs workflow's store reads run under the read policy, bounded by readTimeout 0.948s
+scholarchain.services.WorkflowStoreBoundsSuite:
+  + every method passes a store answer through, and runs on the workflow-stores pool 0.005s
+  + a hanging call is cut at readTimeoutMillis; reads retry within the request bound, writes never 2.112s
+  + Transient is retried up to readMaxAttempts; the breaker opens after its threshold 0.009s
+  + after close no call reaches the store 0.002s
+[info] Passed: Total 14, Failed 0, Errors 0, Passed 14
+[success] Total time: 8 s, completed Nov 23, 2026, 3:11:02 PM

@@ -1,0 +1,39 @@
+{
+  "profile": "NON-PRODUCTION synthetic fixture",
+  "checks": [
+    {
+      "check": "health",
+      "status": 200
+    },
+    {
+      "check": "query",
+      "status": 200
+    },
+    {
+      "check": "evidence",
+      "status": 200
+    },
+    {
+      "check": "explain",
+      "status": 200
+    },
+    {
+      "check": "graph",
+      "status": 200
+    },
+    {
+      "check": "unauthorized",
+      "status": 401
+    },
+    {
+      "check": "replay",
+      "status": 200
+    },
+    {
+      "check": "ambiguous",
+      "status": 200
+    }
+  ],
+  "result": "PASS",
+  "queryId": "query:c717a1ab7768c0cd356d8b7412591381"
+}

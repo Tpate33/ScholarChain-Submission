@@ -92,7 +92,7 @@ self_check() { # self_check <fs.defaultFS> <JVM root>: runs the wrapper's --self
   env JAVA_HOME="$INHERITED" PATH="$INHERITED/bin:$PATH" bash "$WRAPPER" --self-check "$1" "$2" 2>&1
 }
 accept_case() { # accept_case <fs.defaultFS> <JVM root> <expected selected java home>
-  local fs=$1 home=$3 out ck auth want first jh pins
+  local fs=$1 home=$3 out ck auth want first jh pins codec_pin
   if out=$(self_check "$fs" "$2"); then
     ck=$(printf '%s\n' "$out" | awk '/ ARGV [0-9]+ --checkpoint-dir$/ { getline; print $4 }')
     auth=${fs#hdfs://}
@@ -101,14 +101,18 @@ accept_case() { # accept_case <fs.defaultFS> <JVM root> <expected selected java 
     first=$(printf '%s\n' "$out" | awk '/ ARGV 000 / { print $4 }')
     jh=$(printf '%s\n' "$out" | awk '/ ARGV [0-9]+ JAVA_HOME=/ { print $4 }')
     pins=$(printf '%s\n' "$out" | awk -v w="$home" '$2 == "ARGV" && ($4 == "spark.executorEnv.JAVA_HOME=" w || $4 == "spark.yarn.appMasterEnv.JAVA_HOME=" w) { n++ } END { print n + 0 }')
-    if [[ $ck == "$want" && $first == /usr/bin/timeout && $jh == "JAVA_HOME=$home" && $pins == 2 ]]; then
+    # Inspect the actual submission argv: exactly one --conf must replace the inherited
+    # EMR LZO entries, and the existing Java/checkpoint/timeout pins must still hold.
+    codec_pin=$(printf '%s\n' "$out" | awk '$2 == "ARGV" { if ($4 ~ /^spark.hadoop.io.compression.codecs=/) { if (previous != "--conf") exit 1; print $4 } previous=$4 }')
+    if [[ $ck == "$want" && $first == /usr/bin/timeout && $jh == "JAVA_HOME=$home" && $pins == 2 &&
+      $codec_pin == spark.hadoop.io.compression.codecs=org.apache.hadoop.io.compress.GzipCodec,org.apache.hadoop.io.compress.DefaultCodec,org.apache.hadoop.io.compress.BZip2Codec,org.apache.hadoop.io.compress.SnappyCodec ]]; then
       case_ok "accepted $fs checkpoint=$ck java_home=$home (selected by select_java17 on $2)"
       if [[ $PRINTED == no ]]; then
         printf '%s\n' "$out"
         PRINTED=yes
       fi
     else
-      case_fail "$fs on $2: checkpoint=$ck (want $want), argv[0]=$first, ${jh:-no JAVA_HOME} (want JAVA_HOME=$home), AM/executor JAVA_HOME pins=$pins (want 2)"
+      case_fail "$fs on $2: checkpoint=$ck (want $want), argv[0]=$first, ${jh:-no JAVA_HOME} (want JAVA_HOME=$home), AM/executor JAVA_HOME pins=$pins (want 2), input codec pin=${codec_pin:-missing}"
     fi
   else
     case_fail "$fs on $2 refused but must be accepted:"

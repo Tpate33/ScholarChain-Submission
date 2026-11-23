@@ -1,0 +1,53 @@
+[info] welcome to sbt 1.11.7 (Eclipse Adoptium Java 17.0.17)
+[info] loading settings for project scholarchain-build from plugins.sbt...
+[info] loading project definition from /Users/taufeeqpatel/Desktop/ScholarChain/project
+[info] loading settings for project root from build.sbt...
+[info] set current project to scholarchain (in build file:/Users/taufeeqpatel/Desktop/ScholarChain/)
+[info] compiling 1 Scala source to /Users/taufeeqpatel/Desktop/ScholarChain/modules/services/target/scala-3.3.6/test-classes ...
+[info] done compiling
+scholarchain.services.ProductionLauncherSuite:
+==> X scholarchain.services.ProductionLauncherSuite.G5: a throwing workflow factory refuses safely and releases every opened resource  0.261s java.lang.IllegalStateException: private-workflow-message
+    at scholarchain.services.ProductionLauncherSuite.$anonfun$9(ProductionLauncherSuite.scala:262)
+    at scholarchain.services.ProductionServiceProvider.compose$$anonfun$2$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$2(ProductionComposition.scala:375)
+    at scala.util.Either.flatMap(Either.scala:360)
+    at scholarchain.services.ProductionServiceProvider.compose$$anonfun$2$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1(ProductionComposition.scala:358)
+    at scala.util.Either.flatMap(Either.scala:360)
+    at scholarchain.services.ProductionServiceProvider.compose$$anonfun$2$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1(ProductionComposition.scala:357)
+    at scala.util.Either.flatMap(Either.scala:360)
+    at scholarchain.services.ProductionServiceProvider.compose$$anonfun$2$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1(ProductionComposition.scala:356)
+    at scala.util.Either.flatMap(Either.scala:360)
+    at scholarchain.services.ProductionServiceProvider.compose$$anonfun$2$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1(ProductionComposition.scala:355)
+    at scala.util.Either.flatMap(Either.scala:360)
+    at scholarchain.services.ProductionServiceProvider.compose$$anonfun$2$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1(ProductionComposition.scala:354)
+    at scala.util.Either.flatMap(Either.scala:360)
+    at scholarchain.services.ProductionServiceProvider.compose$$anonfun$2$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1(ProductionComposition.scala:353)
+    at scala.util.Either.flatMap(Either.scala:360)
+    at scholarchain.services.ProductionServiceProvider.compose$$anonfun$2$$anonfun$1$$anonfun$1$$anonfun$1$$anonfun$1(ProductionComposition.scala:352)
+    at scala.util.Either.flatMap(Either.scala:360)
+    at scholarchain.services.ProductionServiceProvider.compose$$anonfun$2$$anonfun$1$$anonfun$1$$anonfun$1(ProductionComposition.scala:348)
+    at scala.util.Either.flatMap(Either.scala:360)
+    at scholarchain.services.ProductionServiceProvider.compose$$anonfun$2$$anonfun$1$$anonfun$1(ProductionComposition.scala:347)
+    at scala.util.Either.flatMap(Either.scala:360)
+    at scholarchain.services.ProductionServiceProvider.compose$$anonfun$2$$anonfun$1(ProductionComposition.scala:346)
+    at scala.util.Either.flatMap(Either.scala:360)
+    at scholarchain.services.ProductionServiceProvider.compose$$anonfun$2(ProductionComposition.scala:345)
+    at scala.util.Either.flatMap(Either.scala:360)
+    at scholarchain.services.ProductionServiceProvider.compose(ProductionComposition.scala:343)
+    at scholarchain.services.ProductionServiceProvider.startReleasing(ProductionComposition.scala:477)
+    at scholarchain.services.ProductionLauncher.start$$anonfun$1$$anonfun$5$$anonfun$6$$anonfun$4$$anonfun$4(ProductionLauncher.scala:246)
+    at scala.util.Either.flatMap(Either.scala:360)
+    at scholarchain.services.ProductionLauncher.start$$anonfun$1$$anonfun$5$$anonfun$6$$anonfun$4(ProductionLauncher.scala:236)
+    at scala.util.Either.flatMap(Either.scala:360)
+    at scholarchain.services.ProductionLauncher.start$$anonfun$1$$anonfun$5$$anonfun$6(ProductionLauncher.scala:229)
+    at scala.util.Either.flatMap(Either.scala:360)
+    at scholarchain.services.ProductionLauncher.start$$anonfun$1$$anonfun$5(ProductionLauncher.scala:220)
+    at scala.util.Either.flatMap(Either.scala:360)
+    at scholarchain.services.ProductionLauncher.start$$anonfun$1(ProductionLauncher.scala:212)
+    at scala.util.Either.flatMap(Either.scala:360)
+    at scholarchain.services.ProductionLauncher.start(ProductionLauncher.scala:211)
+    at scholarchain.services.ProductionLauncherSuite.$init$$$anonfun$9(ProductionLauncherSuite.scala:265)
+[error] Failed: Total 1, Failed 1, Errors 0, Passed 0
+[error] Failed tests:
+[error] 	scholarchain.services.ProductionLauncherSuite
+[error] (services / Test / testOnly) sbt.TestsFailedException: Tests unsuccessful
+[error] Total time: 4 s, completed Nov 23, 2026, 12:49:48 PM

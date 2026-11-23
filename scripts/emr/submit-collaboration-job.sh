@@ -323,6 +323,10 @@ done
 
 # build_submit_argv <spark timeout seconds> <java home>: sets SUBMIT_ARGV (timeout + env + spark-submit)
 build_submit_argv() {
+  # The pinned Apache Spark distribution does not ship EMR's LZO codecs. Inheriting
+  # those core-site entries breaks TextInputFormat even for uncompressed JSON input.
+  # Keep the codecs available in the pinned Hadoop runtime; this does not add LZO support.
+  local input_codecs=org.apache.hadoop.io.compress.GzipCodec,org.apache.hadoop.io.compress.DefaultCodec,org.apache.hadoop.io.compress.BZip2Codec,org.apache.hadoop.io.compress.SnappyCodec
   SUBMIT_ARGV=(
     /usr/bin/timeout --foreground -k "$O_kill_after_seconds" "$1"
     env SPARK_HOME="$SPARK_HOME_DIR" SPARK_CONF_DIR="$ROOT/spark-conf" HADOOP_CONF_DIR=/etc/hadoop/conf
@@ -337,6 +341,7 @@ build_submit_argv() {
     --conf spark.eventLog.enabled=true --conf "spark.eventLog.dir=$EVENTS_URI"
     --conf "spark.yarn.stagingDir=$STAGING_URI"
     --conf spark.yarn.maxAppAttempts=1 --conf spark.hadoop.fs.s3a.directory.marker.retention=keep
+    --conf "spark.hadoop.io.compression.codecs=$input_codecs"
     "$WORK/job.jar"
     --input-root "$O_input_root" --curated-run "$O_curated_run" --decision-run "$O_decision_run"
     --grouping-run "$O_grouping_run" --output-root "$O_output_root"

@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "status": "Integration Round 02 local checkpoint candidate; not a production release",
+  "student": {
+    "name": "Taufeeq Patel",
+    "email": "tpate33@uic.edu"
+  },
+  "baseCommit": "bdbf5df02133a0cb5f7493fcd1fd08b98469db60",
+  "profile": "NON-PRODUCTION DBLP-derived bounded dev data; synthetic profile also preserved",
+  "sha256": {
+    "scripts/local-demo.sh": "cfb41ea1e223b0efdbbbbc327b07e84647dbb72ce5d1e1a9aab12f9d7d6494cb",
+    "scripts/demo-smoke.py": "6539d85c783a90f169422ce62283b39693f2505f39f89291ac65a4b2a4382142",
+    "modules/services/src/main/resources/scholarchain/local-demo/world.v1.json": "effb6a47b788b5925e2a4fe856f1e6e97d2a8797cfbf34a904f0d78ac323bf4b",
+    "modules/services/src/main/resources/scholarchain/local-demo/api-keys.v1.json": "10b3c775b80e62b00595b1e8b94bb4eb8b7224622212caa2d608da095affba2a",
+    "scripts/emr/submit-collaboration-job.sh": "8ae6952b68fe2c0fc1c6fa269b7cfc9cb8038e4190357c2ece58fa74635f8d05",
+    "scripts/emr/check-submit-args.sh": "dbd661d9f08775d8505216d4e3ca7e004e396c92d668a36cd4143c676cf33f33",
+    "scripts/pipeline-demo.sh": "4f2322122e734bcfa4dd2e0edd5a7e6d81306fffb75c42b4b01c6593dcf0e0d5",
+    "scripts/pipeline-demo-smoke.py": "a13d5769c83963dd1ecac90da6a5764dd832ba52cb2c5794e1a3ce00e9736fb0",
+    "modules/services/src/main/scala/scholarchain/services/localdemo/PipelineDemo.scala": "20c2ce3dac9f49c47fa71643c1a301446b9885e2a25c4e2f067d4b4c010c4c1e"
+  },
+  "observedEvidence": "docs/agent-runs/integration-02/verification/pipeline-demo/summary.json",
+  "missing": {
+    "finalSubmissionCommit": null,
+    "finalTag": null,
+    "videoUrl": null,
+    "imageDigests": null,
+    "runtimeTerraformPlan": null,
+    "liveDeploymentUrl": null,
+    "productionAnswerModel": null,
+    "productionEmbedder": null,
+    "elasticityResults": null
+  },
+  "notes": [
+    "No commits or pushes authorized by this manifest.",
+    "No live AWS verification performed by the Codex local completion.",
+    "Acceptance/status fields describe preparation time; the human-recorded implementation SHA and decision are in docs/agent-runs/integration-02/human-gate.md after the approved human closeout."
+  ],
+  "verification": {
+    "fullCheck": {
+      "command": "sbt check services/stage pipelineDemoClasspath",
+      "exitCode": 0,
+      "passed": 2851,
+      "skipped": 1,
+      "suites": 233,
+      "failures": 0,
+      "errors": 0,
+      "checkSeconds": 466,
+      "completedAt": "2026-11-23T15:22:29-06:00",
+      "summary": "docs/agent-runs/integration-02/verification/closeout-full-check-summary.txt"
+    },
+    "httpReplay": "PASS, synthetic loopback only",
+    "localCloudPreparation": "docs/agent-runs/integration-02/verification/cloud-preparation-summary.json",
+    "realDataHttpReplay": "PASS; three coauthors each supported by work:dblp:conf/aaai/ZengCZ023",
+    "realDataFocusedTests": {
+      "passed": 3,
+      "failed": 0,
+      "errors": 0
+    },
+    "postRepairGate": {
+      "command": "sbt check services/stage pipelineDemoClasspath",
+      "exitCode": 0,
+      "passed": 2851,
+      "skipped": 1,
+      "suites": 233,
+      "failures": 0,
+      "errors": 0,
+      "checkSeconds": 466,
+      "completedAt": "2026-11-23T15:22:29-06:00",
+      "summary": "docs/agent-runs/integration-02/verification/closeout-full-check-summary.txt",
+      "status": "PASS",
+      "reason": "one full rerun after substantive CR-INT02-A-1 lifecycle repair"
+    }
+  },
+  "dataArtifacts": {
+    "analysisRunId": "run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40",
+    "partManifestSha256": "749763adb05af272a3c0c5473ed3d90d071a3e762d67ef70ebef84295cc94907",
+    "sourceRoot": "modules/storage/src/test/resources/fixtures",
+    "kind": "human-copied verified Phase 6 dev artifact",
+    "normalizedWorkRecords": {
+      "dblp": 41,
+      "openalex": 43,
+      "crossref": 6
+    }
+  },
+  "preparedFromUncommittedWorktree": true,
+  "review": {
+    "verdict": "APPROVE for local checkpoint only",
+    "report": "docs/agent-runs/integration-02/review-report.md",
+    "reviewedImplementationHashes": "docs/agent-runs/integration-02/reviewed-files.json",
+    "humanAcceptance": "PENDING"
+  }
+}

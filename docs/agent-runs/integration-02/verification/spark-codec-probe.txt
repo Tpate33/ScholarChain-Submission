@@ -1,0 +1,6 @@
+Offline diagnostic; no Spark session, AWS client, or network request.
+archived EMR codec configuration: FAIL
+java.lang.IllegalArgumentException: Compression codec com.hadoop.compression.lzo.LzoCodec not found.
+java.lang.ClassNotFoundException: Class com.hadoop.compression.lzo.LzoCodec not found
+Hadoop built-in codecs control: PASS
+DIAGNOSTIC PASS: archived configuration reproduces failure; built-in control succeeds.

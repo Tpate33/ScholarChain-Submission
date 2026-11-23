@@ -1,0 +1,132 @@
+[check-submit-args] CASE ok accepted hdfs://ip-10-42-0-10.ec2.internal:8020 checkpoint=hdfs://ip-10-42-0-10.ec2.internal:8020/scholarchain/checkpoints/a1-0123456789abcdef java_home=/private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/s/java-17-amazon-corretto.x86_64 (selected by select_java17 on /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/s)
+[submit-collaboration-job] CHECK ok locations: input s3a://scholarchain-dev-data-000000000000-us-east-1/input/dev-run-01, output s3a://scholarchain-dev-data-000000000000-us-east-1/output/spark, checkpoint hdfs://ip-10-42-0-10.ec2.internal:8020/scholarchain/checkpoints/a1-0123456789abcdef
+[submit-collaboration-job] CHECK ok java 17 /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/s/java-17-amazon-corretto.x86_64/bin/java (candidate /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/s/jre-17/bin/java; inherited JAVA_HOME and PATH java not used)
+[submit-collaboration-job] ARGV 000 /usr/bin/timeout
+[submit-collaboration-job] ARGV 001 --foreground
+[submit-collaboration-job] ARGV 002 -k
+[submit-collaboration-job] ARGV 003 60
+[submit-collaboration-job] ARGV 004 1560
+[submit-collaboration-job] ARGV 005 env
+[submit-collaboration-job] ARGV 006 SPARK_HOME=/opt/scholarchain/spark-3.5.5-bin-hadoop3-scala2.13
+[submit-collaboration-job] ARGV 007 SPARK_CONF_DIR=/opt/scholarchain/spark-conf
+[submit-collaboration-job] ARGV 008 HADOOP_CONF_DIR=/etc/hadoop/conf
+[submit-collaboration-job] ARGV 009 JAVA_HOME=/private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/s/java-17-amazon-corretto.x86_64
+[submit-collaboration-job] ARGV 010 /opt/scholarchain/spark-3.5.5-bin-hadoop3-scala2.13/bin/spark-submit
+[submit-collaboration-job] ARGV 011 --master
+[submit-collaboration-job] ARGV 012 yarn
+[submit-collaboration-job] ARGV 013 --deploy-mode
+[submit-collaboration-job] ARGV 014 client
+[submit-collaboration-job] ARGV 015 --name
+[submit-collaboration-job] ARGV 016 scholarchain-collaboration-analysis
+[submit-collaboration-job] ARGV 017 --class
+[submit-collaboration-job] ARGV 018 scholarchain.spark.job.CollaborationJob
+[submit-collaboration-job] ARGV 019 --driver-memory
+[submit-collaboration-job] ARGV 020 1g
+[submit-collaboration-job] ARGV 021 --num-executors
+[submit-collaboration-job] ARGV 022 2
+[submit-collaboration-job] ARGV 023 --executor-cores
+[submit-collaboration-job] ARGV 024 1
+[submit-collaboration-job] ARGV 025 --executor-memory
+[submit-collaboration-job] ARGV 026 2g
+[submit-collaboration-job] ARGV 027 --driver-class-path
+[submit-collaboration-job] ARGV 028 /opt/scholarchain/runtime-jars/scala-library-2.13.16.jar:/opt/scholarchain/runtime-jars/hadoop-aws-3.3.4.jar:/opt/scholarchain/runtime-jars/aws-java-sdk-bundle-1.12.262.jar
+[submit-collaboration-job] ARGV 029 --driver-java-options
+[submit-collaboration-job] ARGV 030 -Djdk.reflect.useDirectMethodHandle=false --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/sun.nio.cs=ALL-UNNAMED --add-opens=java.base/sun.security.action=ALL-UNNAMED --add-opens=java.base/sun.util.calendar=ALL-UNNAMED
+[submit-collaboration-job] ARGV 031 --conf
+[submit-collaboration-job] ARGV 032 spark.executor.extraClassPath=/opt/scholarchain/runtime-jars/scala-library-2.13.16.jar:/opt/scholarchain/runtime-jars/hadoop-aws-3.3.4.jar:/opt/scholarchain/runtime-jars/aws-java-sdk-bundle-1.12.262.jar
+[submit-collaboration-job] ARGV 033 --conf
+[submit-collaboration-job] ARGV 034 spark.executor.extraJavaOptions=-Djdk.reflect.useDirectMethodHandle=false --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/sun.nio.cs=ALL-UNNAMED --add-opens=java.base/sun.security.action=ALL-UNNAMED --add-opens=java.base/sun.util.calendar=ALL-UNNAMED
+[submit-collaboration-job] ARGV 035 --conf
+[submit-collaboration-job] ARGV 036 spark.executorEnv.JAVA_HOME=/private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/s/java-17-amazon-corretto.x86_64
+[submit-collaboration-job] ARGV 037 --conf
+[submit-collaboration-job] ARGV 038 spark.yarn.appMasterEnv.JAVA_HOME=/private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/s/java-17-amazon-corretto.x86_64
+[submit-collaboration-job] ARGV 039 --conf
+[submit-collaboration-job] ARGV 040 spark.dynamicAllocation.enabled=false
+[submit-collaboration-job] ARGV 041 --conf
+[submit-collaboration-job] ARGV 042 spark.eventLog.enabled=true
+[submit-collaboration-job] ARGV 043 --conf
+[submit-collaboration-job] ARGV 044 spark.eventLog.dir=hdfs://ip-10-42-0-10.ec2.internal:8020/scholarchain/spark-events
+[submit-collaboration-job] ARGV 045 --conf
+[submit-collaboration-job] ARGV 046 spark.yarn.stagingDir=hdfs://ip-10-42-0-10.ec2.internal:8020/scholarchain/staging
+[submit-collaboration-job] ARGV 047 --conf
+[submit-collaboration-job] ARGV 048 spark.yarn.maxAppAttempts=1
+[submit-collaboration-job] ARGV 049 --conf
+[submit-collaboration-job] ARGV 050 spark.hadoop.fs.s3a.directory.marker.retention=keep
+[submit-collaboration-job] ARGV 051 --conf
+[submit-collaboration-job] ARGV 052 spark.hadoop.io.compression.codecs=org.apache.hadoop.io.compress.GzipCodec,org.apache.hadoop.io.compress.DefaultCodec,org.apache.hadoop.io.compress.BZip2Codec,org.apache.hadoop.io.compress.SnappyCodec
+[submit-collaboration-job] ARGV 053 /tmp/scholarchain-submit.selfcheck/job.jar
+[submit-collaboration-job] ARGV 054 --input-root
+[submit-collaboration-job] ARGV 055 s3a://scholarchain-dev-data-000000000000-us-east-1/input/dev-run-01
+[submit-collaboration-job] ARGV 056 --curated-run
+[submit-collaboration-job] ARGV 057 curated/hadoop/snapshot=dblp-2026-10-03/run=2881724b5c86b561a235836d51946fbd884beed36a14f929b27c278cb5de8baa
+[submit-collaboration-job] ARGV 058 --decision-run
+[submit-collaboration-job] ARGV 059 er-decisions/run=736cb1706210a34f0958e658c061054c4e6b27b80847528db8619da84495b76a
+[submit-collaboration-job] ARGV 060 --grouping-run
+[submit-collaboration-job] ARGV 061 er-assignments/run=84dd896fda43977b934008f10955191e78c2b93b80ec57c00f55dbb137dbd7d2
+[submit-collaboration-job] ARGV 062 --output-root
+[submit-collaboration-job] ARGV 063 s3a://scholarchain-dev-data-000000000000-us-east-1/output/spark
+[submit-collaboration-job] ARGV 064 --checkpoint-dir
+[submit-collaboration-job] ARGV 065 hdfs://ip-10-42-0-10.ec2.internal:8020/scholarchain/checkpoints/a1-0123456789abcdef
+[submit-collaboration-job] ARGV 066 --config
+[submit-collaboration-job] ARGV 067 /tmp/scholarchain-submit.selfcheck/analysis.conf
+[submit-collaboration-job] ARGV 068 --benchmark-pairs
+[submit-collaboration-job] ARGV 069 /tmp/scholarchain-submit.selfcheck/benchmark-pairs.json
+[submit-collaboration-job] ARGV 070 --code-version
+[submit-collaboration-job] ARGV 071 0123456789abcdef0123456789abcdef01234567
+[submit-collaboration-job] ARGV 072 --attempt
+[submit-collaboration-job] ARGV 073 1
+[submit-collaboration-job] ARGV 074 --partitions
+[submit-collaboration-job] ARGV 075 8
+[submit-collaboration-job] ARGV 076 --checkpoint-interval
+[submit-collaboration-job] ARGV 077 2
+[submit-collaboration-job] ARGV 078 --max-tree-entries
+[submit-collaboration-job] ARGV 079 20000
+[submit-collaboration-job] ARGV 080 --max-tree-depth
+[submit-collaboration-job] ARGV 081 4
+[submit-collaboration-job] ARGV 082 --max-driver-validation-rows
+[submit-collaboration-job] ARGV 083 2000
+[submit-collaboration-job] ARGV 084 --max-driver-validation-bytes
+[submit-collaboration-job] ARGV 085 67108864
+[submit-collaboration-job] ARGV 086 --max-metadata-bytes
+[submit-collaboration-job] ARGV 087 1048576
+[submit-collaboration-job] RESULT SELF-CHECK-OK fs.defaultFS=hdfs://ip-10-42-0-10.ec2.internal:8020 authority=ip-10-42-0-10.ec2.internal:8020 argc=88
+[check-submit-args] CASE ok accepted hdfs://ip-10-42-0-10.ec2.internal:8020/ checkpoint=hdfs://ip-10-42-0-10.ec2.internal:8020/scholarchain/checkpoints/a1-0123456789abcdef java_home=/private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/s/java-17-amazon-corretto.x86_64 (selected by select_java17 on /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/s)
+[check-submit-args] CASE ok accepted hdfs://namenode checkpoint=hdfs://namenode/scholarchain/checkpoints/a1-0123456789abcdef java_home=/private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/s/java-17-amazon-corretto.x86_64 (selected by select_java17 on /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/s)
+[check-submit-args] CASE ok accepted hdfs://10.42.0.10:8020 checkpoint=hdfs://10.42.0.10:8020/scholarchain/checkpoints/a1-0123456789abcdef java_home=/private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/s/java-17-amazon-corretto.x86_64 (selected by select_java17 on /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/s)
+[check-submit-args] CASE ok accepted hdfs://ip-10-42-0-10.ec2.internal:8020 checkpoint=hdfs://ip-10-42-0-10.ec2.internal:8020/scholarchain/checkpoints/a1-0123456789abcdef java_home=/private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/s2/jre-17 (selected by select_java17 on /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/s2)
+[check-submit-args] CASE ok refused hdfs:///: [submit-collaboration-job] FAIL exit=3 fs.defaultFS 'hdfs:///' has no authority (name node host)
+[check-submit-args] CASE ok refused hdfs://: [submit-collaboration-job] FAIL exit=3 fs.defaultFS 'hdfs://' has no authority (name node host)
+[check-submit-args] CASE ok refused hdfs://:8020: [submit-collaboration-job] FAIL exit=3 fs.defaultFS 'hdfs://:8020' has an empty or invalid host '' (letters, digits, '-', '.')
+[check-submit-args] CASE ok refused file:///: [submit-collaboration-job] FAIL exit=3 fs.defaultFS 'file:///' is not an hdfs:// URI
+[check-submit-args] CASE ok refused s3a://bucket: [submit-collaboration-job] FAIL exit=3 fs.defaultFS 's3a://bucket' is not an hdfs:// URI
+[check-submit-args] CASE ok refused hdfs://host:8020/path: [submit-collaboration-job] FAIL exit=3 fs.defaultFS 'hdfs://host:8020/path' has a path beyond '/'
+[check-submit-args] CASE ok refused hdfs://host:8020//: [submit-collaboration-job] FAIL exit=3 fs.defaultFS 'hdfs://host:8020//' has a path beyond '/'
+[check-submit-args] CASE ok refused hdfs://host:0: [submit-collaboration-job] FAIL exit=3 fs.defaultFS 'hdfs://host:0' has an invalid port '0'
+[check-submit-args] CASE ok refused hdfs://host:65536: [submit-collaboration-job] FAIL exit=3 fs.defaultFS 'hdfs://host:65536' has an invalid port '65536'
+[check-submit-args] CASE ok refused hdfs://host:80:90: [submit-collaboration-job] FAIL exit=3 fs.defaultFS 'hdfs://host:80:90' has an invalid port '80:90'
+[check-submit-args] CASE ok refused hdfs://-host: [submit-collaboration-job] FAIL exit=3 fs.defaultFS 'hdfs://-host' has an empty or invalid host '-host' (letters, digits, '-', '.')
+[check-submit-args] CASE ok refused hdfs://host-: [submit-collaboration-job] FAIL exit=3 fs.defaultFS 'hdfs://host-' has an empty or invalid host 'host-' (letters, digits, '-', '.')
+[check-submit-args] CASE ok refused hdfs://ho_st: [submit-collaboration-job] FAIL exit=3 fs.defaultFS 'hdfs://ho_st' has an empty or invalid host 'ho_st' (letters, digits, '-', '.')
+[check-submit-args] CASE ok refused hdfs://host,other: [submit-collaboration-job] FAIL exit=3 fs.defaultFS 'hdfs://host,other' has an empty or invalid host 'host,other' (letters, digits, '-', '.')
+[check-submit-args] CASE ok refused hdfs://user@host: [submit-collaboration-job] FAIL exit=3 fs.defaultFS 'hdfs://user@host' has an empty or invalid host 'user@host' (letters, digits, '-', '.')
+[check-submit-args] CASE ok refused hdfs://ho*st: [submit-collaboration-job] FAIL exit=3 fs.defaultFS 'hdfs://ho*st' has an empty or invalid host 'ho*st' (letters, digits, '-', '.')
+[check-submit-args] CASE ok refused hdfs://[::1]:8020: [submit-collaboration-job] FAIL exit=3 fs.defaultFS 'hdfs://[::1]:8020' has an invalid port ':1]:8020'
+[check-submit-args] CASE ok refused HDFS://host: [submit-collaboration-job] FAIL exit=3 fs.defaultFS 'HDFS://host' is not an hdfs:// URI
+[check-submit-args] CASE ok self-check without Java 17: exit 4, no argv: [submit-collaboration-job] FAIL exit=4 java on the primary node is not 17 (no Java 17 candidate under /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/s0: /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/s0/jre-17/bin/java: absent; /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/s0/java-17-amazon-corretto.x86_64/bin/java: absent;)
+[check-submit-args] CASE ok java (a) old selection: PATH java resolves to /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/inherited/java-1.8.0-amazon-corretto.x86_64/jre/bin/java, 'openjdk version "1.8.0_432" 2024-10-15 LTS' -> not 17, the old wrapper refused with exit 4 (attempt 2)
+[check-submit-args] CASE ok java (a) new selection ignores the inherited Java 8: exit 0: [submit-collaboration-job] RESULT JAVA-SELECT-OK java_bin=/private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/a/java-17-amazon-corretto.x86_64/bin/java java_home=/private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/a/java-17-amazon-corretto.x86_64
+[check-submit-args] CASE ok java (a) first candidate jre-17 chosen: exit 0: [submit-collaboration-job] RESULT JAVA-SELECT-OK java_bin=/private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/a/java-17-amazon-corretto.x86_64/bin/java java_home=/private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/a/java-17-amazon-corretto.x86_64
+[check-submit-args] CASE ok java (a2) second candidate: exit 0: [submit-collaboration-job] RESULT JAVA-SELECT-OK java_bin=/private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/a2/java-17-amazon-corretto.x86_64/bin/java java_home=/private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/a2/java-17-amazon-corretto.x86_64
+[check-submit-args] CASE ok java (a3) bad first candidate skipped: exit 0: [submit-collaboration-job] RESULT JAVA-SELECT-OK java_bin=/private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/a3/java-17-amazon-corretto.x86_64/bin/java java_home=/private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/a3/java-17-amazon-corretto.x86_64
+[check-submit-args] CASE ok java (b) no candidate: exit 4: [submit-collaboration-job] FAIL exit=4 java on the primary node is not 17 (no Java 17 candidate under /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/b: /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/b/jre-17/bin/java: absent; /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/b/java-17-amazon-corretto.x86_64/bin/java: absent;)
+[check-submit-args] CASE ok java (c1) candidate reports 1.8: exit 4: [submit-collaboration-job] FAIL exit=4 java on the primary node is not 17 (no Java 17 candidate under /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/c1: /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/c1/jre-17/bin/java: /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/c1/jre-17/bin/java reports 'openjdk version "1.8.0_432" 2024-10-15 LTS'; /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/c1/java-17-amazon-corretto.x86_64/bin/java: absent;)
+[check-submit-args] CASE ok java (c2) candidates report 21: exit 4: [submit-collaboration-job] FAIL exit=4 java on the primary node is not 17 (no Java 17 candidate under /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/c2: /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/c2/jre-17/bin/java: /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/c2/jre-17/bin/java reports 'openjdk version "21.0.5" 2024-10-15 LTS'; /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/c2/java-17-amazon-corretto.x86_64/bin/java: /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/c2/java-17-amazon-corretto.x86_64/bin/java reports 'openjdk version "21.0.5" 2024-10-15 LTS';)
+[check-submit-args] CASE ok java (d) symlink outside the JVM root: exit 4: [submit-collaboration-job] FAIL exit=4 java on the primary node is not 17 (no Java 17 candidate under /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/d: /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/d/jre-17/bin/java: resolves to /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/outside/jdk-17/bin/java, outside /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/d; /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/d/java-17-amazon-corretto.x86_64/bin/java: absent;)
+[check-submit-args] CASE ok java (d) refusal text: exit 4: [submit-collaboration-job] FAIL exit=4 java on the primary node is not 17 (no Java 17 candidate under /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/d: /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/d/jre-17/bin/java: resolves to /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/outside/jdk-17/bin/java, outside /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/d; /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/d/java-17-amazon-corretto.x86_64/bin/java: absent;)
+[check-submit-args] CASE ok java (e1) hanging first candidate skipped: exit 0: [submit-collaboration-job] RESULT JAVA-SELECT-OK java_bin=/private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/e1/java-17-amazon-corretto.x86_64/bin/java java_home=/private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/e1/java-17-amazon-corretto.x86_64
+[check-submit-args] CASE ok java (e1) bounded: 1s
+[check-submit-args] CASE ok java (e2) only candidate hangs: exit 4: [submit-collaboration-job] FAIL exit=4 java on the primary node is not 17 (no Java 17 candidate under /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/e2: /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/e2/jre-17/bin/java: java -version timed out after 1s (/private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/e2/jre-17/bin/java); /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/e2/java-17-amazon-corretto.x86_64/bin/java: absent;)
+[check-submit-args] CASE ok java (e2) bounded: 1s
+[check-submit-args] CASE ok java (e2) refusal text: exit 4: [submit-collaboration-job] FAIL exit=4 java on the primary node is not 17 (no Java 17 candidate under /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/e2: /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/e2/jre-17/bin/java: java -version timed out after 1s (/private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/e2/jre-17/bin/java); /private/var/folders/zt/pbpscx0s72b8jch7_wr7gc9m0000gn/T/scholarchain-check-java.bvvdrlYM/e2/java-17-amazon-corretto.x86_64/bin/java: absent;)
+[check-submit-args] CASE ok java (e3) bound outside 1..10 refused: exit 2: [submit-collaboration-job] FAIL exit=2 --check-java: bound '0' is not an integer in 1..10
+[check-submit-args] RESULT PASS
