@@ -3,16 +3,25 @@ package scholarchain.storage.model
 /**
  * The DynamoDB tables (README L1381-1389; SE-P7-01). Logical names only: physical table names come
  * from configuration in the SDK adapter. `runtimeWritable` marks the three tables the runtime
- * service may write (QuerySession, EntityLinkCache, EvidenceBundle); every other table is written
+ * workflow may write (QuerySession, EntityLinkCache, EvidenceBundle) through
+ * [[scholarchain.storage.port.RuntimeStores]]; the six README tables other than those are written
  * by loaders only.
+ *
+ * SE-INT-01: `serviceState` marks the three service-state tables (QueryOwnership, QueryJob,
+ * IdempotencyKey). They are written only through [[scholarchain.storage.state.ServiceStateStores]],
+ * never through RuntimeStores, so the rag workflow cannot reach them; they are not
+ * `runtimeWritable`.
  */
-enum TableRole(val tag: String, val runtimeWritable: Boolean) {
+enum TableRole(val tag: String, val runtimeWritable: Boolean, val serviceState: Boolean = false) {
   case RunLedger extends TableRole("RunLedger", false)
   case ArtifactRegistry extends TableRole("ArtifactRegistry", false)
   case EvidenceBundle extends TableRole("EvidenceBundle", true)
   case QuerySession extends TableRole("QuerySession", true)
   case EntityLinkCache extends TableRole("EntityLinkCache", true)
   case ResearcherMetricCache extends TableRole("ResearcherMetricCache", false)
+  case QueryOwnership extends TableRole("QueryOwnership", false, true)
+  case QueryJob extends TableRole("QueryJob", false, true)
+  case IdempotencyKey extends TableRole("IdempotencyKey", false, true)
 }
 
 /**
@@ -399,7 +408,96 @@ object TableSpecs {
       "resolution; one table with typed sort keys instead of one table per role"
   )
 
-  /** All six tables, in README order. */
+  /**
+   * SE-INT-01: who submitted a query (services QueryOwnership port). Written once per query by the
+   * QueryJobs process when the workflow call is admitted; read by the EvidenceExplain process.
+   */
+  val QueryOwnership: TableSpec = TableSpec(
+    TableRole.QueryOwnership,
+    Attrs.Pk,
+    Attrs.Sk,
+    Vector.empty,
+    TtlPolicy.Ttl(
+      Attrs.ExpiresAt,
+      "per-query access-control state of the same lifetime as the query session (configured " +
+        "TTL at least the QuerySession TTL); losing an owner row only makes the query's " +
+        "explanation and evidence occurrences unavailable (fail closed: 404), so it is disposable"
+    ),
+    Vector(
+      ap("QO-1", "the owner of one query (GetItem)", None, "query#<queryId>", Exact, "owner"),
+      ap(
+        "QO-2",
+        "the owners of a bounded list of queries in one BatchGetItem (ownedBy: evidence " +
+          "occurrences of the caller's own queries)",
+        None,
+        "query#<queryId>",
+        Exact,
+        "owner"
+      )
+    ),
+    "SE-INT-01 (phase-10 outstanding, N1 and owner eviction): a durable, shared QueryOwnership " +
+      "for separate QueryJobs and EvidenceExplain processes; keyed by query ID because every read " +
+      "is by query ID (one item or a batch of items), never by client"
+  )
+
+  /** SE-INT-01: one asynchronous query job (services JobStore), shared by QueryJobs replicas. */
+  val QueryJob: TableSpec = TableSpec(
+    TableRole.QueryJob,
+    Attrs.Pk,
+    Attrs.Sk,
+    Vector.empty,
+    TtlPolicy.Ttl(
+      Attrs.ExpiresAt,
+      "job state and its opaque result are a delivery buffer of an answer whose durable evidence " +
+        "is in EvidenceBundle and QuerySession; after the configured TTL a client re-submits, so " +
+        "the rows are disposable"
+    ),
+    Vector(
+      ap(
+        "QJ-1",
+        "one job by its ID (GetItem; the owning client is checked on the item, never by a query)",
+        None,
+        "job#<jobId>",
+        Exact,
+        "job"
+      )
+    ),
+    "SE-INT-01 (phase-10 outstanding): durable jobs, required before more than one QueryJobs " +
+      "replica; keyed by job ID because jobs are only ever read and updated by ID (per-state " +
+      "counts are per-replica metrics, not a table read)"
+  )
+
+  /**
+   * SE-INT-01: one Idempotency-Key of one client (services IdempotencyStore), keyed by the SHA-256
+   * of the length-prefixed (client ID, key) pair; the raw key is never stored.
+   */
+  val IdempotencyKey: TableSpec = TableSpec(
+    TableRole.IdempotencyKey,
+    Attrs.Pk,
+    Attrs.Sk,
+    Vector.empty,
+    TtlPolicy.Ttl(
+      Attrs.ExpiresAt,
+      "replay records are disposable by definition (a completed record lives for the configured " +
+        "idempotency TTL); an in-flight record carries a crash bound (in-flight TTL) so a crashed " +
+        "replica cannot pin a key forever"
+    ),
+    Vector(
+      ap(
+        "IK-1",
+        "the record of one (client, Idempotency-Key) pair by its digest (GetItem, conditional " +
+          "put and conditional delete)",
+        None,
+        "idem#<sha256>",
+        Exact,
+        "request"
+      )
+    ),
+    "SE-INT-01 (phase-10 outstanding): durable idempotency shared by QueryJobs replicas; keyed " +
+      "by the digest because the only access is by (client, key)"
+  )
+
+  /** The six README tables, in README order, then the three SE-INT-01 service-state tables. */
   val all: Vector[TableSpec] =
     Vector(
       RunLedger,
@@ -407,7 +505,10 @@ object TableSpecs {
       QuerySession,
       EvidenceBundle,
       ArtifactRegistry,
-      ResearcherMetricCache
+      ResearcherMetricCache,
+      QueryOwnership,
+      QueryJob,
+      IdempotencyKey
     )
 
   def of(role: TableRole): TableSpec = all.find(_.role == role).get

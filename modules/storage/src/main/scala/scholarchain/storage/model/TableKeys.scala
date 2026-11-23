@@ -208,6 +208,26 @@ object TableKeys {
       id(IdKind.Researcher, researcherId, "researcherId").map("researcher#" + _)
   }
 
+  // ------------------------------------------------------------------ SE-INT-01 service state
+
+  /** QO-1, QO-2: `query#<queryId>` / `owner`. */
+  object QueryOwnership {
+    def owner(queryId: String): Either[StoreError, PrimaryKey] =
+      id(IdKind.Query, queryId, "queryId").map(q => PrimaryKey("query#" + q, "owner"))
+  }
+
+  /** QJ-1: `job#<jobId>` / `job`. */
+  object QueryJob {
+    def job(jobId: String): Either[StoreError, PrimaryKey] =
+      ServiceStateIds.jobId(jobId).map(j => PrimaryKey("job#" + j, "job"))
+  }
+
+  /** IK-1: `idem#<sha256>` / `request` (the digest of [[ServiceStateIds.idempotencyKeySha256]]). */
+  object IdempotencyKey {
+    def request(keySha256: String): Either[StoreError, PrimaryKey] =
+      StoreIds.hex64(keySha256, "keySha256").map(h => PrimaryKey("idem#" + h, "request"))
+  }
+
   // ------------------------------------------------------------------ ResearcherMetricCache
   object ResearcherMetricCache {
     def partition(subjectId: String): Either[StoreError, String] =

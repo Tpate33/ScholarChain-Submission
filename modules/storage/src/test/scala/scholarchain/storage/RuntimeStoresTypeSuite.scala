@@ -111,6 +111,79 @@ class RuntimeStoresTypeSuite extends munit.FunSuite {
     )
   }
 
+  // SE-INT-01 (deliberate update): the three service-state tables are added to TableRole but are
+  // NOT runtime-writable, so RuntimeStores.WritableTables stays exactly the three runtime tables
+  // and no member of RuntimeStores reaches a service-state store (rag gets only RuntimeStores).
+  test("SE-INT-01: service-state tables and stores are unreachable from RuntimeStores") {
+    val serviceState = TableRole.values.filter(_.serviceState).toSet
+    assertEquals(serviceState.size, 3)
+    assert(RuntimeStores.WritableTables.intersect(serviceState).isEmpty)
+    assertEquals(scholarchain.storage.state.ServiceStateStores.Tables, serviceState)
+    val returns = classOf[RuntimeStores].getMethods.map(_.getReturnType).toSet
+    val stateTypes: Vector[Class[?]] = Vector(
+      classOf[scholarchain.storage.state.ServiceStateStores],
+      classOf[scholarchain.storage.state.QueryOwnershipStore],
+      classOf[scholarchain.storage.state.QueryJobStore],
+      classOf[scholarchain.storage.state.IdempotencyKeyStore],
+      classOf[KeyValueDeleter],
+      classOf[KeyValueBatchReader]
+    )
+    stateTypes.foreach(t => assert(!returns.exists(t.isAssignableFrom), t.getSimpleName))
+    assert(!compose().keyValues.isInstanceOf[KeyValueDeleter], "the facade hides delete")
+    assert(compileErrors("(??? : RuntimeStores).keyValues.deleteIfRecord(???, ???, ???)").nonEmpty)
+    assert(compileErrors("(??? : RuntimeStores).ownership").nonEmpty)
+  }
+
+  // SE-INT-02 (CR-INT-01-3): even when production passes ONE store holding every table (for
+  // example one DynamoDB adapter with all nine names), the runtime read facade refuses every
+  // service-state table on get and query, before the store is reached, and has no batch path.
+  test("CR-INT-01-3: the runtime read facade refuses every service-state table") {
+    val kv = new InMemoryKeyValueStore(10)
+    val clock = new scholarchain.storage.fake.ManualClock(1_700_000_000_000L)
+    val settings = scholarchain.storage.state.ServiceStateSettings
+      .of("writer", 3600, 1800, 600, 120, 4096, 3, 250, 60000, 5000, 0, 0)
+      .toOption
+      .get
+    val state = scholarchain.storage.state.ServiceStateStores(kv, clock, settings)
+    assertEquals(state.ownership.record("query:alpha-1", "client-a"), Right(()))
+    assert(state.jobs.create("job-1", "query:alpha-1", "client-a", "queued").isRight)
+    val begun = state.idempotency.begin("client-a", "key-1", "1" * 64, "attempt-0000000001")
+    assert(begun.isRight)
+    val keys: Map[TableRole, PrimaryKey] = Map(
+      TableRole.QueryOwnership -> TableKeys.QueryOwnership.owner("query:alpha-1").toOption.get,
+      TableRole.QueryJob -> TableKeys.QueryJob.job("job-1").toOption.get,
+      TableRole.IdempotencyKey -> TableKeys.IdempotencyKey
+        .request(ServiceStateIds.idempotencyKeySha256("client-a", "key-1").toOption.get)
+        .toOption
+        .get
+    )
+    assertEquals(keys.keySet, TableRole.values.filter(_.serviceState).toSet, "every role")
+    val s = compose(kv)
+    keys.foreach { case (role, k) =>
+      assert(kv.get(role, k).exists(_.isDefined), s"control: the store holds the ${role.tag} row")
+      val g = s.keyValues.get(role, k)
+      assert(g.left.exists(_.isInstanceOf[StoreError.Refused]), s"${role.tag} get: $g")
+      Vector(SortKeyCondition.All, SortKeyCondition.Equals(k.sk)).foreach { c =>
+        val q = s.keyValues.query(role, KeyQuery(None, k.pk, c, 5))
+        assert(q.left.exists(_.isInstanceOf[StoreError.Refused]), s"${role.tag} query: $q")
+      }
+      assert(!g.toString.contains("client-a"), "no row content in the refusal")
+    }
+    // No batch path: the facade is not a batch reader, and getMany does not compile.
+    assert(!s.keyValues.isInstanceOf[KeyValueBatchReader])
+    assert(!s.keyValues.isInstanceOf[ServiceStateKeyValues])
+    assert(compileErrors("(??? : RuntimeStores).keyValues.getMany(???, ???)").nonEmpty)
+    // Control: the runtime tables are still readable through the same facade.
+    assertEquals(s.querySessions.putSession(session()), Right(PutOutcome.Written))
+    assertEquals(
+      s.keyValues.query(TableRole.QuerySession, KeyQuery(None, "x", SortKeyCondition.All, 1)),
+      Right(Vector.empty)
+    )
+    TableRole.values.filterNot(_.serviceState).foreach { r =>
+      assert(KeyValueReader.serviceStateRefusal(r).isEmpty, r.tag)
+    }
+  }
+
   test("evidence items resolve through the byEvidence index after a bundle write") {
     val kv = new InMemoryKeyValueStore(10)
     val b = bundle("s3://b/a")

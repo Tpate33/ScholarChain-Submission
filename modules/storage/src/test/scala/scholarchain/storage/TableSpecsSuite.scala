@@ -6,7 +6,9 @@ import TestData.*
 /** Suite 8 (SE-P7-01): table keys, GSIs, TTL policy and the access-pattern registry. */
 class TableSpecsSuite extends munit.FunSuite {
 
-  test("exactly the six tables of README L1381-1386, each with string pk and sk") {
+  // SE-INT-01 (deliberate update): the six README tables plus the three service-state tables
+  // (QueryOwnership, QueryJob, IdempotencyKey) of the production-integration work order.
+  test("the six README tables (L1381-1386) and three service-state tables, string pk and sk") {
     assertEquals(
       TableSpecs.all.map(_.role.tag).toSet,
       Set(
@@ -15,10 +17,18 @@ class TableSpecsSuite extends munit.FunSuite {
         "QuerySession",
         "EvidenceBundle",
         "ArtifactRegistry",
-        "ResearcherMetricCache"
+        "ResearcherMetricCache",
+        "QueryOwnership",
+        "QueryJob",
+        "IdempotencyKey"
       )
     )
-    assertEquals(TableSpecs.all.map(_.role).distinct.size, 6)
+    assertEquals(TableSpecs.all.map(_.role).distinct.size, 9)
+    assertEquals(
+      TableRole.values.filter(_.serviceState).toSet,
+      Set(TableRole.QueryOwnership, TableRole.QueryJob, TableRole.IdempotencyKey)
+    )
+    assert(TableRole.values.forall(r => !(r.serviceState && r.runtimeWritable)), "disjoint")
     TableSpecs.all.foreach { t =>
       assertEquals((t.partitionKey, t.sortKey), ("pk", "sk"), t.role.tag)
       assert(t.justification.nonEmpty, t.role.tag)
@@ -34,11 +44,25 @@ class TableSpecsSuite extends munit.FunSuite {
     assertEquals(names(TableSpecs.QuerySession), Set.empty[String])
     assertEquals(names(TableSpecs.EntityLinkCache), Set("byResearcher"))
     assertEquals(names(TableSpecs.ResearcherMetricCache), Set("byGroup", "byPair", "rank"))
+    assertEquals(names(TableSpecs.QueryOwnership), Set.empty[String])
+    assertEquals(names(TableSpecs.QueryJob), Set.empty[String])
+    assertEquals(names(TableSpecs.IdempotencyKey), Set.empty[String])
   }
 
-  test("TTL applies only to QuerySession and EntityLinkCache, each with a justification") {
+  // SE-INT-01 (deliberate update): the three service-state tables are TTL tables too; each
+  // justification states why its rows are disposable.
+  test("TTL applies only to the disposable tables, each with a justification") {
     val withTtl = TableSpecs.all.filter(_.ttlAttribute.isDefined).map(_.role).toSet
-    assertEquals(withTtl, Set(TableRole.QuerySession, TableRole.EntityLinkCache))
+    assertEquals(
+      withTtl,
+      Set(
+        TableRole.QuerySession,
+        TableRole.EntityLinkCache,
+        TableRole.QueryOwnership,
+        TableRole.QueryJob,
+        TableRole.IdempotencyKey
+      )
+    )
     TableSpecs.all.foreach { t =>
       t.ttl match {
         case TtlPolicy.Ttl(a, why) =>
@@ -137,6 +161,26 @@ class TableSpecsSuite extends munit.FunSuite {
     assert(TableKeys.ResearcherMetricCache.byGroup(workId, 2015, 2020).isLeft)
     assert(TableKeys.ResearcherMetricCache.byGroup(communityId, 2015, 2020).isRight)
     assert(TableKeys.QuerySession.step(queryId, 10000).isLeft)
+  }
+
+  test("SE-INT-01: service-state key forms; IDs validated before any key is built") {
+    assertEquals(
+      TableKeys.QueryOwnership.owner(queryId),
+      Right(PrimaryKey(s"query#$queryId", "owner"))
+    )
+    assertEquals(TableKeys.QueryJob.job("job-abc123"), Right(PrimaryKey("job#job-abc123", "job")))
+    assertEquals(
+      TableKeys.IdempotencyKey.request("a" * 64),
+      Right(PrimaryKey("idem#" + "a" * 64, "request"))
+    )
+    assert(TableKeys.QueryOwnership.owner(runId).isLeft, "a run ID is not a query ID")
+    assert(TableKeys.QueryJob.job("job with space").isLeft)
+    assert(TableKeys.QueryJob.job("j" * 129).isLeft)
+    assert(TableKeys.IdempotencyKey.request("raw-client-key").isLeft, "digests only")
+    val ps = TableSpecs.all.flatMap(_.accessPatterns).map(p => p.id -> p).toMap
+    assertEquals(ps("QO-1").sortForm, "owner")
+    assertEquals(ps("QJ-1").partitionForm, "job#<jobId>")
+    assertEquals(ps("IK-1").partitionForm, "idem#<sha256>")
   }
 
   test("SE-P7-11 item 5: per-generation rejection rows (RL-7) and set summaries (RL-8)") {

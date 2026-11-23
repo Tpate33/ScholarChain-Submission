@@ -12,6 +12,7 @@ import scholarchain.storage.model.{
   GraphRow,
   GraphValue,
   ItemCodecs,
+  QueryAuditRecord,
   StoreError,
   TableKeys,
   TableRole
@@ -414,6 +415,68 @@ object GraphService {
 }
 
 /**
+ * SV-INT-01 (CR-P11-02-1): the audit-record versions explain reads, each verified under its own
+ * version's rules. The writer (rag `AuditStage`) always writes [[AuditRecord.SchemaVersion]]; rows
+ * written before RG-P11-02 carry v2 and stay readable for their whole TTL.
+ *
+ * Rules shared by every version (unchanged from SE-P10): the row's query is the requested query,
+ * `auditSha256` is the SHA-256 of the UTF-8 bytes of `auditJson` (the same hash the row was written
+ * with; nothing is recomputed over a re-serialized body), the body is one JSON object, it decodes
+ * with the strict rag codec (unknown keys refused) and its `queryId` is the requested query. Added
+ * here for both versions: the body's own `schemaVersion` equals the row's `auditSchemaVersion`.
+ *
+ * Per version (`prompts/schemas/audit-record.v2` and `.v3`, both `additionalProperties: false`):
+ *   - v2: the body has NO `verifierVersion` member (v2 has no such property). The rag codec gives
+ *     the absent field its default, None, so no rag change is needed to read v2.
+ *   - v3: the body HAS a `verifierVersion` member (required by v3, `null` allowed).
+ *
+ * Failures: a row failing any rule is the existing 502 integrity failure ([[Reads.corrupt]]); a row
+ * of a version not listed here (v1, or a future version) is the 502 [[unsupported]] error, checked
+ * after the version-independent row rules, so a tampered row is reported as corrupt first.
+ */
+private[services] object AuditVersions {
+  val V2 = "scholarchain.rag.audit-record.v2"
+  val V3 = "scholarchain.rag.audit-record.v3"
+
+  /** The member v3 added to v2 (RG-P11-02). */
+  val AddedInV3 = "verifierVersion"
+
+  /** Versions read, with whether the body must carry [[AddedInV3]]. */
+  val Supported: Map[String, Boolean] = Map(V2 -> false, V3 -> true)
+
+  def unsupported: ApiError =
+    ApiError(
+      ErrorCode.DownstreamFailure,
+      "a stored audit record has a schema version this service does not read"
+    )
+
+  private def corrupt = Reads.corrupt("audit record")
+
+  def read(row: QueryAuditRecord, queryId: String): Either[ApiError, AuditRecord] =
+    if (
+      row == null || row.auditJson == null || row.queryId != queryId ||
+      Canonical.sha256HexUtf8(row.auditJson) != row.auditSha256
+    ) Left(corrupt)
+    else
+      Supported.get(row.auditSchemaVersion) match {
+        case None => Left(unsupported)
+        case Some(needsVerifier) =>
+          val body = scala.util.Try(ujson.read(row.auditJson)).toOption.flatMap(_.objOpt)
+          val shaped = body.exists { o =>
+            o.get("schemaVersion").flatMap(_.strOpt).contains(row.auditSchemaVersion) &&
+            o.contains(AddedInV3) == needsVerifier
+          }
+          if (!shaped) Left(corrupt)
+          else
+            scala.util
+              .Try(upickle.default.read[AuditRecord](row.auditJson))
+              .toOption
+              .filter(a => a.queryId == queryId && a.schemaVersion == row.auditSchemaVersion)
+              .toRight(corrupt)
+      }
+}
+
+/**
  * The explain and audit API: the stored audit record of a query (QuerySession QS-3), its executed
  * plan steps (QS-2) and the score components of its evidence bundle (EB-1). It returns the
  * structured QueryPlan as audited (operations, resolved IDs, hashed filters; never question text or
@@ -438,7 +501,8 @@ final class ExplainService(
    *
    * SE-P10-02 m4: ONE deadline for the whole request; the audit, step and bundle reads share it.
    * U4: `auditSha256` is verified against `auditJson` by the storage codec on decode
-   * (`QueryAuditRecord.problems`) and checked again here before it is returned.
+   * (`QueryAuditRecord.problems`) and checked again here before it is returned. SV-INT-01: the row
+   * is verified under the rules of its own audit version ([[AuditVersions]]: v2 and v3).
    */
   def explain(client: ApiClient, queryId: String): Either[ApiError, Reply] = {
     val until = deadline()
@@ -455,18 +519,7 @@ final class ExplainService(
       got <- read.read(until)(kv.get(TableRole.QuerySession, key))
       item <- got.toRight(unknown)
       row <- ItemCodecs.QueryAuditCodec.decode(item).left.map(_ => Reads.corrupt("audit record"))
-      audit <-
-        if (
-          row.auditSchemaVersion != AuditRecord.SchemaVersion || row.queryId != queryId ||
-          Canonical.sha256HexUtf8(row.auditJson) != row.auditSha256
-        )
-          Left(Reads.corrupt("audit record"))
-        else
-          scala.util
-            .Try(upickle.default.read[AuditRecord](row.auditJson))
-            .toOption
-            .filter(_.queryId == queryId)
-            .toRight(Reads.corrupt("audit record"))
+      audit <- AuditVersions.read(row, queryId)
       partition <- Reads.key(TableKeys.QuerySession.partition(queryId))
       stepItems <- read.read(until)(
         kv.query(

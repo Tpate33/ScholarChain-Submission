@@ -196,41 +196,73 @@ class OpsSuite extends munit.FunSuite {
     assertEquals(levels.sorted, Vector("INFO", "WARN"))
   }
 
+  /** SV-INT-02: the in-memory store behind the port; each call names its attempt ID. */
+  private final class Idem(capacity: Int, ttl: Long, clock: TestClock) {
+    val s = new InMemoryIdempotencyStore(capacity, ttl, clock)
+    private val holds = scala.collection.mutable.Map.empty[String, IdempotencyHold]
+    def begin(c: String, k: String, d: String, attempt: String = "attempt-independent-1") =
+      s.begin(c, k, d, s"$attempt-$k").map {
+        case IdempotencyBegin.Fresh(h) => holds(k) = h; "fresh"
+        case IdempotencyBegin.Replay(o) => s"replay $o"
+        case other => other.toString
+      }
+    def complete(k: String, o: IdempotentOutcome) = assert(s.complete(holds(k), o).isRight)
+    def abandon(k: String) = assert(s.abandon(holds(k)).isRight)
+  }
+
   test(
     "idempotency store: expiry, capacity eviction of completed records, refusal when all in flight"
   ) {
     val clock = new TestClock
-    val s = new IdempotencyStore(2, 1000L, clock)
-    assertEquals(s.begin("c", "a", "d1"), IdempotencyBegin.Fresh)
-    assertEquals(s.begin("c", "a", "d1"), IdempotencyBegin.InProgress)
-    assertEquals(s.begin("c", "a", "d2"), IdempotencyBegin.Mismatch)
-    assertEquals(s.begin("c", "b", "d1"), IdempotencyBegin.Fresh)
-    assertEquals(s.begin("c", "x", "d1"), IdempotencyBegin.Full)
+    val s = new Idem(2, 1000L, clock)
+    assertEquals(s.begin("c", "a", "d1"), Right("fresh"))
+    assertEquals(s.begin("c", "a", "d1", "another-attempt"), Right("InProgress"))
+    assertEquals(s.begin("c", "a", "d2"), Right("Mismatch"))
+    assertEquals(s.begin("c", "b", "d1"), Right("fresh"))
+    assertEquals(s.begin("c", "x", "d1"), Right("Full"))
     val done = IdempotentOutcome.JobRef("job-1")
-    s.complete("c", "a", done)
-    assertEquals(s.begin("c", "a", "d1"), IdempotencyBegin.Replay(done))
-    assertEquals(s.begin("c", "x", "d1"), IdempotencyBegin.Fresh) // evicted the completed "a"
-    s.complete("c", "b", done)
+    s.complete("a", done)
+    assertEquals(s.begin("c", "a", "d1"), Right(s"replay $done"))
+    assertEquals(s.begin("c", "x", "d1"), Right("fresh")) // evicted the completed "a"
+    s.complete("b", done)
     clock.advance(1000L)
-    assertEquals(s.begin("c", "b", "d9"), IdempotencyBegin.Fresh) // completed b expired
-    s.abandon("c", "b")
-    s.abandon("c", "x")
-    assertEquals(s.size, 0)
+    assertEquals(s.begin("c", "b", "d9"), Right("fresh")) // completed b expired
+    s.abandon("b")
+    s.abandon("x")
+    assertEquals(s.s.size, 0)
   }
 
   test("SE-P10-02 m3: an in-flight idempotency record never expires, a completed one does") {
     val clock = new TestClock
-    val s = new IdempotencyStore(4, 1000L, clock)
-    assertEquals(s.begin("c", "k", "d"), IdempotencyBegin.Fresh)
+    val s = new Idem(4, 1000L, clock)
+    assertEquals(s.begin("c", "k", "d"), Right("fresh"))
     clock.advance(10000L) // far past the TTL while the first request still runs
-    assertEquals(s.begin("c", "k", "d"), IdempotencyBegin.InProgress)
-    assertEquals(s.begin("c", "k", "other"), IdempotencyBegin.Mismatch)
+    assertEquals(s.begin("c", "k", "d", "another-attempt"), Right("InProgress"))
+    assertEquals(s.begin("c", "k", "other"), Right("Mismatch"))
     val done = IdempotentOutcome.JobRef("job-1")
-    s.complete("c", "k", done)
+    s.complete("k", done)
     clock.advance(999L) // the TTL runs from completion
-    assertEquals(s.begin("c", "k", "d"), IdempotencyBegin.Replay(done))
+    assertEquals(s.begin("c", "k", "d"), Right(s"replay $done"))
     clock.advance(1L)
-    assertEquals(s.begin("c", "k", "d"), IdempotencyBegin.Fresh)
+    assertEquals(s.begin("c", "k", "d"), Right("fresh"))
+  }
+
+  test("SV-INT-02: in-memory idempotency: the same attempt takes its own record over") {
+    val s = new InMemoryIdempotencyStore(4, 1000L, new TestClock)
+    val first = s.begin("c", "k", "d", "attempt-aaaaaaaaaaaa")
+    val again = s.begin("c", "k", "d", "attempt-aaaaaaaaaaaa")
+    assert(first.exists(_.isInstanceOf[IdempotencyBegin.Fresh]), first.toString)
+    assert(again.exists(_.isInstanceOf[IdempotencyBegin.Fresh]), again.toString)
+    assertEquals(s.begin("c", "k", "d", "attempt-bbbbbbbbbbbb"), Right(IdempotencyBegin.InProgress))
+    val hold = again.toOption.get.asInstanceOf[IdempotencyBegin.Fresh].hold
+    assert(s.complete(hold, IdempotentOutcome.JobRef("job-9")).isRight)
+    assertEquals(
+      s.begin("c", "k", "d", "attempt-bbbbbbbbbbbb"),
+      Right(IdempotencyBegin.Replay(IdempotentOutcome.JobRef("job-9")))
+    )
+    // A hold no longer naming the in-flight record changes nothing.
+    assert(s.abandon(hold).isRight)
+    assertEquals(s.size, 1)
   }
 
   test("SE-P10-02 m3: config refuses an idempotency TTL not above both workflow timeouts") {
@@ -245,20 +277,26 @@ class OpsSuite extends munit.FunSuite {
 
   test("job store: owner isolation, eviction of finished jobs, refusal when all unfinished") {
     val clock = new TestClock
-    val j = new JobStore(2, clock, 1)
-    assert(j.create("c", "job-1", "query:1").isRight)
-    assert(j.create("c", "job-2", "query:2").isRight)
-    assertEquals(
-      j.create("c", "job-3", "query:3").left.map(_.code),
-      Left(ErrorCode.TooManyRequests)
-    )
-    j.start("job-1")
-    j.succeed("job-1", Reply(200, ujson.Obj()))
-    assert(j.create("c", "job-3", "query:3").isRight)
-    assertEquals(j.get("c", "job-1"), None)
-    assertEquals(j.get("other", "job-2"), None)
-    assertEquals(j.get("c", "job-2").map(_.state), Some(JobState.Queued))
+    val j = new InMemoryJobStore(2, clock)
+    // SV-INT-02: the 429 is admission control (per replica, in services), in front of the store.
+    val admission = new JobAdmission(2, 1)
+    def admitted(id: String, q: String) =
+      admission.admit().flatMap(_ => j.create("c", id, q).left.map(e => fail(e.message)))
+    assert(admitted("job-1", "query:1").isRight)
+    assert(admitted("job-2", "query:2").isRight)
+    val refused = admission.admit()
+    assertEquals(refused.left.map(_.code), Left(ErrorCode.TooManyRequests))
+    assertEquals(refused.left.toOption.get.headers, Vector("Retry-After" -> "1"))
+    assert(j.start("job-1").isRight)
+    assert(j.succeed("job-1", Reply(200, ujson.Obj())).isRight)
+    admission.release()
+    assert(admitted("job-3", "query:3").isRight)
+    assertEquals(j.get("c", "job-1"), Right(None))
+    assertEquals(j.get("other", "job-2"), Right(None))
+    assertEquals(j.get("c", "job-2").map(_.map(_.state)), Right(Some(JobState.Queued)))
     assertEquals(j.counts("queued"), 2)
+    // The store itself never evicts an unfinished job: with every kept job unfinished it refuses.
+    assert(j.create("c", "job-4", "query:4").isLeft)
   }
 
   test("API key authenticator: constant-time digest match, scopes, malformed headers") {

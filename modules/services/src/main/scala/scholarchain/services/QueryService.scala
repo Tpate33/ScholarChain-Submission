@@ -382,6 +382,24 @@ object QueryViews {
  * is guarded by the `workflow` circuit breaker and is never retried (it persists create-once audit
  * rows under its query ID).
  */
+/*
+ * SV-INT-02 (A1-W, CR-INT-02 services side): every COMPLETE service-state operation (idempotency
+ * `begin`, `complete`, `abandon`; job `create`, `start`, `succeed`, `fail`, `remove` and the job
+ * reads) runs as ONE `op` of `stateOps.writeTracked(deadline(), readRequestTimeoutMillis)`: a fresh
+ * request deadline per operation, the real-time cap, at most `readMaxAttempts` attempts each under
+ * `readTimeoutMillis`, and serial retries (a timed-out attempt is retried only after it ended).
+ * The non-blocking in-memory pair (`inProcess`, local only) is called directly, as before.
+ *
+ * Attempt identity: ONE attempt ID per logical request (`attempts.next()`, minted once in
+ * [[idempotent]]), passed unchanged to every retry of that request's `begin`; independent requests
+ * (independent HTTP requests, even with the same Idempotency-Key) mint independent IDs.
+ *
+ * Between a `Fresh` begin and the workflow call there is only local work (the query ID and the
+ * breaker check) and the workflow pool's queue wait (`queueWaitMillis`); the ownership record runs
+ * inside the workflow timer. That is the services side of core ST-2: begin (<=
+ * readRequestTimeoutMillis) + queue wait + workflow timeout + complete or abandon (<=
+ * readRequestTimeoutMillis), measured from the first applied begin write.
+ */
 final class QueryService(
     workflow: QueryWorkflow,
     syncCalls: Calls,
@@ -394,7 +412,11 @@ final class QueryService(
     ownershipReads: ReadPolicy,
     deadline: () => Deadline,
     config: ServiceConfig,
-    ids: IdSource
+    ids: IdSource,
+    stateOps: ReadPolicy,
+    admission: JobAdmission,
+    attempts: scholarchain.storage.state.AttemptTokens,
+    cleanup: java.util.concurrent.Executor
 ) {
 
   /** SE-P10-04 m3: readiness of the workflow pools (not every thread pinned by an overdue call). */
@@ -430,9 +452,104 @@ final class QueryService(
       }
     } yield reply
 
-  private def idempotent(client: ApiClient, key: String, request: QueryRequest) =
-    idempotency.begin(client.clientId, key, request.digest) match {
-      case IdempotencyBegin.Fresh =>
+  /**
+   * One complete service-state operation under the write policy (A1-W), with `what` prefixed to the
+   * policy's typed error (fixed text; no store detail).
+   */
+  private def state[A](what: String, inProcess: Boolean)(
+      op: => Either[scholarchain.storage.model.StoreError, A]
+  ): Either[ApiError, A] = stateTracked(what, inProcess)(op)._1
+
+  /**
+   * [[state]] with the `settled` of its last attempt. An in-process store (the non-blocking
+   * in-memory pair) runs directly, as before SV-INT-02; its only refusal is a `500`.
+   */
+  private def stateTracked[A](what: String, inProcess: Boolean)(
+      op: => Either[scholarchain.storage.model.StoreError, A]
+  ): (Either[ApiError, A], Settled) =
+    if (inProcess)
+      (
+        op.left.map(_ => ApiError(ErrorCode.Internal, s"$what: the in-process store refused it")),
+        QueryService.Done
+      )
+    else {
+      val (out, settled) = stateOps.writeTracked(deadline(), config.readRequestTimeoutMillis)(op)
+      (out.left.map(e => e.copy(message = s"$what: ${e.message}")), settled)
+    }
+
+  private def idem = idempotency.inProcess
+  private def local = jobs.inProcess
+
+  /** Runs `task` on the cleanup pool (never on the caller's thread); dropped when it is full. */
+  private def async(task: () => Unit): Unit =
+    try cleanup.execute(() => task())
+    catch { case _: RejectedExecutionException => () }
+
+  /** Forgets `hold` now (bounded by the write policy); keeps an interrupt of this thread. */
+  private def abandonNow(hold: IdempotencyHold): Unit = {
+    val interrupted = Thread.interrupted()
+    try { state("releasing the Idempotency-Key", idem)(idempotency.abandon(hold)); () }
+    finally if (interrupted) Thread.currentThread().interrupt()
+  }
+
+  /**
+   * SE-P10-03 N4: forgets `hold` once `settled` (the workflow call actually ended): at once when it
+   * already has; else, when it does, on the cleanup pool (an in-process store: directly on the
+   * thread that ends the call, as before SV-INT-02).
+   */
+  private def abandonWhenSettled(settled: Settled, hold: IdempotencyHold): Unit =
+    if (settled.isDone) abandonNow(hold)
+    else if (idem) { settled.thenRun(() => abandonNow(hold)); () }
+    else { settled.whenComplete((_, _) => async(() => abandonNow(hold))); () }
+
+  /**
+   * SV-INT-02: a `begin` that ended in a timeout or a store failure may still have APPLIED its
+   * in-flight record under this request's attempt ID (the response was lost). Once its last attempt
+   * has ended, the same attempt ID reads its own record back (`Fresh`) and forgets it, so the key
+   * is not held for `inFlightTtlSeconds` by a request that never ran. Runs on the cleanup pool,
+   * after the caller already returned; a record of another attempt is never touched.
+   */
+  private def releaseOrphan(
+      pending: Settled,
+      clientId: String,
+      key: String,
+      digest: String,
+      attemptId: String
+  ): Unit = {
+    pending.whenComplete((_, _) =>
+      async { () =>
+        state("releasing the Idempotency-Key", idem)(
+          idempotency.begin(clientId, key, digest, attemptId)
+        ) match {
+          case Right(IdempotencyBegin.Fresh(hold)) => abandonNow(hold)
+          case _ => ()
+        }
+      }
+    )
+    ()
+  }
+
+  private def finish(hold: IdempotencyHold, outcome: IdempotentOutcome): Unit = {
+    // A failed `complete` leaves the record in flight until its in-flight TTL: a retry under the
+    // key is then 409 in-progress, never a second execution. The response is still the outcome.
+    state("recording the Idempotency-Key outcome", idem)(idempotency.complete(hold, outcome))
+    ()
+  }
+
+  private def idempotent(client: ApiClient, key: String, request: QueryRequest) = {
+    // SV-INT-02: one attempt ID for this logical request, reused by every retry of its begin.
+    val attemptId = attempts.next()
+    val digest = request.digest
+    val (begun, pending) =
+      stateTracked("recording the Idempotency-Key", idem)(
+        idempotency.begin(client.clientId, key, digest, attemptId)
+      )
+    begun match {
+      case Left(e) =>
+        if (!idem && (e.code == ErrorCode.Timeout || e.code == ErrorCode.DownstreamFailure))
+          releaseOrphan(pending, client.clientId, key, digest, attemptId)
+        Left(e)
+      case Right(IdempotencyBegin.Fresh(hold)) =>
         // SE-P10-02 n2: the in-flight key is always finalised, also when execute throws.
         // SE-P10-03 N4: a retryable outcome (504 after a timeout, 503, 429) releases the key
         // only when the workflow call has actually ended, so a retry under the key can never run
@@ -444,38 +561,33 @@ final class QueryService(
         try {
           val (out, settled) = execute(client, request)
           out match {
-            case Left(e) if e.code.retryable =>
-              settled.thenRun(() => idempotency.abandon(client.clientId, key))
-              ()
-            case Left(e) =>
-              idempotency.complete(client.clientId, key, IdempotentOutcome.Final(Left(e)))
-            case Right((_, Some(jobId))) =>
-              idempotency.complete(client.clientId, key, IdempotentOutcome.JobRef(jobId))
-            case Right((reply, None)) =>
-              idempotency.complete(client.clientId, key, IdempotentOutcome.Final(Right(reply)))
+            case Left(e) if e.code.retryable => abandonWhenSettled(settled, hold)
+            case Left(e) => finish(hold, IdempotentOutcome.Final(Left(e)))
+            case Right((_, Some(jobId))) => finish(hold, IdempotentOutcome.JobRef(jobId))
+            case Right((reply, None)) => finish(hold, IdempotentOutcome.Final(Right(reply)))
           }
           finalised = true
           out.map(_._1)
-        } finally if (!finalised) idempotency.abandon(client.clientId, key)
-      case IdempotencyBegin.Replay(outcome) =>
+        } finally if (!finalised) abandonNow(hold)
+      case Right(IdempotencyBegin.Replay(outcome)) =>
         val replayed = Vector("Idempotent-Replayed" -> "true")
         (outcome match {
           case IdempotentOutcome.Final(r) => r
           case IdempotentOutcome.JobRef(jobId) =>
-            jobs
-              .get(client.clientId, jobId)
-              .map(j => accepted(j))
-              .toRight(
-                ApiError(
-                  ErrorCode.NotFound,
-                  "the job of this Idempotency-Key is no longer retained"
+            state("reading the job", local)(jobs.get(client.clientId, jobId)).flatMap(
+              _.map(j => accepted(j))
+                .toRight(
+                  ApiError(
+                    ErrorCode.NotFound,
+                    "the job of this Idempotency-Key is no longer retained"
+                  )
                 )
-              )
+            )
         }) match {
           case Right(r) => Right(r.copy(headers = r.headers ++ replayed))
           case Left(e) => Left(e.copy(headers = e.headers ++ replayed))
         }
-      case IdempotencyBegin.InProgress =>
+      case Right(IdempotencyBegin.InProgress) =>
         Left(
           ApiError(
             ErrorCode.IdempotencyInProgress,
@@ -483,14 +595,14 @@ final class QueryService(
             headers = retryAfter
           )
         )
-      case IdempotencyBegin.Mismatch =>
+      case Right(IdempotencyBegin.Mismatch) =>
         Left(
           ApiError(
             ErrorCode.IdempotencyKeyReused,
             "this Idempotency-Key was used with a different request body"
           )
         )
-      case IdempotencyBegin.Full =>
+      case Right(IdempotencyBegin.Full) =>
         Left(
           ApiError(
             ErrorCode.TooManyRequests,
@@ -499,6 +611,7 @@ final class QueryService(
           )
         )
     }
+  }
 
   private def accepted(j: Job): Reply =
     Reply(202, QueryViews.job(j), Vector("Location" -> QueryViews.jobLink(j.jobId)))
@@ -660,47 +773,79 @@ final class QueryService(
         (out.map(_ -> None), settled)
       case QueryMode.Async =>
         val jobId = s"job-${ids.token()}"
-        val out = jobs.create(client.clientId, jobId, queryId).flatMap { job =>
-          try {
-            jobRunner.execute(() => runJob(jobId, client, queryId, request.question))
-            Right(accepted(job) -> Some(jobId))
-          } catch {
-            case _: RejectedExecutionException =>
-              jobs.remove(jobId)
-              Left(
-                ApiError(
-                  ErrorCode.TooManyRequests,
-                  "the asynchronous job queue is full",
-                  headers = retryAfter
-                )
-              )
+        // SV-INT-02: admission (429) is per replica, in services; the store has no capacity.
+        val out = admission.admit().flatMap { _ =>
+          state("creating the job", local)(jobs.create(client.clientId, jobId, queryId)) match {
+            case Left(e) =>
+              admission.release()
+              Left(e)
+            case Right(job) =>
+              try {
+                jobRunner.execute(() => runJob(jobId, client, queryId, request.question))
+                Right(accepted(job) -> Some(jobId))
+              } catch {
+                case _: RejectedExecutionException =>
+                  state("removing the refused job", local)(jobs.remove(job))
+                  admission.release()
+                  Left(
+                    ApiError(
+                      ErrorCode.TooManyRequests,
+                      "the asynchronous job queue is full",
+                      headers = retryAfter
+                    )
+                  )
+              }
           }
         }
         (out, QueryService.Done)
     }
 
-  /** SE-P10-02 n2: a job always reaches a final state, also when its run throws. */
+  /** Records `error` as the job's final state (bounded; a failed write leaves it to the TTL). */
+  private def failJob(jobId: String, error: ApiError): Unit = {
+    state("recording the job error", local)(jobs.fail(jobId, error))
+    ()
+  }
+
+  /**
+   * SE-P10-02 n2: a job always reaches a final state, also when its run throws (best effort: each
+   * final write is bounded by the write policy). SV-INT-02: a job whose `start` cannot be recorded
+   * does not run its workflow; a result that cannot be recorded (for example over the payload
+   * bound) becomes a `500` job error. The admission slot is returned in every case.
+   */
   private def runJob(jobId: String, client: ApiClient, queryId: String, question: String): Unit = {
     var finalised = false
     try {
-      jobs.start(jobId)
-      runWorkflow(jobCalls, client, queryId, question, config.asyncTimeoutMillis)._1 match {
-        case Right(reply) => jobs.succeed(jobId, reply)
-        case Left(e) => jobs.fail(jobId, e)
-      }
-      finalised = true
-    } finally
-      if (!finalised)
-        jobs.fail(jobId, ApiError(ErrorCode.Internal, "the job failed unexpectedly"))
+      try {
+        state("starting the job", local)(jobs.start(jobId)) match {
+          case Left(e) => failJob(jobId, e)
+          case Right(()) =>
+            runWorkflow(jobCalls, client, queryId, question, config.asyncTimeoutMillis)._1 match {
+              case Right(reply) =>
+                state("recording the job result", local)(jobs.succeed(jobId, reply)) match {
+                  case Left(_) =>
+                    failJob(
+                      jobId,
+                      ApiError(ErrorCode.Internal, "the job result could not be recorded")
+                    )
+                  case Right(()) => ()
+                }
+              case Left(e) => failJob(jobId, e)
+            }
+        }
+        finalised = true
+      } finally
+        if (!finalised)
+          failJob(jobId, ApiError(ErrorCode.Internal, "the job failed unexpectedly"))
+    } finally admission.release()
   }
 
   private def jobOf(client: ApiClient, jobId: String): Either[ApiError, Job] =
     if (!JobPattern.matches(jobId))
       Left(ApiError(ErrorCode.InvalidParameter, "jobId: not a job ID"))
     else
-      jobs
-        .get(client.clientId, jobId)
-        .toRight(ApiError(ErrorCode.NotFound, "no such job for this client"))
+      state("reading the job", local)(jobs.get(client.clientId, jobId)).flatMap(
+        _.toRight(ApiError(ErrorCode.NotFound, "no such job for this client"))
+      )
 
   /** GET /v1/jobs/{jobId}. */
   def job(client: ApiClient, jobId: String): Either[ApiError, Reply] =

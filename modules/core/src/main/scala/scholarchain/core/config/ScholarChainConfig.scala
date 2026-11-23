@@ -22,7 +22,18 @@ final case class ScholarChainConfig(
     community: CommunityConfig,
     entityResolution: EntityResolutionConfig,
     runtime: RuntimeConfig,
-    analysis: AnalysisConfig = AnalysisConfig()
+    analysis: AnalysisConfig = AnalysisConfig(),
+    // DE-INT-01: production scope (optional keys `storage.dynamodb.*`, `storage.serviceState.*`
+    // and `services.<kind>.*`; see ProductionConfig.scala). Unset sections equal their defaults
+    // and are omitted from the digest input, so existing digests are unchanged.
+    dynamoDb: DynamoDbConfig = DynamoDbConfig(),
+    serviceState: ServiceStateConfig = ServiceStateConfig(),
+    services: ServicesConfig = ServicesConfig(),
+    // DE-INT-04: production scope (optional keys `storage.s3.*`, `storage.neptune.*` and
+    // `storage.s3vectors.*`; see AdapterConfig.scala). Same digest rule as DE-INT-01.
+    s3: S3Config = S3Config(),
+    neptune: NeptuneConfig = NeptuneConfig(),
+    s3Vectors: S3VectorsConfig = S3VectorsConfig()
 ) derives ReadWriter
 
 final case class AwsConfig(region: String, accountId: String) derives ReadWriter
@@ -697,5 +708,25 @@ object ScholarChainConfig {
    * configuration could set an analysis-scope key.
    */
   def digestWithoutGrouping(c: ScholarChainConfig): String =
-    digest(withoutAnalysis(withoutGrouping(c)))
+    digest(withoutProduction(withoutAnalysis(withoutGrouping(c))))
+
+  /**
+   * `c` with every production-scope key unset (DE-INT-01): `storage.dynamodb.*`,
+   * `storage.serviceState.*` and `services.<kind>.*` configure runtime processes, never a pipeline
+   * stage, so they are excluded from [[digestWithoutGrouping]] (and hence from the grouping and
+   * analysis digests). No earlier configuration could set them, so no existing digest changes.
+   * DE-INT-04 adds `storage.s3.*`, `storage.neptune.*`, `storage.s3vectors.*`,
+   * `storage.dynamodb.retryMaxAttempts` and `services.apiKeys.*` to the same scope.
+   */
+  def withoutProduction(c: ScholarChainConfig): ScholarChainConfig =
+    if (c == null) c
+    else
+      c.copy(
+        dynamoDb = DynamoDbConfig(),
+        serviceState = ServiceStateConfig(),
+        services = ServicesConfig(),
+        s3 = S3Config(),
+        neptune = NeptuneConfig(),
+        s3Vectors = S3VectorsConfig()
+      )
 }

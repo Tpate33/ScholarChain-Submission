@@ -37,16 +37,20 @@ final case class ServicePorts(
     access: StoreAccess,
     accessLog: AccessLog,
     clock: ServiceClock,
-    ids: IdSource
+    ids: IdSource,
+    // SV-INT-02: the durable job and idempotency stores of a QueryJobs process (production);
+    // None composes the in-memory pair (local, one replica).
+    state: Option[ServiceStatePorts] = None
 )
 
 /**
- * Supplies settings and ports to a service main (SE-P10-03 Part B). No production implementation
- * exists yet: it needs the production store adapters and workflow model (storage-engineer,
- * rag-engineer), the Secrets Manager key source and deployment configuration (infra-engineer) and
- * core configuration keys for `services.*` (domain-engineer). A main finds it with
- * `java.util.ServiceLoader` (one `META-INF/services/scholarchain.services.ServiceProvider` entry on
- * the classpath); tests pass one directly.
+ * Supplies settings and ports to a service main (SE-P10-03 Part B). SV-INT-02: the production
+ * composition is [[ProductionServiceProvider]] (core `ProductionSettings.forProcess`, the DynamoDB
+ * adapter through an injected client factory, explicit injection points for every adapter that does
+ * not exist yet, failing closed when one is missing). It has no no-argument entry point yet: a main
+ * finds a provider with `java.util.ServiceLoader` (one
+ * `META-INF/services/scholarchain.services.ServiceProvider` entry on the classpath,
+ * build-engineer), which needs the remaining production adapters first; tests pass one directly.
  */
 trait ServiceProvider {
   def settings(kind: ServiceKind): Either[String, ServiceSettings]
@@ -109,7 +113,8 @@ object ServiceMain {
           ports.clock,
           ports.ids,
           kind,
-          ports.ownership
+          ports.ownership,
+          ports.state.orNull
         )
         server <- HttpServerAdapter.start(runtime.router, settings.server).left.map { e =>
           runtime.close(); e

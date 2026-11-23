@@ -153,7 +153,7 @@ object RuntimeStores {
     require(vectors != null && vectorPolicy != null, "reader and policy are required")
     new RuntimeStores(
       ObjectReader.readOnly(objects),
-      KeyValueReader.readOnly(keyValues),
+      KeyValueReader.runtimeReadOnly(keyValues), // SE-INT-02: refuses service-state tables
       readOnlyGraph(graph),
       VectorReader.verified(vectors, vectorPolicy),
       IndexInspector.readOnly(vectorIndexes),

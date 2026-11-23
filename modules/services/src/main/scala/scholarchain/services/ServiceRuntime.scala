@@ -53,7 +53,9 @@ object ServiceRuntime {
       clock: ServiceClock,
       ids: IdSource,
       kind: ServiceKind = ServiceKind.All,
-      ownership: QueryOwnership = null
+      ownership: QueryOwnership = null,
+      state: ServiceStatePorts = null,
+      attempts: scholarchain.storage.state.AttemptTokens = null
   ): Either[String, ServiceRuntime] = {
     val problems = ServiceConfig.problems(config)
     // CR-P11-01-6: `kind` is checked before any call on it, so a null kind is a Left, never an NPE.
@@ -63,6 +65,8 @@ object ServiceRuntime {
       Left("every port is required")
     else if (kind.serves(ServiceKind.QueryJobs) && workflow == null)
       Left("workflow: required by query-jobs")
+    else if (state != null && (state.jobs == null || state.idempotency == null))
+      Left("state: the job store and the idempotency store are both required")
     else if (
       (kind.serves(ServiceKind.EvidenceExplain) || kind.serves(ServiceKind.Graph)) &&
       runtime == null
@@ -100,7 +104,18 @@ object ServiceRuntime {
       def deadline(): Deadline =
         Deadline(clock.monotonicNanos() + config.readRequestTimeoutMillis * 1000000L)
 
-      val jobs = new JobStore(config.maxJobs, clock, config.retryAfterSeconds)
+      // SV-INT-02: the durable pair when given (production), else the in-memory pair (local).
+      val stateStores = Option(state).getOrElse(
+        ServiceStatePorts(
+          new InMemoryJobStore(config.maxJobs, clock),
+          new InMemoryIdempotencyStore(
+            config.idempotencyCapacity,
+            config.idempotencyTtlMillis,
+            clock
+          )
+        )
+      )
+      val jobs = stateStores.jobs
       // SE-P10-04 m2: key-value class calls (evidence, explain AND ownership) share one pool and
       // breaker; QueryJobs has it too, for recording ownership.
       //
@@ -133,12 +148,21 @@ object ServiceRuntime {
           b,
           jobs,
           pool("jobs", config.jobWorkers, config.jobQueueCapacity),
-          new IdempotencyStore(config.idempotencyCapacity, config.idempotencyTtlMillis, clock),
+          stateStores.idempotency,
           owners,
           ownershipKv.get,
           () => deadline(),
           config,
-          ids
+          ids,
+          // SV-INT-02 (A1-W): job and idempotency operations use the key-value policy (pool,
+          // timeouts, breaker) outside the store lock, as the ownership calls do.
+          ownershipKv.get,
+          new JobAdmission(config.maxJobs, config.retryAfterSeconds),
+          Option(attempts).getOrElse(scholarchain.storage.state.AttemptTokens.secureRandom()),
+          // Releases that run after a request returned (an orphaned begin, a late-settling
+          // workflow): one thread, bounded queue; a full queue drops the release (the in-flight
+          // TTL then frees the key).
+          pool("state-cleanup", 1, config.keyValueQueueCapacity)
         )
       }
       val evidence = Option.when(kind.serves(ServiceKind.EvidenceExplain))(

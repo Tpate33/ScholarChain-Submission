@@ -64,12 +64,21 @@ enum ConfigError {
 enum ValueKind {
   case Token, Text, OptionalText, Bucket, Region, AccountId, PositiveInt, AnyLong, Probability,
     Window, Windows, IdentityVersion, OptionalToken, OptionalLocation, OptionalPositiveInt,
-    OptionalLong
+    OptionalLong,
+    // DE-INT-01 production kinds: parsed by type only; the bound of each key is
+    // [[ProductionKeys]] data. Their error reasons never contain the value.
+    OptionalInt32, OptionalInt64, OptionalBoolean, OptionalString, OptionalTokenList,
+    OptionalWindow
 
   /** Optional kinds may be unset (absent, `null`, or an empty environment value). */
   def optional: Boolean =
     this == OptionalText || this == OptionalToken || this == OptionalLocation ||
-      this == OptionalPositiveInt || this == OptionalLong
+      this == OptionalPositiveInt || this == OptionalLong || production
+
+  /** The DE-INT-01 production kinds. */
+  def production: Boolean =
+    this == OptionalInt32 || this == OptionalInt64 || this == OptionalBoolean ||
+      this == OptionalString || this == OptionalTokenList || this == OptionalWindow
 }
 
 /** One configuration key: dotted path, kind, and its environment variable name. */
@@ -93,7 +102,8 @@ final case class ConfigKey(path: String, kind: ValueKind) {
  * (DE-P6-03) adds three more OPTIONAL analysis-scope keys, set together or not at all:
  * `analysis.pathLengthSampleSize`, `analysis.pathLengthSeed` and
  * `analysis.pathLengthMinComponentSize` (the component-level path-length estimate); unset, no
- * digest changes and no estimate is stored.
+ * digest changes and no estimate is stored. DE-INT-01 and DE-INT-04 add the OPTIONAL production
+ * keys ([[ProductionKeys.allKeys]]); unset, no digest changes.
  */
 object ConfigKeys {
   val EnvPrefix = "SCHOLARCHAIN_CFG_"
@@ -101,12 +111,20 @@ object ConfigKeys {
   /**
    * Environment variable name of a key: `SCHOLARCHAIN_CFG_` + path segments, each camelCase segment
    * written as UPPER_SNAKE, joined by `__`. Example: `aws.accountId` ->
-   * `SCHOLARCHAIN_CFG_AWS__ACCOUNT_ID`.
+   * `SCHOLARCHAIN_CFG_AWS__ACCOUNT_ID`. DE-INT-01: a `-` inside a segment (the service kinds
+   * `query-jobs`, `evidence-explain`) is written `_`, for example
+   * `services.query-jobs.syncTimeoutMillis` ->
+   * `SCHOLARCHAIN_CFG_SERVICES__QUERY_JOBS__SYNC_TIMEOUT_MILLIS` (no earlier key contains `-`; env
+   * names stay unique, which a test checks).
    */
   def envNameOf(path: String): String =
     EnvPrefix + path
       .split('.')
-      .map(_.flatMap(c => if (c.isUpper) "_" + c.toString else c.toUpper.toString))
+      .map(
+        _.flatMap(c =>
+          if (c.isUpper) "_" + c.toString else if (c == '-') "_" else c.toUpper.toString
+        )
+      )
       .mkString("__")
 
   import ValueKind.*
@@ -154,7 +172,7 @@ object ConfigKeys {
     ConfigKey("analysis.pathLengthSampleSize", OptionalPositiveInt),
     ConfigKey("analysis.pathLengthSeed", OptionalLong),
     ConfigKey("analysis.pathLengthMinComponentSize", OptionalPositiveInt)
-  )
+  ) ++ ProductionKeys.allKeys.map(s => ConfigKey(s.path, s.kind)) // DE-INT-01/04, optional
   val byPath: Map[String, ConfigKey] = all.map(k => k.path -> k).toMap
   val byEnv: Map[String, ConfigKey] = all.map(k => k.envName -> k).toMap
   private val prefixes: Set[String] =
@@ -464,7 +482,42 @@ object ConfigLoader {
     case _ => Left(s"'$s' is not a window YYYY-YYYY")
   }
 
+  /** DE-INT-01: environment syntax of the production kinds; reasons never echo the value. */
+  private def productionEnv(kind: ValueKind, raw: String): Either[String, Raw] = kind match {
+    case ValueKind.OptionalInt32 =>
+      raw.toIntOption
+        .map(i => Raw.Num(BigDecimal(i), integral = true))
+        .toRight("expected a 32-bit integer")
+    case ValueKind.OptionalInt64 =>
+      raw.toLongOption
+        .map(l => Raw.Num(BigDecimal(l), integral = true))
+        .toRight("expected a 64-bit integer")
+    case ValueKind.OptionalBoolean =>
+      raw match {
+        case "true" => Right(Raw.Bool(true))
+        case "false" => Right(Raw.Bool(false))
+        case _ => Left("expected true or false")
+      }
+    case ValueKind.OptionalTokenList => Right(Raw.Arr(raw.split(",", -1).toVector.map(Raw.Str(_))))
+    case ValueKind.OptionalWindow =>
+      raw match {
+        case WindowText(a, b) =>
+          Right(
+            Raw.Obj(
+              Map(
+                "startYear" -> Raw.Num(BigDecimal(a.toInt), integral = true),
+                "endYear" -> Raw.Num(BigDecimal(b.toInt), integral = true)
+              )
+            )
+          )
+        case _ => Left("expected a window YYYY-YYYY")
+      }
+    case _ => Right(Raw.Str(raw))
+  }
+
   private def envValue(key: ConfigKey, raw: String): Either[String, Raw] = key.kind match {
+    case k if k.production =>
+      if (raw.isEmpty) Right(Raw.NullValue) else productionEnv(k, raw)
     case ValueKind.OptionalPositiveInt if raw.nonEmpty =>
       raw.toIntOption
         .map(i => Raw.Num(BigDecimal(i), integral = true))
@@ -612,6 +665,49 @@ object ConfigLoader {
         case None => Vector.empty
       }
 
+    // DE-INT-01: production keys, typed by kind and checked against their bound (KeySpec data).
+    // Reasons name the key and the bound, never the value.
+    def production(spec: KeySpec): Option[Any] =
+      values.get(spec.path) match {
+        case None | Some((Raw.NullValue, _)) => None
+        case Some((v, src)) =>
+          val parsed: Either[String, Any] = (spec.kind, v) match {
+            case (ValueKind.OptionalInt32, Raw.Num(n, true)) if n.isValidInt => Right(n.toInt)
+            case (ValueKind.OptionalInt32, _) => Left("expected a 32-bit integer literal")
+            case (ValueKind.OptionalInt64, Raw.Num(n, true)) if n.isValidLong => Right(n.toLong)
+            case (ValueKind.OptionalInt64, _) => Left("expected a 64-bit integer literal")
+            case (ValueKind.OptionalBoolean, Raw.Bool(b)) => Right(b)
+            case (ValueKind.OptionalBoolean, _) => Left("expected true or false")
+            case (ValueKind.OptionalString, Raw.Str(s)) => Right(s)
+            case (ValueKind.OptionalString, _) => Left("expected a string")
+            case (ValueKind.OptionalTokenList, Raw.Arr(items)) =>
+              val tokens = items.collect { case Raw.Str(s) if StableId.isToken(s) => s }
+              if (tokens.size == items.size) Right(tokens)
+              else Left("expected a list of tokens [A-Za-z0-9._-]+")
+            case (ValueKind.OptionalTokenList, _) => Left("expected a list of tokens")
+            case (ValueKind.OptionalWindow, Raw.Obj(f))
+                if f.keySet == Set("startYear", "endYear") =>
+              (f("startYear"), f("endYear")) match {
+                case (Raw.Num(a, true), Raw.Num(b, true)) if a.isValidInt && b.isValidInt =>
+                  TimeWindow
+                    .of(a.toInt, b.toInt)
+                    .left
+                    .map(_ => "expected a window with startYear <= endYear (four-digit years)")
+                case _ => Left("startYear and endYear must be integers")
+              }
+            case (ValueKind.OptionalWindow, _) => Left("expected { startYear = Y, endYear = Y }")
+            case _ => Left("unsupported value kind")
+          }
+          parsed.flatMap(x => spec.problem(x).toLeft(x)) match {
+            case Left(reason) => fail(spec.path, src, reason); None
+            case Right(x) => Some(x)
+          }
+      }
+    val productionValues: Map[String, Any] =
+      ProductionKeys.allKeys.flatMap(s => production(s).map(s.path -> _)).toMap
+    val (dynamo, state, services) = ProductionConfig.build(productionValues)
+    val (s3, neptune, s3Vectors) = ProductionConfig.buildAdapters(productionValues)
+
     val config = ScholarChainConfig(
       configSchemaVersion = version,
       environment = token("environment"),
@@ -674,15 +770,23 @@ object ConfigLoader {
         pathLengthSampleSize = optPositiveInt(AnalysisConfig.PathLengthSampleSizeKey),
         pathLengthSeed = optLong(AnalysisConfig.PathLengthSeedKey),
         pathLengthMinComponentSize = optPositiveInt(AnalysisConfig.PathLengthMinComponentSizeKey)
-      )
+      ),
+      dynamoDb = dynamo,
+      serviceState = state,
+      services = services,
+      s3 = s3,
+      neptune = neptune,
+      s3Vectors = s3Vectors
     )
     // Cross-key rules (reject < llmBandLower < llmBandUpper < accept; grouping policy differs
     // from the match policy; the two run roots are disjoint; the analysis export format is a
-    // known format) once every key is valid.
+    // known format; DE-INT-01 production rules whose keys are all set) once every key is valid.
     if (errors.isEmpty)
       (EntityResolutionConfig.problems(config.entityResolution) ++
-        AnalysisConfig.problems(config.analysis)).foreach { case (key, reason) =>
-        errors += ConfigError.InvalidValue(key, "resolved configuration", reason)
+        AnalysisConfig.problems(config.analysis) ++
+        ProductionRules.violations(ProductionConfig.ruleInputs(config))).foreach {
+        case (key, reason) =>
+          errors += ConfigError.InvalidValue(key, "resolved configuration", reason)
       }
     if (errors.nonEmpty) Left(errors.toVector) else Right(config)
   }

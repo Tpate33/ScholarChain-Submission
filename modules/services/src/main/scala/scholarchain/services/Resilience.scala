@@ -327,6 +327,120 @@ final class ReadPolicy(
     else attempt(1, deadline, capAt, op)
   }
 
+  /**
+   * SV-INT-02 (A1-W, CR-INT-02-1, CR-INT-01-1): one COMPLETE service-state store operation (an
+   * idempotency `begin`, `complete` or `abandon`; a job write or read) as ONE `op` of this policy,
+   * with SERIAL retries. Like [[read]] (circuit check, at most `maxAttempts` attempts, each under
+   * `min(timeoutMillis, time left)`, the `capMillis` real-time bound and the request deadline),
+   * with one difference: an attempt that TIMED OUT is retried only after it has actually ended (its
+   * `settled`), and only while the bound leaves time. If the bound is reached first, the operation
+   * ends with the policy's typed `504` and is NOT retried, so two attempts of one operation (one
+   * attempt ID) never run at once, and a late write of a timed-out attempt can never land after a
+   * retry's outcome was acted on.
+   *
+   * Returns the outcome and the `settled` of the LAST attempt (already completed unless that
+   * attempt is still running past the caller's bound: the residual N4 work, at most one attempt per
+   * operation). The caller never waits past `capMillis` (nor the deadline).
+   */
+  def writeTracked[A](deadline: Deadline, capMillis: Long = Long.MaxValue)(
+      op: => Either[StoreError, A]
+  ): (Either[ApiError, A], java.util.concurrent.CompletableFuture[Unit]) = {
+    val capAt =
+      if (capMillis == Long.MaxValue) Long.MaxValue
+      else System.nanoTime() + capMillis * 1000000L
+    if (left(deadline, capAt) <= 0) (timedOut(0), ReadPolicy.Done)
+    else if (!breaker.allow())
+      (
+        Left(
+          ApiError(
+            ErrorCode.CircuitOpen,
+            s"the $dependency circuit is open",
+            headers = ApiError.retryAfter(retryAfterSeconds)
+          )
+        ),
+        ReadPolicy.Done
+      )
+    else serial(1, deadline, capAt, op)
+  }
+
+  /** [[writeTracked]] without the settled handle. */
+  def write[A](deadline: Deadline, capMillis: Long = Long.MaxValue)(
+      op: => Either[StoreError, A]
+  ): Either[ApiError, A] = writeTracked(deadline, capMillis)(op)._1
+
+  /** Whether `s` completes within the time left (false when the bound is reached first). */
+  private def settledWithin(
+      s: java.util.concurrent.CompletableFuture[Unit],
+      deadline: Deadline,
+      capAt: Long
+  ): Boolean =
+    s.isDone || {
+      val wait = left(deadline, capAt)
+      wait > 0 && (try { s.get(wait, TimeUnit.MILLISECONDS); true }
+      catch {
+        case _: TimeoutException => false
+        case _: InterruptedException => Thread.currentThread().interrupt(); false
+        case _: ExecutionException | _: java.util.concurrent.CancellationException => true
+      })
+    }
+
+  @annotation.tailrec
+  private def serial[A](
+      n: Int,
+      deadline: Deadline,
+      capAt: Long,
+      op: => Either[StoreError, A]
+  ): (Either[ApiError, A], java.util.concurrent.CompletableFuture[Unit]) = {
+    val remaining = left(deadline, capAt)
+    val budget = math.min(timeoutMillis, remaining)
+    val truncated = budget < timeoutMillis
+    if (budget <= 0) {
+      breaker.neutral()
+      (timedOut(n - 1), ReadPolicy.Done)
+    } else {
+      def again = n < maxAttempts && left(deadline, capAt) > 0
+      val (out, settled) = calls.runTracked(budget, remaining)(access(op))
+      out match {
+        case Right(Right(a)) =>
+          breaker.success()
+          (Right(a), settled)
+        case Right(Left(e)) if e.retryable && again => serial(n + 1, deadline, capAt, op)
+        case Left(CallFailure.TimedOut) if again && settledWithin(settled, deadline, capAt) =>
+          serial(n + 1, deadline, capAt, op)
+        case Right(Left(_: StoreError.Refused)) =>
+          breaker.neutral()
+          (
+            Left(ApiError(ErrorCode.Internal, s"the $dependency request was refused by its port")),
+            settled
+          )
+        case Right(Left(_)) =>
+          breaker.failure()
+          (Left(downstream(s"the $dependency store failed after $n attempt(s)")), settled)
+        case Left(CallFailure.TimedOut) =>
+          if (truncated) breaker.neutral() else breaker.failure()
+          (timedOut(n), settled)
+        case Left(f) if f.neverStarted =>
+          breaker.notStarted()
+          (
+            Left(
+              ApiError(
+                ErrorCode.Overloaded,
+                s"no capacity for the $dependency call",
+                headers = ApiError.retryAfter(retryAfterSeconds)
+              )
+            ),
+            settled
+          )
+        case Left(CallFailure.Interrupted) =>
+          breaker.neutral()
+          (Left(ApiError(ErrorCode.Internal, "the request was interrupted")), settled)
+        case Left(_) =>
+          breaker.failure()
+          (Left(downstream(s"the $dependency store failed after $n attempt(s)")), settled)
+      }
+    }
+  }
+
   /** Milliseconds left before the request deadline and the real-time cap, whichever is first. */
   private def left(deadline: Deadline, capAt: Long): Long =
     if (capAt == Long.MaxValue) deadline.remainingMillis(clock)
@@ -385,4 +499,11 @@ final class ReadPolicy(
       }
     }
   }
+}
+
+object ReadPolicy {
+
+  /** An already-settled operation (nothing is still running). */
+  val Done: java.util.concurrent.CompletableFuture[Unit] =
+    java.util.concurrent.CompletableFuture.completedFuture(())
 }

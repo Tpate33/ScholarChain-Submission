@@ -70,19 +70,33 @@ object HttpServerAdapter {
     override def initialValue(): java.lang.Boolean = java.lang.Boolean.FALSE
   }
 
-  private def readBounded(in: InputStream, max: Int): (Array[Byte], Boolean) = {
+  /**
+   * The largest body bound the reader accepts: core `ProductionBounds.MaxServerBodyBytes`
+   * (`Int.MaxValue - 9`, CR-INT-04-6), so the buffer of `max + 1` bytes stays an array a JVM can
+   * allocate. [[start]] refuses a larger `maxBodyBytes`.
+   */
+  val MaxBodyBytes: Int = scholarchain.core.config.ProductionBounds.MaxServerBodyBytes
+
+  /**
+   * Reads at most `max + 1` bytes of `in`: the body and whether it exceeded `max` (the body is then
+   * cut to `max`). SV-INT-02 (CR-INT-04-6, services part): the counting is in Long, so no bound up
+   * to `Int.MaxValue` wraps (`max + 1 - total` overflowed at `max = Int.MaxValue`, and the negative
+   * length made every request with a body fail).
+   */
+  private[services] def readBounded(in: InputStream, max: Int): (Array[Byte], Boolean) = {
+    val limit = math.max(0L, max.toLong) + 1L
     val out = new ByteArrayOutputStream()
     val buf = new Array[Byte](8192)
-    var total = 0
+    var total = 0L
     var n = in.read(buf)
-    while (n >= 0 && total <= max) {
-      val keep = math.min(n, max + 1 - total)
+    while (n >= 0 && total < limit) {
+      val keep = math.min(n.toLong, limit - total).toInt
       out.write(buf, 0, keep)
       total += keep
-      n = if (total <= max) in.read(buf) else -1
+      n = if (total < limit) in.read(buf) else -1
     }
     val bytes = out.toByteArray
-    if (bytes.length > max) (bytes.take(max), true) else (bytes, false)
+    if (bytes.length.toLong > max.toLong) (bytes.take(math.max(0, max)), true) else (bytes, false)
   }
 
   private def requestOf(ex: HttpExchange, body: Array[Byte], tooLarge: Boolean) = {
@@ -125,6 +139,7 @@ object HttpServerAdapter {
       s.overflowCapacity < 1
     )
       Left("backlog, workers, queueCapacity, maxBodyBytes and overflowCapacity must be >= 1")
+    else if (s.maxBodyBytes > MaxBodyBytes) Left(s"maxBodyBytes: at most $MaxBodyBytes")
     else
       try {
         val server = HttpServer.create(new InetSocketAddress(s.host, s.port), s.backlog)
