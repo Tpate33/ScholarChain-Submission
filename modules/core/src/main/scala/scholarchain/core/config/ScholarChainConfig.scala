@@ -33,7 +33,9 @@ final case class ScholarChainConfig(
     // `storage.s3vectors.*`; see AdapterConfig.scala). Same digest rule as DE-INT-01.
     s3: S3Config = S3Config(),
     neptune: NeptuneConfig = NeptuneConfig(),
-    s3Vectors: S3VectorsConfig = S3VectorsConfig()
+    s3Vectors: S3VectorsConfig = S3VectorsConfig(),
+    productionWorkflow: ProductionWorkflowConfig = ProductionWorkflowConfig(),
+    productionLoad: ProductionLoadConfig = ProductionLoadConfig()
 ) derives ReadWriter
 
 final case class AwsConfig(region: String, accountId: String) derives ReadWriter
@@ -727,6 +729,8 @@ object ScholarChainConfig {
         services = ServicesConfig(),
         s3 = S3Config(),
         neptune = NeptuneConfig(),
-        s3Vectors = S3VectorsConfig()
+        s3Vectors = S3VectorsConfig(),
+        productionWorkflow = ProductionWorkflowConfig(),
+        productionLoad = ProductionLoadConfig()
       )
 }

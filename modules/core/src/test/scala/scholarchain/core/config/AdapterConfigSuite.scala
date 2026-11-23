@@ -90,7 +90,10 @@ class AdapterConfigSuite extends munit.FunSuite {
     val c = loadOk(full)
     assertEquals(ProductionConfig.problems(c), Vector.empty)
     assertEquals(AdapterKeys.all.size, 1 + 6 + 5 + 6 + 6, "frozen DE-INT-04 key count")
-    assertEquals(ProductionKeys.allKeys.size, ProductionKeys.all.size + AdapterKeys.all.size)
+    assertEquals(
+      ProductionKeys.allKeys.size,
+      ProductionKeys.all.size + AdapterKeys.all.size + ProductionWorkflowKeys.all.size + ProductionLoadKeys.all.size
+    )
     assertEquals(ProductionKeys.allKeys.map(_.path).distinct.size, ProductionKeys.allKeys.size)
     val adapterPaths = AdapterKeys.all.map(_.path).toSet
     assertEquals(
@@ -470,7 +473,10 @@ class AdapterConfigSuite extends munit.FunSuite {
   test("the adapter rule table is data: unique IDs, known keys, formulas naming their keys") {
     val ids = ProductionRules.every.map(_.id)
     assertEquals(ids.distinct.size, ids.size)
-    assertEquals(ProductionRules.every.size, ProductionRules.all.size + 15)
+    assertEquals(
+      ProductionRules.every.size,
+      ProductionRules.all.size + 15 + ProductionWorkflowKeys.rules.size + ProductionLoadKeys.rules.size
+    )
     for (r <- AdapterRules.all) {
       assert(
         r.keys.forall(k =>

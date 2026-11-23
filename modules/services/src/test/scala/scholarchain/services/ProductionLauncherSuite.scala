@@ -177,22 +177,11 @@ class ProductionLauncherSuite extends munit.FunSuite {
     assertEquals(h.clients.dynamoClients.size, 1, "the bundle's DynamoDB factory was used")
   }
 
-  test("A5: the production seams build no key source and no workflow: refused before any client") {
+  test("A5: the production workflow remains absent without productionWorkflow configuration") {
     val ls = LauncherFixture.launcherSettings(ServiceKindKey.QueryJobs)
     val system = ProductionLauncher.Seams.system
-    assertEquals(system.apiKeys(ls.apiKeys), Left(ProductionLauncher.ApiKeysNotBuilt))
     assertEquals(system.workflow(ls), None)
-    val h = new LauncherHarness(keys = system.apiKeys, workflow = Some(new Capture().factory))
-    kinds.foreach { case (kind, _) =>
-      val r = h.launcher.start(kind)
-      assert(
-        r.left.exists(_.startsWith("apiKeys (Secrets Manager ApiKeyDigestSource)")),
-        r.toString
-      )
-      assert(r.left.exists(_.contains("not provided")), r.toString)
-    }
-    assertEquals(h.opens.get, 0, "no storage client was opened")
-    // With a key source, the production workflow seam still refuses, naming the workflow.
+    // Stub keys ensure this test never constructs an SDK client or resolves credentials.
     val w = new LauncherHarness(workflow = system.workflow(ls))
     assert(w.launcher.start(ServiceKind.QueryJobs).left.exists(_.startsWith("workflow")))
     assertEquals(w.clients.closes.get, 1)

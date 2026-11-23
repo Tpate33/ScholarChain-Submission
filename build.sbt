@@ -52,6 +52,10 @@ lazy val pipelineDemoClasspath =
   taskKey[File](
     "Stages a separate local DBLP demo classpath with storage's optional reader libraries"
   )
+lazy val productionLoadClasspath =
+  taskKey[File](
+    "Stages a separate production loader classpath with storage's optional reader libraries"
+  )
 lazy val verifyVersionLedger =
   taskKey[Unit]("Checks the version ledger, its tool-mandated mirrors, and literal versions")
 lazy val verifyBuildSources =
@@ -546,6 +550,9 @@ lazy val services = project
     Compile / mainClass := Some("scholarchain.services.QueryJobsMain"),
     Compile / run / fork := true,
     libraryDependencies ++= Seq(slf4jApi.value, logbackClassic.value % Runtime),
+    // Production authentication and model transports live in services, never in rag or storage.
+    libraryDependencies ++= DependencyScopes.ServicesOnlyAwsModules
+      .map(module => DependencyScopes.AwsOrg % module % versionLedger.value("aws-sdk-v2.bom")),
     // BE-P7-06 (DU-P7-04): services resolves the SDK (and its Netty) itself; same pin as storage.
     dependencyOverrides ++= nettyOverrides.value,
     // Local container image (`sbt dockerLocal`): pinned JRE, non-root user,
@@ -594,7 +601,9 @@ lazy val tests = project
       hadoopClientApi.value.excludeAll(testsCodecExclusions: _*) % Test,
       hadoopClientRuntime.value.excludeAll(testsCodecExclusions: _*) % Test,
       parquetHadoop.value.excludeAll(testsCodecExclusions: _*) % Test,
-      sparkSql.value.excludeAll(sparkCodecExclusions: _*) % Test
+      sparkSql.value.excludeAll(sparkCodecExclusions: _*) % Test,
+      // Cross-module production composition uses injected Bedrock SDK requests, never live calls.
+      DependencyScopes.AwsOrg % "bedrockruntime" % versionLedger.value("aws-sdk-v2.bom") % Test
     ),
     dependencyOverrides ++= nettyOverrides.value :+ snappyJava.value,
     Test / javaOptions ++= java17Opens,
@@ -618,6 +627,15 @@ lazy val root = project
       val out = (ThisBuild / baseDirectory).value / "target" / "pipeline-demo" / "classpath.txt"
       IO.write(out, cp.distinct.map(_.getAbsolutePath).mkString(java.io.File.pathSeparator))
       streams.value.log.info("Local DBLP demo classpath: " + out)
+      out
+    },
+    productionLoadClasspath := {
+      // Explicit loader entry point only; normal runtime/package dependency fences stay intact.
+      val cp = (services / Runtime / fullClasspath).value.map(_.data) ++
+        (storage / Runtime / fullClasspath).value.map(_.data)
+      val out = (ThisBuild / baseDirectory).value / "target" / "production-load" / "classpath.txt"
+      IO.write(out, cp.distinct.map(_.getAbsolutePath).mkString(java.io.File.pathSeparator))
+      streams.value.log.info("Production loader classpath: " + out)
       out
     },
     verifyBuildSources := {

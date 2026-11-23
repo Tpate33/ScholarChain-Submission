@@ -164,13 +164,11 @@ object LauncherMapping {
  *      core `ProductionSettings.forLauncher(c, kind)` (never `forProcess`): a configuration without
  *      the process's adapter or API-key source sections is refused HERE, before any credential
  *      provider or client exists;
- *   2. builds the Secrets Manager `ApiKeyDigestSource` from `ApiKeySourceSettings` (production: NOT
- *      BUILT, criterion B is blocked on the secretsmanager SDK module, so this step refuses, naming
- *      `apiKeys`, still before any client exists);
+ *   2. builds the lazy Secrets Manager digest source from `ApiKeySourceSettings`;
  *   3. opens ONE storage `StorageClients` bundle and maps `LauncherSettings` 1:1 into it
  *      ([[LauncherMapping]]);
- *   4. composes through [[ProductionServiceProvider.launcher]] (the workflow: production NOT BUILT,
- *      refused naming `workflow`; the workflow's store calls bounded by the query-jobs read policy,
+ *   4. composes through [[ProductionServiceProvider.launcher]] (the real Bedrock workflow requires
+ *      `productionWorkflow`; its store calls are bounded by the query-jobs read policy,
  *      [[WorkflowStoreBounds]]) and starts the server.
  *
  * The bundle (and an `AutoCloseable` key source) is closed EXACTLY ONCE: at once when any step
@@ -273,23 +271,18 @@ object ProductionLauncher {
       ids: IdSource
   )
 
-  /** The refusal of the production API-key source while criterion B is blocked. */
-  val ApiKeysNotBuilt: String =
-    "apiKeys (Secrets Manager ApiKeyDigestSource): not built in this build (the AWS SDK " +
-      "secretsmanager module is not on the services classpath; SV-INT-03b blocked on " +
-      "build-engineer); not provided (production dependency, fail closed)"
-
   object Seams {
 
     /**
-     * The production environment: the process configuration, storage `StorageClients.open()`, no
-     * API-key source and no workflow yet (both fail closed, naming themselves).
+     * Real production adapters. Client construction sends no request. Missing workflow config fails
+     * closed; neither local demo model nor in-memory storage can be selected here.
      */
     def system: Seams = Seams(
       loadConfig = () => ConfigLoader.loadFromSystem(),
-      apiKeys = _ => Left(ApiKeysNotBuilt),
+      apiKeys = SecretsManagerKeys.open,
       openClients = () => LauncherClients.open(),
-      workflow = _ => None,
+      workflow =
+        ls => Option.when(ls.workflow.isDefined)(stores => ProductionWorkflow.build(ls, stores)),
       accessLog = AccessLog.slf4j(),
       clock = ServiceClock.system,
       ids = IdSource.secure()

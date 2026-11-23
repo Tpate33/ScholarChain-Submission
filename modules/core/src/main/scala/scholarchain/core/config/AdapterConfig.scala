@@ -584,5 +584,6 @@ final case class LauncherSettings(
     s3: Option[S3AdapterSettings],
     neptune: Option[NeptuneAdapterSettings],
     s3Vectors: Option[S3VectorsAdapterSettings],
-    apiKeys: ApiKeySourceSettings
+    apiKeys: ApiKeySourceSettings,
+    workflow: Option[ProductionWorkflowSettings] = None
 )

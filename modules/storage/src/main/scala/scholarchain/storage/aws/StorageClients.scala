@@ -36,10 +36,23 @@ import scholarchain.storage.aws.neptune.{
   NeptuneGraphReader,
   NeptuneReaderSettings
 }
-import scholarchain.storage.aws.s3.{S3Calls, S3ObjectReader, S3ReaderSettings}
-import scholarchain.storage.aws.s3vectors.{S3VectorsCalls, S3VectorsReader, S3VectorsReaderSettings}
-import scholarchain.storage.model.StoreError
-import scholarchain.storage.port.{GraphReader, ObjectReader}
+import scholarchain.storage.aws.s3.{
+  S3Calls,
+  S3ObjectReader,
+  S3ReaderSettings,
+  S3ObjectStore,
+  S3PutCalls
+}
+import scholarchain.storage.aws.s3vectors.{
+  S3VectorsCalls,
+  S3VectorsReader,
+  S3VectorsReaderSettings,
+  S3VectorsStore,
+  S3VectorsPutCalls
+}
+import scholarchain.storage.aws.neptune.NeptuneGraphWriter
+import scholarchain.storage.model.{StoreError, VectorLimits}
+import scholarchain.storage.port.{GraphReader, ObjectReader, ObjectStore, GraphWriter, VectorStore}
 
 /**
  * SE-INT-04: how storage builds each SDK seam: the seam plus the resource that releases it. The
@@ -55,6 +68,18 @@ trait SdkBuilders {
   def s3(s: AwsClientSettings, c: AwsCredentialsProvider): (S3Calls, AutoCloseable)
   def neptune(s: NeptuneClientSettings, c: AwsCredentialsProvider): (NeptuneCalls, AutoCloseable)
   def s3Vectors(s: AwsClientSettings, c: AwsCredentialsProvider): (S3VectorsCalls, AutoCloseable)
+
+  /** Loader extensions default to refusal for older injected test builders. */
+  def s3Store(
+      s: AwsClientSettings,
+      c: AwsCredentialsProvider
+  ): (S3Calls, S3PutCalls, AutoCloseable) =
+    throw new UnsupportedOperationException("S3 loader builder not supplied")
+  def vectorStore(
+      s: AwsClientSettings,
+      c: AwsCredentialsProvider
+  ): (S3VectorsCalls, S3VectorsPutCalls, AutoCloseable) =
+    throw new UnsupportedOperationException("vector loader builder not supplied")
 }
 
 object SdkBuilders {
@@ -130,6 +155,14 @@ object SdkBuilders {
       def s3Vectors(s: AwsClientSettings, c: AwsCredentialsProvider) = {
         val client = s3VectorsClient(s, c, ambient)
         (S3VectorsCalls.of(client), client)
+      }
+      override def s3Store(s: AwsClientSettings, c: AwsCredentialsProvider) = {
+        val client = s3Client(s, c, ambient)
+        (S3Calls.of(client), S3PutCalls.of(client), client)
+      }
+      override def vectorStore(s: AwsClientSettings, c: AwsCredentialsProvider) = {
+        val client = s3VectorsClient(s, c, ambient)
+        (S3VectorsCalls.of(client), S3VectorsPutCalls.of(client), client)
       }
     }
   }
@@ -296,6 +329,67 @@ final class StorageClients private (
       built <- Guarded.built("s3vectors")(builders.s3Vectors(client, credentials))
       _ <- group.add("S3 Vectors client", built._2)
     } yield S3VectorsReader.of(Guarded.s3Vectors(group, built._1), settings)
+
+  /** Loader-only facade; caller must never pass its write capability into runtime composition. */
+  def objectStore(
+      client: AwsClientSettings,
+      settings: S3ReaderSettings
+  ): Either[StoreError, ObjectStore] =
+    for {
+      _ <- open
+      _ <- required(client, settings)
+      _ <- AmbientEndpoints.check("s3", client.endpointOverride, ambient)
+      built <- Guarded.built("s3 loader")(builders.s3Store(client, credentials))
+      _ <- group.add("S3 loader client", built._3)
+    } yield S3ObjectStore.of(
+      Guarded.s3(group, built._1),
+      new S3PutCalls {
+        def putObject(
+            r: software.amazon.awssdk.services.s3.model.PutObjectRequest,
+            b: software.amazon.awssdk.core.sync.RequestBody
+        ) = {
+          group.ensureOpen(); built._2.putObject(r, b)
+        }
+      },
+      settings
+    )
+
+  /**
+   * Writer endpoint/settings are supplied explicitly, distinct from the runtime reader endpoint.
+   */
+  def graphWriter(client: NeptuneClientSettings): Either[StoreError, GraphWriter] =
+    for {
+      _ <- open
+      _ <- Option(client).toRight(StoreError.Refused("neptune loader: client settings required"))
+      built <- Guarded.built("neptune loader")(builders.neptune(client, credentials))
+      _ <- group.add("Neptune loader client", built._2)
+    } yield NeptuneGraphWriter.of(Guarded.neptune(group, built._1))
+
+  /** Externally serialized loader only; S3 Vectors has no conditional PutVectors operation. */
+  def vectorStore(
+      client: AwsClientSettings,
+      settings: S3VectorsReaderSettings,
+      limits: VectorLimits
+  ): Either[StoreError, VectorStore] =
+    for {
+      _ <- open
+      _ <- required(client, settings)
+      _ <-
+        if (VectorLimits.problems(limits).isEmpty) Right(())
+        else Left(StoreError.Refused("vector limits invalid"))
+      _ <- AmbientEndpoints.check("s3vectors", client.endpointOverride, ambient)
+      built <- Guarded.built("s3vectors loader")(builders.vectorStore(client, credentials))
+      _ <- group.add("S3 Vectors loader client", built._3)
+    } yield S3VectorsStore.of(
+      Guarded.s3Vectors(group, built._1),
+      new S3VectorsPutCalls {
+        def putVectors(r: software.amazon.awssdk.services.s3vectors.model.PutVectorsRequest) = {
+          group.ensureOpen(); built._2.putVectors(r)
+        }
+      },
+      settings,
+      limits
+    )
 
   private def required(a: AnyRef, b: AnyRef): Either[StoreError, Unit] =
     if (a == null || b == null) Left(StoreError.Refused("client and reader settings are required"))

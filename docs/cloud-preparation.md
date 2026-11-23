@@ -1,10 +1,73 @@
 # Cloud preparation — November 23, 2026
 
 The runnable local synthetic demo is verified. The subsequent DBLP-derived local
-profile now also passes its focused API checks (see [demo instructions](demo-script.md)). A complete cloud deployment is not
-ready to execute. No new cloud run, AWS call, model call, commit or push was made
-in this preparation. The historical Phase 6 acceptance explicitly stopped EMR retries;
-this preparation does not reopen that authorization.
+profile now also passes its focused API checks (see [demo instructions](demo-script.md)).
+Integration Round 02 was accepted as a local checkpoint and pushed separately;
+the subsequent production-connection work described below remains local preparation.
+A complete cloud deployment is not ready to execute. No AWS or paid model call,
+deployment, commit or push was made by this subsequent preparation. The historical
+Phase 6 acceptance explicitly stopped EMR retries; this work does not reopen that
+authorization.
+
+## Production connections implemented locally
+
+The current source adds concrete S3 create-once object writes, Neptune graph writes,
+and S3 Vectors writes behind the existing storage ports. `ProductionLoadMain`
+composes those adapters, DynamoDB and a real Bedrock embedder through the existing
+`OpeningLoad`; it does not implement a second loader. Its default and `--validate`
+modes inspect local configuration and bounded source envelopes without constructing
+AWS clients. Full source/store verification remains in `OpeningLoad` during an
+approved execution. Execution additionally requires an explicit matching run ID.
+
+Production services now compose Bedrock Converse answer synthesis and Titan Text
+Embeddings V2 with the existing RAG evidence and claim-verification stages. The
+Secrets Manager key source reads a versioned digest-only document, caches only
+within its configured TTL, and refuses an expired cache if refresh fails. These
+are concrete clients with offline SDK-response tests; they have not contacted the
+live services. No Anthropic or Voyage direct-provider switch was made.
+
+The additive `productionWorkflow.*` and `productionLoad.*` configuration sections
+make serving provenance, model versions, source directories, writer endpoint and
+input/resource bounds explicit. Non-secret example overlays live under
+`modules/core/src/test/resources/fixtures/production-workflow.conf` and
+`production-load.conf`; their locations and limits require approved-run replacement.
+Graph/report/log zone buckets must be among the existing raw/curated/context S3
+adapter allowlist, with suitable distinct zone prefixes. A loader uses the explicit
+Neptune writer endpoint rather than a read replica.
+
+`productionLoad.analysisConfigFile` separately names the archived producer's
+original `.conf` file. The loader reads at most 64 KiB and resolves it through the
+same configuration loader without ambient overrides, then verifies the original
+analysis digest. Live runtime model/resource configuration must not replace that
+producer configuration: doing so would change the digest of an accepted artifact.
+
+The separate `productionLoadClasspath` build task supplies the optional Parquet
+reader runtime to this loader. Normal service packaging and the existing local
+DBLP/synthetic demo classpaths remain separate. The classpath task has been built;
+no standalone CLI replay is claimed. Tests exercise its preparation/argument methods.
+The coordinator observed the final repository gate pass on November 23, 2026:
+**2,882 passed, zero failures/errors, one skipped, 241 suites**. The check completed
+at 4:24:09 PM CST, using the normal test-marker task (`markTestRun`: 485 seconds);
+refreshed loader
+and DBLP classpaths and service staging also succeeded. See the
+[production test report](agent-runs/production-connections-01/test-report.md) and
+[production preparation status](agent-runs/production-connections-01/status.md)
+for subsequent observed results. Owner reports record 11 storage tests,
+23 workflow/load/adapter configuration tests, 42 existing configuration regressions,
+a later five-test producer-config regression run, and 18 services tests passing.
+These are separate focused runs, not counts to add into a repository total.
+A cross-module test also passed using the accepted DBLP artifacts, `OpeningLoad`,
+simulated Bedrock replies and in-memory stores: three verified claims, resolvable
+citations/support paper, audit persistence and exactly-once model closure were
+checked. None of these results is live AWS evidence. Independent source-snapshot
+review approved the local checkpoint with no open major/critical finding after the
+producer-config digest finding was repaired. The final gate subsequently passed;
+the review was not a full line-by-line audit or live approval.
+
+S3 Vectors loading requires one externally serialized loader into run-owned indexes:
+Get/compare/Put has no atomic conditional insert across processes. Neptune's exact
+map-SET/custom-ID behavior, vector float round trips and bounded-load throughput
+still require live verification.
 
 ## Local correction prepared
 
@@ -58,10 +121,10 @@ not described as lint-clean. No unrelated cleanup was made.
 | Boundary | Existing evidence | Missing connection |
 |---|---|---|
 | Real data -> Hadoop -> Spark | Local phase evidence and verified manifests | Successful bounded cloud execution; current corpus-scale compliance unestablished |
-| Store loading | `OpeningLoad`, load ports, tests; DynamoDB adapter supports writes | Production graph/object/vector load adapters or operational loader wiring, real embedder, and live load verification |
+| Store loading | Existing `OpeningLoad` has concrete graph/object/vector writers, a real Bedrock embedder, typed source/bound settings and an operational main; offline integration and full gate passed | Standalone CLI replay, approved input artifacts, populated stores and live load verification |
 | Runtime storage reads | Concrete Neptune, DynamoDB, S3 and S3 Vectors adapters | Provisioned/populated stores, connectivity and live queries |
-| Production startup | Validated launcher and durable-state composition | Secrets Manager key source; `ProductionLauncher.Seams.system.workflow` is still `None` |
-| Model providers | Typed synthesis/embedder ports and non-production implementations | Real answer/embedding implementations, version/dimension configuration and approved paid use |
+| Production startup | Launcher now selects the real workflow and Secrets Manager digest source; missing configuration fails closed | Approved real configuration, credentials/IAM, network reachability and live startup |
+| Model providers | Concrete Bedrock Converse/Titan clients and explicit model/version/dimension bounds; injected-response tests | Model access/quotas, live output/embedding compatibility, measured quality and approved paid use |
 | Runtime infrastructure | Base network/buckets/IAM and transient EMR stack | Neptune, runtime tables/vector index, service compute/network/IAM, deployment and scaling configuration |
 | Evaluation | Local contracts and synthetic HTTP replay | Real-data query, model/retrieval evaluation and measured scale-out/scale-in |
 
@@ -76,9 +139,9 @@ cleanup. Neither document is a current live resource inventory.
    accepted Phase 6 DBLP-derived dev output and serves a verified query. Preserve
    the template-model/in-memory labels; this does not satisfy the live-cloud or
    corpus-scale course requirements.
-2. Complete the loader/runtime connections above, with local stub-based tests for
-   SDK calls and model responses. Add only the runtime resources needed by that
-   bounded path. This is implementation work, not just supplying credentials.
+2. Preserve the passing local integration, independent review and full-gate evidence.
+   A standalone CLI replay is not claimed. Add only the runtime resources needed by that bounded path;
+   application adapters do not provision their target resources.
 3. Before any launch, obtain a read-only current inventory, choose the real model
    and embedding dimensions, review a new Terraform plan, price its concrete
    resources, and agree a run duration, spending bound and cleanup plan. No new
@@ -87,15 +150,26 @@ cleanup. Neither document is a current live resource inventory.
    outputs and errors, and measure the required scaling behavior. Update the report
    with observed results and keep any unmet requirements explicit.
 
+The student reports published course guidance allowing approximately 10K/50K DBLP
+works, up to 10K real S3 Vectors, small documented elasticity experiments, and
+Anthropic/Voyage alternatives when Bedrock quotas prevent execution for classmates.
+Individual approval has not been recorded. This guidance informs a minimum run
+proposal; it is not permission for a paid operation or provider change here.
+Before paid execution, present the exact resources, current prices, existing and
+proposed cumulative charges **before credits**, run limits and teardown plan for
+human approval, using the professor's recommended cumulative ceiling of $25.
+The loader uses five vector indexes: total vectors and provider requests must be
+bounded explicitly across all indexes; a work count is not a vector count.
+
 No reliable total deployment cost can be quoted from the present partial runtime.
 The old Phase 6 EMR estimate does not price Neptune, service compute, models,
 endpoints, storage and retained resources. It must not be reused as the budget for
 this deployment.
 
-Before reusing the changed wrapper in an approved cloud run, the user must approve
-a commit, and its immutable script hash and version pins must be refreshed in a
-new reviewed run configuration and plan. The historical pins and plans have been
-left intact; they will not silently deploy this uncommitted script. Do not apply an
+Before reusing the corrected wrapper in an approved cloud run, its accepted commit,
+immutable script hash and version pins must be recorded in a new reviewed run
+configuration and plan. The historical pins and plans have been left intact;
+they will not silently deploy a different script. Do not apply an
 old plan or stage a different script under an existing immutable object key.
 
 Recording the video can wait until the implementation being demonstrated is final.

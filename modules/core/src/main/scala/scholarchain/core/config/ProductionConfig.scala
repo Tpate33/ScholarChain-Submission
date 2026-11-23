@@ -284,6 +284,15 @@ enum KeyBound {
   /** An Int or Long value in `[min, max]`. */
   case Range(min: Long, max: Long)
 
+  /** A finite decimal in the closed range. */
+  case DecimalRange(min: Double, max: Double)
+
+  /** An absolute local artifact directory path, never an URI or traversal. */
+  case LocalDirectory
+
+  /** An archived producer configuration file path; existence is checked by the reader. */
+  case LocalArtifactFile
+
   /** A string fully matching `pattern`. */
   case Matches(pattern: String, what: String)
 
@@ -318,6 +327,21 @@ enum KeyBound {
 
   /** Why `v` violates the bound, or None. */
   def problem(v: Any): Option[String] = this match {
+    case LocalDirectory | LocalArtifactFile =>
+      val artifact = if (this == LocalArtifactFile) "file" else "directory"
+      v match {
+        case s: String if s.nonEmpty && !s.exists(_.isControl) =>
+          scala.util.Try(java.nio.file.Paths.get(s)).toOption match {
+            case Some(p) if p.isAbsolute && p.normalize() == p && !s.startsWith("//") => None
+            case _ => Some(s"must be an absolute normalized local artifact $artifact path")
+          }
+        case _ => Some(s"must be an absolute normalized local artifact $artifact path")
+      }
+    case DecimalRange(min, max) =>
+      v match {
+        case n: Double if n.isFinite && n >= min && n <= max => None
+        case _ => Some(s"must be a finite decimal in [$min, $max]")
+      }
     case NeptuneEndpoint =>
       v match {
         case s: String if AdapterBounds.neptuneEndpointOk(s) => None
@@ -526,7 +550,8 @@ object ProductionKeys {
    * Every production key: the DE-INT-01 table, then the DE-INT-04 adapter table
    * ([[AdapterKeys.all]]). The loader and the validation use this table.
    */
-  val allKeys: Vector[KeySpec] = all ++ AdapterKeys.all
+  val allKeys: Vector[KeySpec] =
+    all ++ AdapterKeys.all ++ ProductionWorkflowKeys.all ++ ProductionLoadKeys.all
 
   val byPath: Map[String, KeySpec] = allKeys.map(s => s.path -> s).toMap
 }
@@ -1133,7 +1158,8 @@ object ProductionRules {
     ) ++ dynamoDb ++ cross ++ serviceState
 
   /** Every rule: the DE-INT-01 table, then the DE-INT-04 adapter table ([[AdapterRules.all]]). */
-  val every: Vector[ConfigRule] = all ++ AdapterRules.all
+  val every: Vector[ConfigRule] =
+    all ++ AdapterRules.all ++ ProductionWorkflowKeys.rules ++ ProductionLoadKeys.rules
 
   /**
    * (key, reason) of every rule that applies to `m` and fails. A rule that reads a key in `bad` (a
@@ -1169,7 +1195,9 @@ object ProductionConfig {
         Option(c.services)
           .flatMap(s => Option(s.apiKeys))
           .toVector
-          .flatMap(flat(AdapterKeys.ApiKeysPrefix, _))).toMap
+          .flatMap(flat(AdapterKeys.ApiKeysPrefix, _)) ++
+        Option(c.productionWorkflow).toVector.flatMap(flat(ProductionWorkflowKeys.Prefix, _)) ++
+        Option(c.productionLoad).toVector.flatMap(flat(ProductionLoadKeys.Prefix, _))).toMap
 
   /**
    * DE-INT-04: the inputs of the rule table: [[flatten]] plus the non-production keys the adapter
@@ -1770,7 +1798,8 @@ object ProductionSettings {
             s(m, ApiKeysPrefix + "secretId"),
             client(ApiKeysPrefix),
             l(m, ApiKeysPrefix + "cacheTtlMillis")
-          )
+          ),
+          workflow = if (queryJobs) ProductionWorkflowKeys.settings(c, m) else None
         )
       }
 }

@@ -1,0 +1,35 @@
+Command: sbt check productionLoadClasspath pipelineDemoClasspath services/stage
+Working directory: /Users/taufeeqpatel/Desktop/ScholarChain
+Exit code: 0 (observed by build owner; success output inspected by orchestrator)
+Result: 2882 passed, 0 failed/errors, 1 skipped, 241 suites
+Full check completed: 2026-11-23 16:24:09 America/Chicago (final markTestRun task: 485 seconds)
+Classpath generation: both passed
+Services staging completed: 2026-11-23 16:24:21 America/Chicago (12 seconds)
+No AWS, paid model call or deployment invoked.
+Raw log: /private/tmp/scholarchain-production-connections-check.log
+Raw log SHA256: e1016fd6662c70431aca337c026c4ddc338eb34a03c41e41f1f1306112d11be1
+
+Archived gate output:
+[success] Total time: 0 s, completed Nov 23, 2026, 4:15:22 PM
+[success] Total time: 17 s, completed Nov 23, 2026, 4:15:39 PM
+[success] Total time: 4 s, completed Nov 23, 2026, 4:15:43 PM
+[success] Total time: 12 s, completed Nov 23, 2026, 4:15:55 PM
+[success] Total time: 1 s, completed Nov 23, 2026, 4:15:56 PM
+[success] Total time: 5 s, completed Nov 23, 2026, 4:16:01 PM
+[success] Total time: 2 s, completed Nov 23, 2026, 4:16:03 PM
+[success] Total time: 1 s, completed Nov 23, 2026, 4:16:04 PM
+[success] Total time: 0 s, completed Nov 23, 2026, 4:16:04 PM
+[info] markTestRun: core: production sources=32, test sources=36, passed=668
+[info] markTestRun: entityResolution: production sources=40, test sources=41, passed=464
+[info] markTestRun: hadoop: production sources=18, test sources=13, passed=85
+[info] markTestRun: rag: production sources=19, test sources=16, passed=141
+[info] markTestRun: root: production sources=0, test sources=0, passed=0
+[info] markTestRun: services: production sources=25, test sources=26, passed=182
+[info] markTestRun: sparkAnalytics: production sources=26, test sources=32, passed=263
+[info] markTestRun: storage: production sources=63, test sources=70, passed=806
+[info] markTestRun: tests: production sources=0, test sources=45, passed=273
+[info] markTestRun: wrote /Users/taufeeqpatel/Desktop/ScholarChain/.claude/.last-test-run (git_head=19c5b1ec6b3ce7f9e3678a12dae6fa8593799474, worktree=dirty, suites=241, passed=2882, skipped=1)
+[success] Total time: 485 s (0:08:05.0), completed Nov 23, 2026, 4:24:09 PM
+[success] Total time: 0 s, completed Nov 23, 2026, 4:24:09 PM
+[success] Total time: 0 s, completed Nov 23, 2026, 4:24:09 PM
+[success] Total time: 12 s, completed Nov 23, 2026, 4:24:21 PM

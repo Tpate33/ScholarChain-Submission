@@ -207,8 +207,7 @@ object ProductionMapping {
  *   `DynamoDbClientFactory` sharing the bundle's credentials provider and its explicit retry
  *   setting, CR-INT-07-3; tests: a stub). Required by query-jobs and evidence-explain.
  * @param apiKeys
- *   the client key digests (production: the AWS Secrets Manager-backed source of SV-INT-03b, NOT
- *   BUILT: the secretsmanager SDK module is not on the services classpath). Required.
+ *   client key digests from the lazy Secrets Manager-backed source. Required.
  * @param objects
  *   ordinary S3 reads (production: `StorageClients.objectReader`). Required by query-jobs.
  * @param graph
@@ -220,9 +219,9 @@ object ProductionMapping {
  *   Required by query-jobs.
  * @param workflow
  *   builds the Graph-RAG workflow over the composed runtime stores (production: rag
- *   `CollaborationWorkflow` with the production AnswerModel and query embedder, NOT BUILT; only
- *   non-production ones exist). Required by query-jobs. The stores it receives are bounded by the
- *   query-jobs read policy ([[WorkflowStoreBounds]], G4).
+ *   `CollaborationWorkflow` with the configured Bedrock AnswerModel and query embedder). Required
+ *   by query-jobs. The stores it receives are bounded by the query-jobs read policy
+ *   ([[WorkflowStoreBounds]], G4).
  */
 final case class ProductionDependencies(
     dynamoDb: Option[DynamoDbClientSettings => Either[String, DynamoDbCalls]] = None,
@@ -394,7 +393,10 @@ final class ProductionServiceProvider private (
               Some(st.ports)
             ),
             Some(st.settings),
-            Vector[AutoCloseable](bounds)
+            Vector[AutoCloseable](bounds) ++ (wf match {
+              case c: AutoCloseable => Vector(c)
+              case _ => Vector.empty
+            })
           )
         case ServiceKind.EvidenceExplain =>
           for {

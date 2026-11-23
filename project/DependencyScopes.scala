@@ -94,6 +94,9 @@ object DependencyScopes {
   /** The AWS SDK v2 service modules storage declares; services must receive each one. */
   val AwsModules: Seq[String] = Seq("dynamodb", "neptunedata", "s3", "s3vectors")
 
+  /** Concrete production authentication/model transports, declared by services only. */
+  val ServicesOnlyAwsModules: Seq[String] = Seq("secretsmanager", "bedrockruntime")
+
   /**
    * Native compression codec families (BE-P7-05, DU-P7-02): never on storage Compile or Runtime,
    * never on rag or services (classpath or packaging); on storage Test only snappy-java, exactly
@@ -558,7 +561,7 @@ object DependencyScopes {
       Required(HadoopOrg, "hadoop-client-api", pins.hadoop),
       Required(HadoopOrg, "hadoop-client-runtime", pins.hadoop)
     )
-    val aws = AwsModules.map(Required(AwsOrg, _, awsVersion))
+    val aws = (AwsModules ++ ServicesOnlyAwsModules).map(Required(AwsOrg, _, awsVersion))
     // BE-P7-06: the Spark-world test classpaths (sparkAnalytics Test and SparkIT, tests Test).
     val sparkWorld = Seq(
       "spark-test" -> in.sparkTest,
@@ -716,6 +719,7 @@ object DependencyScopes {
       jar(HadoopOrg, "hadoop-client-runtime", hadoop)
     )
     val sdk = AwsModules.map(jar(AwsOrg, _, aws)) :+ jar(AwsOrg, "sdk-core", aws)
+    val servicesSdk = sdk ++ ServicesOnlyAwsModules.map(jar(AwsOrg, _, aws))
     val ragSide = Seq(jar("com.lihaoyi", "upickle_3", "0.0.1"))
     val snappyLedger = jar(SnappyOrg, SnappyName, snappy)
     val snappyOld = jar(SnappyOrg, SnappyName, "0.0.1")
@@ -734,7 +738,7 @@ object DependencyScopes {
     }
     val sdkNetty = nettyJars(NettySdkModules, netty)
     val sparkNetty = nettyJars(NettySparkModules, netty)
-    val servicesPackaged = (sdk ++ sdkNetty).map(mapped)
+    val servicesPackaged = (servicesSdk ++ sdkNetty).map(mapped)
     val good = Inputs(
       storageSide ++ sdk,
       storageSide ++ sdk ++ sdkNetty,
@@ -742,7 +746,7 @@ object DependencyScopes {
       ragSide,
       ragSide,
       ragSide,
-      sdk ++ sdkNetty,
+      servicesSdk ++ sdkNetty,
       servicesPackaged,
       servicesPackaged.map(m => m.copy(destination = "/opt/docker/" + m.destination)),
       hadoopRuntime = ragSide,
@@ -827,6 +831,18 @@ object DependencyScopes {
         "s3vectors missing from services runtime",
         "services-runtime-aws-sdk",
         good.copy(servicesRuntime = good.servicesRuntime.filterNot(_.name == "s3vectors"))
+      ),
+      (
+        "secretsmanager missing from services runtime",
+        "services-runtime-aws-sdk",
+        good.copy(servicesRuntime = good.servicesRuntime.filterNot(_.name == "secretsmanager"))
+      ),
+      (
+        "bedrockruntime missing from services packaging",
+        "services-universal-aws-sdk",
+        good.copy(servicesUniversal =
+          good.servicesUniversal.filterNot(_.destination.contains("bedrockruntime"))
+        )
       ),
       (
         "neptunedata missing from services packaging",

@@ -1,0 +1,47 @@
+{
+  "baseCommit": "19c5b1ec6b3ce7f9e3678a12dae6fa8593799474",
+  "scope": "Implementation and test bytes for final local validation; review used supplied snapshots, not a complete line-by-line audit.",
+  "sha256": {
+    "build.sbt": "f6d6ce10b070d374a46022f90004c057b1918951f91d06cc41eca1a53a719510",
+    "modules/core/src/main/scala/scholarchain/core/config/AdapterConfig.scala": "87021758e2a7219f546b94d37c7af6235c1424fdd7ff14be77075c66e4e4341c",
+    "modules/core/src/main/scala/scholarchain/core/config/ConfigLoader.scala": "ab0bcb149c3928995ae6e7056b27bfb4bb2d66393c20a975681536081a720fde",
+    "modules/core/src/main/scala/scholarchain/core/config/ProductionConfig.scala": "75f25e57b2ea41dd5b1e1aa55db15cb52e198e8baae3681f29686746b2cb84aa",
+    "modules/core/src/main/scala/scholarchain/core/config/ProductionLoadConfig.scala": "ad5af3440562ae394cdf0a308f2d6398854e69e503803cecfb3caec5688f071f",
+    "modules/core/src/main/scala/scholarchain/core/config/ProductionWorkflowConfig.scala": "949723d18883f453547fb0842c26dded810c5e50122da698841556811c3c79a2",
+    "modules/core/src/main/scala/scholarchain/core/config/ScholarChainConfig.scala": "0243d7fdb1cdfcbe12ba61f061598c6a912e3770a7f3c17018f2d2bb8ed937b7",
+    "modules/core/src/test/resources/fixtures/production-load.conf": "1062d2b77fb927870c279f7dab9000ad8fdd307f2f1148ebc0c2dc7b951981ae",
+    "modules/core/src/test/resources/fixtures/production-workflow.conf": "2dcb12f4bc5c7eddac75cb1c1c055c5841782ff9a8858de49140fc5e39f48d3c",
+    "modules/core/src/test/scala/scholarchain/core/config/AdapterConfigSuite.scala": "51e639ecd45629c9a2e2d03fed3cdedfce7402faad040160edce9919e768db44",
+    "modules/core/src/test/scala/scholarchain/core/config/ProductionLoadConfigSuite.scala": "71ad5026b1124b5875f57b7b2fa891a557a997875c47d9d1fd04c0e486edb033",
+    "modules/core/src/test/scala/scholarchain/core/config/ProductionWorkflowConfigSuite.scala": "e96d100318ef35760ee65d22163bb2a7ba8024b9a64dba0fdf691404403b3dbc",
+    "modules/services/src/main/scala/scholarchain/services/Auth.scala": "061d89fc313f0e2a93ede003023edbe61b5ee57479ed03304a1f512915a8b782",
+    "modules/services/src/main/scala/scholarchain/services/BedrockModels.scala": "3aaf56f4f678dfdfdf3eba2c0ed4a9b8a6fce2546b81ce2edda717b54ae88f20",
+    "modules/services/src/main/scala/scholarchain/services/ProductionComposition.scala": "be0156ba0c3d8f463fd9c1077c675098e133dea0dc1361c84e0acec653bda4ba",
+    "modules/services/src/main/scala/scholarchain/services/ProductionLauncher.scala": "d9a00d6f9eb8754a714cdf7f9752909914102208dde9aaf08a9a5ce8eedaba4e",
+    "modules/services/src/main/scala/scholarchain/services/ProductionLoad.scala": "9365a355c83e79a85983efa37b53d1a6d3477b46ba0d233c40cd77bf3118f3be",
+    "modules/services/src/main/scala/scholarchain/services/ProductionLoadMain.scala": "8c828a5eb4e5b1206c844c413a5022c02a8148293c5d91e91a0e02eda6541d3d",
+    "modules/services/src/main/scala/scholarchain/services/ProductionWorkflow.scala": "8acd35e6c77f58310b8fad7eb957d42a1d7e21b7fa73d30aec4ebb43588a4355",
+    "modules/services/src/main/scala/scholarchain/services/SecretsManagerKeys.scala": "f044d088f0dafac0ab2f2df039a5355c0bb6d8cf62e40de4daf28061e22386e0",
+    "modules/services/src/test/scala/scholarchain/services/ProductionLauncherSuite.scala": "29710fe910d0fae7bf95bb9ab56fa5addad2fbefb4b48fb2c535201fcb4ad498",
+    "modules/services/src/test/scala/scholarchain/services/ProductionLoadSuite.scala": "f6b5e311fc207890282ed4251ec6b8936ad699f2dc2a7d8759ba0c31e01d02e5",
+    "modules/services/src/test/scala/scholarchain/services/ProductionModelsSuite.scala": "118eaf6e12fe3ed624a958c1f3ddb8e96940f4d182021b8bc152bbf78bf694c7",
+    "modules/storage/src/main/scala/scholarchain/storage/aws/StorageClients.scala": "607e61b567ccb28630c46aca5df047723b480c4c6d153223cdc512572244b3d6",
+    "modules/storage/src/main/scala/scholarchain/storage/aws/neptune/NeptuneGraphWriter.scala": "88641dd95e98263773c6834d4ad7b748101901055419f6f87f89613e7ec9a0ef",
+    "modules/storage/src/main/scala/scholarchain/storage/aws/s3/S3ObjectStore.scala": "1e4e3adb798caec795e8abdf456ec5172a409af529ef228f354e8441f13faa19",
+    "modules/storage/src/main/scala/scholarchain/storage/aws/s3vectors/S3VectorsStore.scala": "a34b9bfd3ae9727e3051d53915bfafa2f7935643e1a7c93251e9bf35da933eba",
+    "modules/storage/src/test/scala/scholarchain/storage/aws/neptune/NeptuneGraphWriterSuite.scala": "27b4ac87804969d5be48ebac6561a2059fe8b197578b815a7faa55c451a2e14e",
+    "modules/storage/src/test/scala/scholarchain/storage/aws/s3/S3ObjectStoreSuite.scala": "dd92853c659ff4c0e98e1064787b547ce390fecb8a8afd1de1b2199d6e314c1b",
+    "modules/storage/src/test/scala/scholarchain/storage/aws/s3vectors/S3VectorsStoreSuite.scala": "1994fcb01c75e4515ccf3c1fd8558d56d1addd6b1c4254aa2ce0f7d23e410811",
+    "project/DependencyScopes.scala": "d248c1dcd1f37e5ba8899ad7c8acbcef065e563f622cc7a1b9420762a1421189",
+    "tests/src/test/resources/production-connections/launcher.conf": "11daa0fee4fa757fde7132ccea3140cd851e31f4153812f42f98d275fb0acdd1",
+    "tests/src/test/scala/scholarchain/tests/services/ProductionOpeningLoadSuite.scala": "bd992c3241231675f2c8cf6b4ed2b7869d06bb9d40eb8e286d16ae3361f663d9"
+  },
+  "closeoutFormattingOnly": {
+    "operation": "Remove extra blank lines at EOF; configuration values unchanged",
+    "testedSha256": {
+      "modules/core/src/test/resources/fixtures/production-load.conf": "7700baf51cca2561f463fc541c8913c2073a39f9ca03e6658053b77dc2fe2d4b",
+      "modules/core/src/test/resources/fixtures/production-workflow.conf": "2d2a17983f1fd7fd3f22652dcd38ee23b14ae9f5657f7c093d61049556d02030",
+      "tests/src/test/resources/production-connections/launcher.conf": "c162079651880a1c8349a03269efd9e1faa63337bcb258ca8fddfc774fd6d9f6"
+    }
+  }
+}

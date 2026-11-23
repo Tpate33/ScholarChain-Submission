@@ -47,7 +47,8 @@ object ApiClient {
 
 /**
  * The port that supplies the configured clients and their key digests. Production source: an AWS
- * Secrets Manager secret referenced by ARN (deferred; no AWS call in Phase 10). Tests use a fake.
+ * Secrets Manager digest document referenced by ARN or name ([[SecretsManagerKeys]]). Tests use an
+ * injected source and never retrieve a real secret.
  */
 trait ApiKeyDigestSource {
   def clients(): Either[String, Vector[ApiClient]]

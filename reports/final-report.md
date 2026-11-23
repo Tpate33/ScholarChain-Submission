@@ -9,6 +9,10 @@ API demonstration now loads verified, real DBLP-derived Phase 6 dev outputs into
 in-memory stores and uses a template answer synthesizer and hashed-token stand-in
 embeddings. The older synthetic fixture profile is preserved. Neither profile is a
 deployed graph-plus-vector RAG application or a real-model evaluation.
+Subsequent local preparation adds concrete AWS loading/model/key-source connections
+and an operational loader around the existing `OpeningLoad`. Its offline tests do
+not establish live deployment; current evidence and pending gates are tracked in
+the [production preparation record](../docs/agent-runs/production-connections-01/status.md).
 See the [deliverable index](../docs/deliverable-index.md) for unmet requirements and
 [verification record](../docs/verification.md) for current command results.
 
@@ -68,7 +72,9 @@ the implementation nor independently executed tests.
 
 Historical phase folders record prompts, repairs, reviews and acceptance decisions.
 Integration 01 was accepted for local scope, with cloud and production residuals
-explicitly retained. Integration 02 has not received final human acceptance. A stale
+explicitly retained. Integration 02 was accepted as a local checkpoint against
+implementation `1079eac`, recorded in acceptance commit `19c5b1e`. The subsequent
+production connections remain unaccepted and uncommitted. A stale
 Claude test marker caused repeated stop-hook refusals during handoff; repeating the
 same refusal did not add verification. Actual check output, rather than a manually
 edited marker, is the basis for the current verification record.
@@ -105,7 +111,11 @@ Storage ports separate application logic from AWS adapters. S3 holds objects and
 provenance artifacts, Neptune is the intended graph store, and DynamoDB is intended
 for durable operational state. Integration 01 added AWS adapters and durable state
 contracts with local tests. Live store loads and their production behavior remain
-unverified. The demo instantiates in-memory implementations and loses state on exit.
+unverified. Subsequent preparation adds concrete loader-only S3 conditional writes,
+Neptune parameterized graph writes and S3 Vectors Get/compare/Put. The latter requires
+one externally serialized loader because its writes are not conditional across
+processes. The existing demo still instantiates in-memory implementations and loses
+state on exit.
 
 ## 11. S3 Vectors and optional search
 
@@ -123,8 +133,10 @@ The collaboration workflow coordinates typed planning, identity resolution, grap
 retrieval, evidence construction, synthesis and claim verification. Keeping numbers
 and paths in typed evidence allows verification before returning claims. In the demo,
 `NonProductionTemplateSynthesizer` formats the response: it is not an LLM. Production
-answer and embedding providers remain missing and must not silently fall back to
-these implementations.
+composition now has concrete Bedrock Converse answer and Titan Text Embeddings V2
+adapters, with typed model/version/dimension and request bounds. They are tested
+with injected SDK responses, not real provider output. Missing production settings
+fail closed; neither demo implementation is a production fallback.
 
 ## 13. Services and API
 
@@ -194,6 +206,30 @@ Neither check measures learned retrieval relevance, LLM factuality, real-corpus
 coverage or deployed performance. Historical and current results are separated in
 [the evaluation record](../docs/evaluation.md).
 
+After that accepted checkpoint, owners reported focused offline production-connection
+results: 11 storage writer tests, 23 workflow/load/adapter configuration tests,
+42 existing configuration regressions, a subsequent five-test producer-config run,
+and 18 services tests passed. These separate runs are not a repository-wide total.
+A cross-module test passed using the accepted DBLP artifacts, existing `OpeningLoad`,
+simulated Bedrock responses and in-memory stores, verifying three claims, citation
+support, audit persistence and exactly-once model closure. No provider call was made.
+The operational loader separately reads the archived producer config (at most
+64 KiB, no ambient overrides) to preserve its digest while runtime models/resources
+change. This repairs the verified production-review digest finding. Independent
+source-snapshot review approved the local checkpoint after the verified major digest
+finding was closed; no major/critical finding remains open in that scope. It did
+not constitute a full line-by-line audit. The coordinator then observed
+`sbt check productionLoadClasspath pipelineDemoClasspath services/stage` pass:
+**2,882 tests passed, zero failures/errors, one skipped, 241 suites**. The check
+completed at 4:24:09 PM CST on November 23, with the normal marker task
+(`markTestRun`: 485 seconds); both classpath tasks succeeded and staging completed
+at 4:24:21 PM.
+See the [production test report](../docs/agent-runs/production-connections-01/test-report.md)
+and [preparation record](../docs/agent-runs/production-connections-01/status.md).
+The loader classpath task has been built; no standalone CLI replay is claimed.
+The 2,851-test result above belongs to Integration Round 02, not the new uncommitted
+production changes.
+
 ## 19. Factory evaluation
 
 The phase evidence provides an audit trail of repair and human acceptance. The
@@ -201,8 +237,11 @@ handoff preserved partial work and identified missing production pieces. Budget
 exhaustion, long sessions and repeated stop-hook refusals increased coordination
 cost. This report supplies no fabricated token total or productivity comparison.
 Independent Integration 02 closeout reviewers approved the local scopes after one
-major cleanup repair. Human checkpoint acceptance and the student explanation/demo
-remain pending; this is not production-readiness approval.
+major cleanup repair. The student recorded
+[local checkpoint acceptance](../docs/agent-runs/integration-02/human-gate.md)
+against implementation commit `1079eac`; acceptance commit `19c5b1e` was pushed.
+The student explanation/demo remains pending; this is not production-readiness
+approval or acceptance of subsequent production changes.
 
 ## 20. Cost analysis
 
@@ -236,10 +275,17 @@ acceptance and production verification remain outstanding.
 ## 23. Limitations and unfinished requirements
 
 The required deployed end-to-end real-data system is incomplete. Missing items
-include live Neptune/DynamoDB/S3 Vectors verification, real model providers, Secrets
-Manager API-key loading, runtime IaC/deployment, measured elasticity, a clean-checkout
+include live Neptune/DynamoDB/S3 Vectors loading/query verification, live model and
+Secrets Manager validation, runtime IaC/deployment, measured elasticity, a clean-checkout
 bounded run and video. Corpus-scale requirements and instructor-approved deviations
-are not established. The synthetic demo must not be described as an approved
+are not established for this project individually. The student reports published
+reduced-scale course guidance for classmates (10K/50K works, up to 10K real vectors,
+small elasticity experiments, and quota-related provider alternatives); no paid
+execution or provider change follows from this local preparation. A concrete run
+proposal must account for historical and proposed spending before credits against
+the recommended cumulative $25 ceiling, including total vectors and provider
+requests across all five indexes rather than assuming work and vector counts are
+equal. The synthetic demo must not be described as an approved
 substitute or as satisfaction of all minimum course acceptance criteria.
 
 ## 24. Lessons and contributions
@@ -266,6 +312,9 @@ Ctrl-C. This demo creates no cloud resources. Historical Phase A cleanup succeed
 on November 19; base resources, buckets and logs were retained and have not been
 re-inventoried. Do not delete them without a reviewed approved plan. Before submitting,
 the student must review the report, record the video, obtain remaining required
-evidence or explicitly disclose gaps, approve a final commit/tag and verify instructor
-access to the private repository. No final submission tag or video link exists in
-this working state.
+evidence or explicitly disclose gaps, and approve the final Git checkpoint.
+The professor's updated requirement, as supplied by the student, is a **public,
+anonymously cloneable repository**. Actual visibility and anonymous cloneability
+have not been independently verified here. The student must submit its URL through
+the designated Microsoft Teams assignment before **November 25, 2026, 11 PM CST**.
+No final submission tag or video link exists in this working state.

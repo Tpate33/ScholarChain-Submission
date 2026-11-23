@@ -67,7 +67,8 @@ enum ValueKind {
     OptionalLong,
     // DE-INT-01 production kinds: parsed by type only; the bound of each key is
     // [[ProductionKeys]] data. Their error reasons never contain the value.
-    OptionalInt32, OptionalInt64, OptionalBoolean, OptionalString, OptionalTokenList,
+    OptionalInt32, OptionalInt64, OptionalDouble, OptionalBoolean, OptionalString,
+    OptionalTokenList,
     OptionalWindow
 
   /** Optional kinds may be unset (absent, `null`, or an empty environment value). */
@@ -77,7 +78,7 @@ enum ValueKind {
 
   /** The DE-INT-01 production kinds. */
   def production: Boolean =
-    this == OptionalInt32 || this == OptionalInt64 || this == OptionalBoolean ||
+    this == OptionalInt32 || this == OptionalInt64 || this == OptionalDouble || this == OptionalBoolean ||
       this == OptionalString || this == OptionalTokenList || this == OptionalWindow
 }
 
@@ -492,6 +493,12 @@ object ConfigLoader {
       raw.toLongOption
         .map(l => Raw.Num(BigDecimal(l), integral = true))
         .toRight("expected a 64-bit integer")
+    case ValueKind.OptionalDouble =>
+      scala.util
+        .Try(BigDecimal(raw))
+        .toOption
+        .map(n => Raw.Num(n, integral = false))
+        .toRight("expected a finite decimal number")
     case ValueKind.OptionalBoolean =>
       raw match {
         case "true" => Right(Raw.Bool(true))
@@ -676,6 +683,9 @@ object ConfigLoader {
             case (ValueKind.OptionalInt32, _) => Left("expected a 32-bit integer literal")
             case (ValueKind.OptionalInt64, Raw.Num(n, true)) if n.isValidLong => Right(n.toLong)
             case (ValueKind.OptionalInt64, _) => Left("expected a 64-bit integer literal")
+            case (ValueKind.OptionalDouble, Raw.Num(n, _)) if n.toDouble.isFinite =>
+              Right(n.toDouble)
+            case (ValueKind.OptionalDouble, _) => Left("expected a finite decimal number")
             case (ValueKind.OptionalBoolean, Raw.Bool(b)) => Right(b)
             case (ValueKind.OptionalBoolean, _) => Left("expected true or false")
             case (ValueKind.OptionalString, Raw.Str(s)) => Right(s)
@@ -776,7 +786,9 @@ object ConfigLoader {
       services = services,
       s3 = s3,
       neptune = neptune,
-      s3Vectors = s3Vectors
+      s3Vectors = s3Vectors,
+      productionWorkflow = ProductionWorkflowKeys.build(productionValues),
+      productionLoad = ProductionLoadKeys.build(productionValues)
     )
     // Cross-key rules (reject < llmBandLower < llmBandUpper < accept; grouping policy differs
     // from the match policy; the two run roots are disjoint; the analysis export format is a
