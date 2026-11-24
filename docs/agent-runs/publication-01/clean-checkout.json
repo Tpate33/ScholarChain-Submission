@@ -1,0 +1,86 @@
+{
+  "verifiedSourceCommit": "69d63538a57914f471eb199380e07570182a491f",
+  "cloneKind": "independent fresh local clone; not an anonymous GitHub clone",
+  "gate": {
+    "command": "sbt -Dsbt.offline=true check pipelineDemoClasspath",
+    "exitCode": 0,
+    "suites": 243,
+    "passed": 2886,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 4,
+    "checkSeconds": 472,
+    "worktree": "clean",
+    "logSha256": "05324b18fa3748877e437d77876064e568d1701dec03fc397f8c8479d9f1bf1b"
+  },
+  "skipNotes": [
+    "DecisionExportSuite generated Hadoop curated-a sample probe",
+    "GroupingExportSuite generated Hadoop curated-a sample probe",
+    "SampleQueueProbeSuite generated Hadoop curated-a sample probe",
+    "Existing semantic-neighbours smoke case"
+  ],
+  "httpReplay": {
+    "result": "PASS",
+    "profile": "pipeline-demo; DBLP-DERIVED; NON-PRODUCTION",
+    "analysisRunId": "run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40",
+    "limitations": [
+      "in-memory stores",
+      "template answer model",
+      "hashed-token stand-in embeddings",
+      "bounded dev sample, not full corpus or cloud deployment"
+    ],
+    "checks": [
+      {
+        "check": "health",
+        "httpStatus": 200
+      },
+      {
+        "check": "query",
+        "httpStatus": 200
+      },
+      {
+        "check": "graph",
+        "httpStatus": 200
+      },
+      {
+        "check": "evidence",
+        "httpStatus": 200
+      },
+      {
+        "check": "explain",
+        "httpStatus": 200
+      },
+      {
+        "check": "replay",
+        "httpStatus": 200
+      },
+      {
+        "check": "unauthorized",
+        "httpStatus": 401
+      }
+    ],
+    "queryId": "query:031ddaa09ac31821dd4b64572852e344"
+  },
+  "agentValidation": {
+    "command": ".claude/hooks/validate-agent-files.sh --probes",
+    "exitCode": 1,
+    "inertTableProbesPassed": 888,
+    "fixtureProbesPassed": 51,
+    "shellcheckVersion": "0.11.0",
+    "shellcheckFailingScripts": 5,
+    "diagnosticCodes": [
+      "SC2154",
+      "SC2034"
+    ],
+    "classification": "pre-existing static source-search/exported-global lint debt; no runtime initialization defect verified; hooks unchanged",
+    "logSha256": "577de139bbedc98198e89813f59c1e4ccbceb7a4e4ef1a0998342d328a7f568d",
+    "lintLogSha256": "61eb023154f5521ba9b9820926a8e6e907956a4aa04e43d492bdd921fa75c8d3"
+  },
+  "limitations": [
+    "No private held-out labels accessed",
+    "No AWS or paid model calls",
+    "No Docker verification or new container environment",
+    "No model-backed generation replay",
+    "Anonymous GitHub clone pending explicit publication approval"
+  ]
+}

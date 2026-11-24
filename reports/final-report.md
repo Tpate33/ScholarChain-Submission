@@ -17,7 +17,11 @@ See the [deliverable index](../docs/deliverable-index.md) for unmet requirements
 [verification record](../docs/verification.md) for current command results.
 This sanitized publication candidate is unpublished and has not received new human
 acceptance. [Publication notes](../docs/publication.md) distinguish original accepted
-commits from derived history, unchanged demo fixtures and pending clean-clone gates.
+commits from derived history, unchanged demo fixtures and candidate verification.
+A fresh local clone of candidate Q `69d63538` passed 2,886 tests, zero failures/errors,
+four skips, 243 suites and all seven HTTP smoke checks. The full agent validator
+exited 1 despite 939 passing behavior probes because ShellCheck flagged unchanged
+hooks; see publication notes for exact limits. Anonymous public cloning is unverified.
 
 ## 1. Problem and motivation
 
@@ -237,8 +241,9 @@ to production connections. Subsequent original-history offline preparation recor
 **2,889 passed, zero failures/errors, one skipped, 243 suites**. That gate ran on the
 source candidate before its original commit, not a fresh sanitized clone. See the
 [offline test report](../docs/agent-runs/aws-plan-01/test-report.md) and
-[historical acceptance](../docs/agent-runs/aws-plan-01/human-gate.md). No new candidate
-full-gate or standalone replay result is claimed here. Portable packaging and private
+[historical acceptance](../docs/agent-runs/aws-plan-01/human-gate.md). The later Q
+fresh-local-clone gate and HTTP replay are separately recorded in publication notes;
+three generated-state ER probes additionally skip there. Portable packaging and private
 runtime infrastructure were prepared offline. A zero-byte `libjvm.so` in the Java
 base still blocks healthy container verification; further Docker recovery is deferred.
 
@@ -288,8 +293,8 @@ acceptance and production verification remain outstanding.
 
 The required deployed end-to-end real-data system is incomplete. Missing items
 include live Neptune/DynamoDB/S3 Vectors loading/query verification, live model and
-Secrets Manager validation, live runtime IaC application/deployment, measured elasticity, a clean-checkout
-bounded run and video. Corpus-scale requirements and instructor-approved deviations
+Secrets Manager validation, live runtime IaC application/deployment, measured elasticity,
+a full bounded producer-pipeline replay, anonymous public-clone verification and video. Corpus-scale requirements and instructor-approved deviations
 are not established for this project individually. The student reports published
 reduced-scale course guidance for classmates (10K/50K works, up to 10K real vectors,
 small elasticity experiments, and quota-related provider alternatives); no paid

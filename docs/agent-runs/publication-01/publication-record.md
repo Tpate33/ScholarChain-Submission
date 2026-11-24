@@ -36,6 +36,14 @@ committer identities, timestamps and messages were preserved. All four originall
 signed commits were unchanged; no inherited signature was attached to a rewritten
 commit. No new signing or acceptance is claimed.
 
+An additional source-to-candidate completeness check confirmed **1,100** required
+application/build/configuration/dataset/factory artifacts retain their exact
+original blob IDs, including all **18 role definitions** and **five project
+commands**. The only original tracked path omitted is the held-out review queue
+named above; no other source, configuration or grading-document path was dropped.
+The exact original human evaluation evidence remains private rather than being
+represented by the redacted public derivative.
+
 The derivative was constructed in a fresh Git object database: all 3,161 initial
 objects were reachable from its sole main ref, with no original refs, reflogs,
 alternates, queue payload or original constraining document blob. There are no
@@ -84,8 +92,48 @@ provenance do not prove absence of every possible secret or hidden payload.
 
 The original source checkpoint's existing gate passed 2,889 tests, zero
 failures/errors, one skipped, 243 suites. That is not yet evidence of a clean clone
-of this derivative. Candidate clean-clone validation and independent final privacy
-review are pending and will be recorded separately before publication approval.
+of this derivative. An independent fresh local clone of commit
+`69d63538a57914f471eb199380e07570182a491f` then ran
+`sbt -Dsbt.offline=true check pipelineDemoClasspath`: **exit 0, 2,886 passed,
+zero failures/errors, four skipped, 243 suites**, 472 seconds. The legitimate
+marker recorded that commit and a clean worktree. All 64 dependency checks and
+four relocated worker CLI probes passed. The subsequent DBLP HTTP replay passed
+all seven checks. No source, fixture or application configuration was changed.
+
+The difference from the original 2,889/one-skip gate is three unchanged ER sample
+probes requiring a completed generated Hadoop `curated-a` output under `target/`,
+which is absent in a fresh clone: `DecisionExportSuite`, `GroupingExportSuite`,
+and `SampleQueueProbeSuite`. Their source explicitly skips absent/incomplete
+generated output. These are not missing private labels or withheld queue inputs.
+The fourth skip is the existing semantic-neighbours smoke case.
+
+The agent validator's **888 inert table probes and 51 fixture probes passed**,
+but the full validator **exited 1**: ShellCheck 0.11.0 flagged five unchanged hook
+scripts. Factory-owner read-only review verified their imported globals are
+initialized before use; no runtime initialization defect was established. The
+validator lacks a script-relative ShellCheck source path, and two library globals
+are intentionally consumed by callers. Diagnostic-only `-P SCRIPTDIR` resolved
+caller warnings; standalone returned-global warnings remain. No hook was edited
+or warning silently waived. Full agent validation is therefore not fully green.
+Any candidate-only constitutional correction needs explicit human ratification.
+
+[clean-checkout.json](clean-checkout.json) records the actual counts, skip scope,
+HTTP result, validator exit and log digests. Later attestation/documentation-only
+commits must be checked for identical application/build/test/configuration blobs;
+these results belong to the verified source commit, not a second full-suite run
+or an anonymous GitHub clone. No full suite was repeated for evidence-only edits.
+
+Independent release review of documentation/evidence commit
+`69d63538a57914f471eb199380e07570182a491f` returned **PASS within the declared
+scope**. It inspected 71 commit metadata objects and 1,768 permitted historical
+blobs, keeping 189 protected blobs excluded. It found no verified credentials,
+private keys, provider tokens, signed URLs or surviving reconstruction constraints.
+The removed queue and original constraining document blob were absent from the
+entire object database; all 3,177 objects were reachable from the sole main ref.
+The four broad semantic matches were methodology, synthetic examples or explicitly
+unevaluated reports. Accepted gzip and the completed Parquet inspections apply to
+unchanged binary objects. This is an independent scoped review, not a universal
+privacy guarantee and not a human publication decision.
 
 Nonsecret historical AWS account/resource identifiers, local paths and required
 student identity remain inherited disclosures; they are not credentials. Public
@@ -98,3 +146,9 @@ be claimed before an explicitly approved independent public repository exists.
 Final timely tag/SHA, video link, and Microsoft Teams submission receipt remain
 outstanding. The professor's deadline is November 25, 2026, 11 PM America/Chicago.
 Do not make the original repository public or force-push its history as a shortcut.
+
+[publication-steps.md](publication-steps.md) contains exact future human commands
+for an empty, independent public repository, a single approved main/tag push and
+an environment-isolated anonymous clone. The proposed name is
+`Tpate33/ScholarChain-Submission`, subject to availability and explicit human
+approval. It must not be a fork or visibility change of the private original.

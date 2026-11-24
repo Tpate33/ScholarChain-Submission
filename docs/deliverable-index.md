@@ -24,7 +24,7 @@ Author: Taufeeq Patel, tpate33@uic.edu. Deadline: November 25, 2026, 11 PM CST.
 Outstanding graded requirements include successful cloud processing, live store loads,
 live embedding/answer model validation, required corpus size or instructor-approved deviation,
 live runtime IaC application/deployment, elasticity experiments, final course acceptance,
-clean-checkout verification, video, and release acceptance. No instructor waiver is
+anonymous public-clone verification, full bounded producer replay, video, and release acceptance. No instructor waiver is
 claimed. Local fixtures must not be presented as an approved substitute.
 
 Local preparation and remaining deployment connections: [cloud preparation](cloud-preparation.md).
@@ -37,5 +37,10 @@ its original commits remain historical provenance, not acceptance of rewritten h
 Production connections subsequently recorded 2,882 tests; accepted offline preparation
 recorded 2,889 tests, zero failures/errors, one skipped, 243 suites. Container JVM
 verification remains blocked. [Publication notes](publication.md) track the unpublished
-sanitized candidate, commit-map interpretation, clean-clone plan and pending submission
-gates; no new candidate gate, public repository, final tag or Teams receipt is claimed.
+sanitized candidate, commit-map interpretation and pending submission gates. A fresh
+local Q clone passed 2,886 tests, zero failures/errors, four skips, 243 suites and seven
+HTTP smoke checks. Three ER skips require generated curated-a state; the existing
+semantic-neighbor skip remains. All 939 behavior probes passed, but the full agent
+validator exited 1 on unchanged-hook ShellCheck findings. Publication security review
+approved its scoped Q assessment. No public repository, anonymous public clone, final
+tag or Teams receipt is claimed.

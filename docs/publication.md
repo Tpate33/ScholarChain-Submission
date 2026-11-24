@@ -37,9 +37,39 @@ reads are part of reproduction.
 Original-history verification progressed through Integration 02 (2,851 tests),
 production connections (2,882) and offline AWS preparation (**2,889 passed, zero
 failures/errors, one skipped, 243 suites**). These historical gates and scoped reviews
-are archived, not new sanitized clean-clone results. The candidate gate/replay is
-pending until observed evidence is recorded. The existing semantic-neighbor skip
-remains. No successful AWS run, live store/model validation or elasticity result is
+are archived, not new sanitized clean-clone results.
+
+A fresh local clone of candidate **Q `69d63538`** subsequently passed
+`sbt -Dsbt.offline=true check pipelineDemoClasspath`: **2,886 passed, zero
+failures/errors, four skipped, 243 suites**, exit 0, 472 seconds. Four worker CLI
+relocation checks and 64 dependency-fence checks passed. All seven HTTP smoke checks
+passed (six HTTP 200 responses and the expected unauthenticated 401). This used the
+existing dependency cache and unchanged committed dev fixtures; it is not anonymous
+public-clone evidence or a cold dependency-bootstrap result.
+
+The three additional skips are `DecisionExportSuite`, `GroupingExportSuite` and
+`SampleQueueProbeSuite`, which need generated
+`modules/hadoop/target/test-work/local-pipeline/curated-a` output absent from a fresh
+clone. The fourth is the existing semantic-neighbor skip. No tests were weakened and
+no private labels were read. The original 2,889/one-skip result remains historical.
+
+All **939 agent-behavior probes** passed (888 table and 51 fixture probes), but the
+**complete validator exited 1**, not PASS: ShellCheck 0.11.0 reported SC2154 imported
+globals and SC2034 cross-file assignments in five unchanged hook files. Factory-owner
+read-only classification is complete: all 11 hook blobs match original `e08aa09`;
+globals are initialized before use. SC2154 reflects missing ShellCheck source-path
+context; SC2034 flags library assignments consumed by callers. Diagnostic-only
+`-P SCRIPTDIR` resolves caller warnings; two standalone assignment warnings need
+scoped annotations. No runtime bug or security regression was verified. This is a
+known static-lint limitation: the full validator still exits 1. Any hook correction
+requires human ratification; no hook edits were made. Independent
+publication security review approved Q within its recorded scope; it is not a new
+application-wide review or a universal privacy guarantee. See the
+[publication record](agent-runs/publication-01/publication-record.md) for exact evidence.
+Later documentation-only attestations do not establish a new human acceptance or
+require repeating the unchanged application gate.
+
+No successful AWS run, live store/model validation or elasticity result is
 established. Container application verification is blocked by zero-byte `libjvm.so`
 in the Java base; Docker recovery/new environments remain deferred.
 
@@ -65,7 +95,8 @@ sbt check pipelineDemoClasspath
 python3 scripts/pipeline-demo-smoke.py --output target/clone-evidence
 ```
 
-These are planned commands, not claimed candidate results. Do not add `sbt clean` to
+The commands above are reproduction instructions; the actual Q gate used the offline
+flag and populated cache as recorded above. Do not add `sbt clean` to
 an already fresh clone. The smoke owns/stops its loopback JVM and checks health,
 query, graph, citation, explain, replay and missing-key authentication. It expects
 three coauthors of Ailing Zeng supported by `work:dblp:conf/aaai/ZengCZ023` and the

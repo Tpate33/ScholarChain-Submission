@@ -19,8 +19,12 @@ concurrent builds in the same checkout. Preserve target evidence before cleaning
 
 ## Sanitized candidate reproduction
 
-Follow [publication notes](publication.md) for a fresh candidate clone. No new
-clean-clone gate is claimed yet. Existing committed DBLP demo fixtures remain
+Follow [publication notes](publication.md) for a fresh candidate clone. A fresh local
+clone of Q `69d63538` passed the offline gate (2,886 tests, zero failures/errors, four
+skips, 243 suites) and seven HTTP smoke checks. The extra three ER skips require
+generated curated-a state. All 939 behavior probes passed, but full agent validation
+exited 1 on unchanged-hook ShellCheck findings; do not report the validator as PASS.
+Anonymous public cloning remains unverified. Existing committed DBLP demo fixtures remain
 bit-identical; do not copy an old `target/` directory. Historical ER/Spark runs
 require separately prepared dev inputs because rewritten ancestors do not satisfy
 their original identity pins. Never substitute held-out inputs or relabel old outputs.
