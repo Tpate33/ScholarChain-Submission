@@ -65,7 +65,7 @@ for h in .claude/hooks/*.sh; do
   [ -e "$h" ] || continue
   if bash -n "$h" 2>/dev/null; then pass "bash -n $h"; else fail "bash -n $h: $(bash -n "$h" 2>&1 | head -1)"; fi
   if command -v shellcheck >/dev/null 2>&1; then
-    if shellcheck -x -S warning "$h" >/dev/null 2>&1; then pass "shellcheck $h"; else fail "shellcheck $h"; fi
+    if shellcheck -x -S warning -P SCRIPTDIR "$h" >/dev/null 2>&1; then pass "shellcheck $h"; else fail "shellcheck $h"; fi
   fi
 done
 command -v shellcheck >/dev/null 2>&1 || echo "NOTE  shellcheck not installed; skipped (bash -n still enforced)"

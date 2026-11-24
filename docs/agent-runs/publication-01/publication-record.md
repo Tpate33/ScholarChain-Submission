@@ -36,10 +36,14 @@ committer identities, timestamps and messages were preserved. All four originall
 signed commits were unchanged; no inherited signature was attached to a rewritten
 commit. No new signing or acceptance is claimed.
 
-An additional source-to-candidate completeness check confirmed **1,100** required
-application/build/configuration/dataset/factory artifacts retain their exact
-original blob IDs, including all **18 role definitions** and **five project
-commands**. The only original tracked path omitted is the held-out review queue
+Before the later human-approved lint amendment, a source-to-candidate completeness
+check confirmed **1,100** required application/build/configuration/dataset/factory
+artifacts retained their exact original blob IDs, including all **18 role
+definitions** and **five project commands**. The lint amendment changes only two
+factory hooks: **1,098** of those artifacts remain byte-identical, with the two
+explicitly approved exceptions recorded below. All application code, build/test
+code, configuration, datasets and producer manifests remain unchanged. The only
+original tracked path omitted is the held-out review queue
 named above; no other source, configuration or grading-document path was dropped.
 The exact original human evaluation evidence remains private rather than being
 represented by the redacted public derivative.
@@ -107,15 +111,42 @@ and `SampleQueueProbeSuite`. Their source explicitly skips absent/incomplete
 generated output. These are not missing private labels or withheld queue inputs.
 The fourth skip is the existing semantic-neighbours smoke case.
 
-The agent validator's **888 inert table probes and 51 fixture probes passed**,
-but the full validator **exited 1**: ShellCheck 0.11.0 flagged five unchanged hook
+During the initial Q run, the agent validator's **888 inert table probes and 51
+fixture probes passed**, but the full validator **exited 1**: ShellCheck 0.11.0 flagged five unchanged hook
 scripts. Factory-owner read-only review verified their imported globals are
 initialized before use; no runtime initialization defect was established. The
 validator lacks a script-relative ShellCheck source path, and two library globals
 are intentionally consumed by callers. Diagnostic-only `-P SCRIPTDIR` resolved
 caller warnings; standalone returned-global warnings remain. No hook was edited
-or warning silently waived. Full agent validation is therefore not fully green.
-Any candidate-only constitutional correction needs explicit human ratification.
+or warning silently waived at that stage. Full agent validation was not yet green;
+the candidate-only correction required the human ratification recorded next.
+
+### Human-approved candidate-only lint follow-up
+
+The human then explicitly approved: “I approve the minimal candidate-only
+ShellCheck repair: the one search-path option and two scoped annotations
+identified by the review.” This authorized the exact candidate-only amendment;
+it did not authorize original-repository changes or publication. This quotation
+archives the received instruction, not an agent-authored human-gate decision.
+
+The factory owner applied only `-P SCRIPTDIR` to the validator's ShellCheck call
+and two assignment-scoped SC2034 annotations for globals consumed by sourcing
+hooks. The exact change is two files, five insertions, one deletion; no runtime
+guard logic, matrix, tools, permissions or privacy fences changed. Independent
+review confirmed the patch matches the approved proposal and weakens no floor.
+
+**The affected validator now passes: exit 0, zero failures, 888 table probes and
+51 fixture probes (939 total) passed.** All nine shell hooks pass syntax and
+ShellCheck; settings/MCP JSON and registration/executable/frontmatter/collision/
+orphan/ownership checks pass. [factory-lint-repair.json](factory-lint-repair.json)
+records the exact validated hook hashes, patch/log digests and scope.
+
+The earlier Q exit-1 record in `clean-checkout.json` is historical and was not
+rewritten into a false pass. The application suite, HTTP replay and 29-file
+Parquet scan were not repeated: this amendment affects lint tooling/comments,
+not application behavior. The original repository and its active constitution
+remain unchanged. Future agent work using the amended candidate must load that
+candidate in a fresh session; no model-backed phase replay was performed here.
 
 [clean-checkout.json](clean-checkout.json) records the actual counts, skip scope,
 HTTP result, validator exit and log digests. Later attestation/documentation-only

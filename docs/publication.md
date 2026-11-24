@@ -53,21 +53,24 @@ The three additional skips are `DecisionExportSuite`, `GroupingExportSuite` and
 clone. The fourth is the existing semantic-neighbor skip. No tests were weakened and
 no private labels were read. The original 2,889/one-skip result remains historical.
 
-All **939 agent-behavior probes** passed (888 table and 51 fixture probes), but the
-**complete validator exited 1**, not PASS: ShellCheck 0.11.0 reported SC2154 imported
-globals and SC2034 cross-file assignments in five unchanged hook files. Factory-owner
-read-only classification is complete: all 11 hook blobs match original `e08aa09`;
-globals are initialized before use. SC2154 reflects missing ShellCheck source-path
-context; SC2034 flags library assignments consumed by callers. Diagnostic-only
-`-P SCRIPTDIR` resolves caller warnings; two standalone assignment warnings need
-scoped annotations. No runtime bug or security regression was verified. This is a
-known static-lint limitation: the full validator still exits 1. Any hook correction
-requires human ratification; no hook edits were made. Independent
-publication security review approved Q within its recorded scope; it is not a new
-application-wide review or a universal privacy guarantee. See the
+At Q the 939 behavior probes passed but the complete validator exited 1 on
+ShellCheck imported-global/cross-file-assignment findings. The user subsequently
+ratified a minimal candidate-only factory lint repair at `00bf656a`: two hooks,
+five insertions and one deletion. The affected complete validator now **PASS, exit 0,
+zero failures**, with **888 table + 51 fixture = 939 behavior probes passing**.
+All nine shell hooks passed syntax and ShellCheck checks; JSON, role definitions,
+registrations, executable bits, collision/orphan and ownership checks passed.
+These are two explicit lint-only hook exceptions to the original baseline, with no
+matrix, tool, guard-logic or privilege change. Application code, build definitions,
+tests and manifests remain unchanged. No full application gate, HTTP replay or
+Parquet scan was repeated after this repair; Q’s application results remain the
+attributed results above, not new-head full-suite results. See the
+[factory repair evidence](agent-runs/publication-01/factory-lint-repair.json).
+Independent publication security review approved Q within its recorded scope; it
+is not a new application-wide review or a universal privacy guarantee. See the
 [publication record](agent-runs/publication-01/publication-record.md) for exact evidence.
-Later documentation-only attestations do not establish a new human acceptance or
-require repeating the unchanged application gate.
+Publication itself remains unauthorized; the scoped lint ratification is not general
+acceptance of the candidate or permission to publish.
 
 No successful AWS run, live store/model validation or elasticity result is
 established. Container application verification is blocked by zero-byte `libjvm.so`

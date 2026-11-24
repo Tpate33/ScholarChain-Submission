@@ -5,7 +5,7 @@ Author: Taufeeq Patel, tpate33@uic.edu. Deadline: November 25, 2026, 11 PM CST.
 
 | Requirement group | Location / status |
 |---|---|
-| Agent definitions, permissions, ownership | `.claude/`, `docs/agents.md`; historical ratification in phase records; unchanged by takeover |
+| Agent definitions, permissions, ownership | `.claude/`, `docs/agents.md`; historical ratification plus user-ratified candidate-only two-hook lint repair; no privilege/ownership change |
 | Versioned contracts | `modules/core/` |
 | Dataset selection, samples, licenses | `datasets/dataset-manifest.yaml`, `datasets/schemas/`, Phase 3 records |
 | Hadoop / ER / Spark | `modules/hadoop/`, `modules/entity-resolution/`, `modules/spark/`; local evidence in Phases 4–6 |
@@ -40,7 +40,10 @@ verification remains blocked. [Publication notes](publication.md) track the unpu
 sanitized candidate, commit-map interpretation and pending submission gates. A fresh
 local Q clone passed 2,886 tests, zero failures/errors, four skips, 243 suites and seven
 HTTP smoke checks. Three ER skips require generated curated-a state; the existing
-semantic-neighbor skip remains. All 939 behavior probes passed, but the full agent
-validator exited 1 on unchanged-hook ShellCheck findings. Publication security review
+semantic-neighbor skip remains. Q’s full validator initially exited 1; the subsequent
+user-ratified two-hook lint repair now passes complete validation and all 939 behavior
+probes. Application/build/test/manifests remain unchanged, with no full-suite/HTTP/
+Parquet rerun claimed after the repair. See the
+[repair evidence](agent-runs/publication-01/factory-lint-repair.json). Publication security review
 approved its scoped Q assessment. No public repository, anonymous public clone, final
 tag or Teams receipt is claimed.

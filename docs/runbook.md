@@ -22,8 +22,11 @@ concurrent builds in the same checkout. Preserve target evidence before cleaning
 Follow [publication notes](publication.md) for a fresh candidate clone. A fresh local
 clone of Q `69d63538` passed the offline gate (2,886 tests, zero failures/errors, four
 skips, 243 suites) and seven HTTP smoke checks. The extra three ER skips require
-generated curated-a state. All 939 behavior probes passed, but full agent validation
-exited 1 on unchanged-hook ShellCheck findings; do not report the validator as PASS.
+generated curated-a state. Q’s full validator initially exited 1. After the user-ratified
+candidate-only two-hook lint repair, complete validation and all 939 behavior probes
+pass; see the [repair evidence](agent-runs/publication-01/factory-lint-repair.json).
+Application/build/test/manifests remain unchanged. No full application, HTTP or
+Parquet rerun was performed after that lint-only repair.
 Anonymous public cloning remains unverified. Existing committed DBLP demo fixtures remain
 bit-identical; do not copy an old `target/` directory. Historical ER/Spark runs
 require separately prepared dev inputs because rewritten ancestors do not satisfy

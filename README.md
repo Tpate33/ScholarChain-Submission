@@ -59,9 +59,11 @@ The [release manifest](release-manifest.json) is the historical Integration 02 m
 not the sanitized candidate release manifest. [Publication notes](docs/publication.md)
 record original-to-derived history, verification limits and pending submission gates.
 A fresh local clone of candidate Q `69d63538` passed 2,886 tests (four skipped,
-243 suites) and all seven HTTP smoke checks. The complete agent validator exited 1
-despite 939 passing behavior probes; see publication notes for unchanged-hook
-ShellCheck findings and skip prerequisites. This is not anonymous public-clone evidence.
+243 suites) and all seven HTTP smoke checks. Q’s full agent validator initially
+exited 1; after the user-ratified candidate-only two-hook lint repair it now passes
+with 939 passing behavior probes. Application/build/test/manifests are unchanged;
+Q’s full suite and HTTP results were not rerun. See publication notes for repair
+evidence and skip prerequisites. This is not anonymous public-clone evidence.
 This candidate is unpublished; preparing it does not authorize publication. The original
 private repository remains separate. A final submission tag and video are outstanding.
 The professor’s latest supplied guidance requires a public, anonymously cloneable

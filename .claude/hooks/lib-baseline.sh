@@ -109,8 +109,12 @@ baseline_init() {
   { mkdir -p "$state_dir" && chmod 700 "$state_dir"; } 2>/dev/null || return 1
   skey="$(python3 -I -c 'import hashlib, sys; print(hashlib.sha256(sys.argv[1].encode()).hexdigest()[:32])' "$1|$(pwd -P)")" || return 1
   base="$state_dir/session-$skey.baseline.v2.json"
+  # Returned global: sourcing hooks read this after baseline_init succeeds.
+  # shellcheck disable=SC2034
   started="$state_dir/session-$skey.started"
   lockdir="$state_dir/session-$skey.lock"
+  # Returned global: audit-bash-writes.sh appends to this session log.
+  # shellcheck disable=SC2034
   incidents="$state_dir/session-$skey.incidents.log"
 }
 

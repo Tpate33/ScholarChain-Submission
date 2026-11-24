@@ -1,0 +1,38 @@
+{
+  "sourceParentCommit": "00bf656a73049fb276d45a64f73bcdf83e6ea73c",
+  "approval": "User explicitly approved the one candidate-only ShellCheck source-path option and two scoped annotations; no publication permission given.",
+  "scope": "Sanitized candidate only; original repository and history unchanged",
+  "patchSha256": "85fd3bcb92f5f2d447d2526494acb570912741936c70908f784e2f55568c4310",
+  "validatedHookSha256": {
+    ".claude/hooks/validate-agent-files.sh": "443b236160ab8b298cc398d6d0c5ebc7a1d8b0b876a45cd462a31e1a1a5d4a56",
+    ".claude/hooks/lib-baseline.sh": "23f84356467054f7bb74c82cb7804564cc660f7d61f04dfc03cc06c0858e4b1d"
+  },
+  "diff": {
+    "files": 2,
+    "insertions": 5,
+    "deletions": 1
+  },
+  "command": ".claude/hooks/validate-agent-files.sh --probes",
+  "exitCode": 0,
+  "failures": 0,
+  "tableProbesPassed": 888,
+  "fixtureProbesPassed": 51,
+  "shellHooksSyntaxAndShellcheckPassed": 9,
+  "settingsAndMcpJson": "PASS",
+  "registrationExecutableBitsFrontmatterCollisionOrphanOwnership": "PASS",
+  "privilegeDelta": "none",
+  "floorInvariants": "unchanged",
+  "independentPatchReview": "PASS: exact approved change, no runtime logic/permissions/privacy fences/failure checks weakened",
+  "logSha256": "07cb2e4700ec4fcc0960ede67fb39e9da42d16bcd646d76eeda2a6134bb2ab6f",
+  "applicationSuiteRerun": false,
+  "httpReplayRerun": false,
+  "parquetScanRerun": false,
+  "originalRepositoryWritten": false,
+  "networkOrCloudOperations": false,
+  "limitations": [
+    "Application verification remains the separately recorded fresh-clone Q gate: 2886 passed, 4 skipped, 243 suites; HTTP 7/7.",
+    "This is targeted validation of exact hook bytes before final evidence/commit creation, not another clean-clone application suite.",
+    "No model-backed phase replay or anonymous GitHub clone is established.",
+    "Publication requires separate explicit human approval."
+  ]
+}

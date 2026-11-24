@@ -19,9 +19,13 @@ This sanitized publication candidate is unpublished and has not received new hum
 acceptance. [Publication notes](../docs/publication.md) distinguish original accepted
 commits from derived history, unchanged demo fixtures and candidate verification.
 A fresh local clone of candidate Q `69d63538` passed 2,886 tests, zero failures/errors,
-four skips, 243 suites and all seven HTTP smoke checks. The full agent validator
-exited 1 despite 939 passing behavior probes because ShellCheck flagged unchanged
-hooks; see publication notes for exact limits. Anonymous public cloning is unverified.
+four skips, 243 suites and all seven HTTP smoke checks. Q’s full agent validator
+initially exited 1. After a user-ratified candidate-only lint repair to two hooks
+at `00bf656a`, full validation passes with 939 behavior probes passing. Application
+code, build, tests and manifests are unchanged; no full-suite, HTTP or Parquet rerun
+is claimed after the repair. See publication notes and the
+[repair evidence](../docs/agent-runs/publication-01/factory-lint-repair.json).
+Anonymous public cloning remains unverified; publication remains unauthorized.
 
 ## 1. Problem and motivation
 
@@ -68,7 +72,9 @@ Claude specialist/reviewer cycle.
 ## 5. Authority and ownership
 
 The student controls approval, submission and cloud spending. The takeover preserves
-existing uncommitted integration-02 work. AGENTS.md, skills and hooks remain unchanged.
+existing uncommitted integration-02 work. AGENTS.md, skills and hooks were unchanged
+during that historical takeover. The later sanitized candidate has the two explicitly
+ratified lint-only hook exceptions described above; the original repository is unchanged.
 No AWS mutation, paid model call, commit or push is authorized as part of this local
 completion. Direct Codex edits and checks do not constitute independent review.
 Separate read-only reviewer contexts subsequently inspected the local scopes and
