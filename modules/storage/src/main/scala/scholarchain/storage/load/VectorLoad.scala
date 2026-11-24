@@ -751,6 +751,59 @@ object VectorLoad {
     }
   }
 
+  /**
+   * Offline census of the exact production plan. No embedder, store or write is accepted. Refuses
+   * every pre-write rejection instead of reporting a filtered subset as complete.
+   */
+  def census(
+      permit: LoadPermit,
+      parquet: ParquetReadBounds,
+      layout: S3Layout,
+      config: VectorLoadConfig,
+      modelVersion: String,
+      maxTotalVectors: Long
+  ): Either[StoreError, VectorInputCensus] =
+    if (permit.target != TargetStore.S3Vectors || maxTotalVectors < 1)
+      Left(StoreError.Refused("census: s3-vectors permit and positive global vector cap required"))
+    else if (EmbeddingModelVersion.problem(modelVersion).isDefined)
+      Left(StoreError.Refused("census: invalid embedding model version"))
+    else if (EmbeddingPolicy.refusal(config.embedding, Some(modelVersion)).isDefined)
+      Left(StoreError.Refused("census: embedding policy refuses model version"))
+    else
+      plan(permit, parquet, layout, config, modelVersion).flatMap { p =>
+        if (p.rejected.nonEmpty)
+          Left(
+            StoreError.Refused(
+              s"census: ${p.rejected.size} planned input rejections; no projection allowed"
+            )
+          )
+        else if (p.rows.toLong > maxTotalVectors)
+          Left(
+            StoreError
+              .Refused(s"census: ${p.rows} total vectors exceed global cap $maxTotalVectors")
+          )
+        else {
+          val dimension = config.indexes.head.dimension
+          if (config.indexes.exists(_.dimension != dimension))
+            Left(StoreError.Refused("census: indexes must share one configured dimension"))
+          else
+            workOf(permit, layout, modelVersion, dimension, p.docs).map { work =>
+              VectorInputCensus(
+                p.rows,
+                VectorIndexes.all.map { ix =>
+                  val docs = p.docs.filter(_.index.name == ix.name)
+                  (ix.name, docs.size, docs.map(d => bytesOf(d.text).toLong).sum)
+                },
+                dimension,
+                p.docs.map(d => bytesOf(d.text).toLong).sum,
+                p.docs.map(d => bytesOf(d.text)).maxOption.getOrElse(0),
+                work.sha256,
+                work.manifest
+              )
+            }
+        }
+      }
+
   private def artifactRow(permit: LoadPermit, d: Doc): ArtifactRecord =
     ArtifactRecord(
       ArtifactRecord.SchemaVersion,

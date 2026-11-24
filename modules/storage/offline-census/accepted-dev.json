@@ -1,0 +1,2542 @@
+{
+  "kind": "offline-planned-inputs-no-embeddings-no-writes",
+  "runId": "run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40",
+  "partManifestSha256": "749763adb05af272a3c0c5473ed3d90d071a3e762d67ef70ebef84295cc94907",
+  "groupingRunId": "run:84dd896fda43977b934008f10955191e78c2b93b80ec57c00f55dbb137dbd7d2",
+  "groupingPartManifestSha256": "2e95081c48501cc94c5d40dce7a0723423cab61c557fffbabbcdabdfc0509e72",
+  "benchmarkDigest": "2e1ff1824ba18c90a8b154e9932c51c64565779f62eeb2a519df22ea20bc8be9",
+  "curatedRunId": "run:2881724b5c86b561a235836d51946fbd884beed36a14f929b27c278cb5de8baa",
+  "worksBySource": {
+    "crossref": 6,
+    "dblp": 41,
+    "openalex": 43
+  },
+  "indexes": [
+    {
+      "index": "researcher-profile-v1",
+      "candidateVectors": 176,
+      "embeddingTextBytes": "443796"
+    },
+    {
+      "index": "collaboration-community-v1",
+      "candidateVectors": 51,
+      "embeddingTextBytes": "48960"
+    },
+    {
+      "index": "paper-abstract-v1",
+      "candidateVectors": 8,
+      "embeddingTextBytes": "16506"
+    },
+    {
+      "index": "collaboration-path-v1",
+      "candidateVectors": 9,
+      "embeddingTextBytes": "8130"
+    },
+    {
+      "index": "topic-institution-summary-v1",
+      "candidateVectors": 5,
+      "embeddingTextBytes": "3776"
+    }
+  ],
+  "totalCandidateVectors": 249,
+  "dimension": 256,
+  "embeddingTextBytes": "521168",
+  "largestEmbeddingTextBytes": 3070,
+  "plannedWorkManifestSha256": "c4e261d97a86d1df3b135262b406c237f6c8c114e1e20d280d9fc92df96a9d3d",
+  "graphVertices": 459,
+  "graphEdges": 799,
+  "analysisItems": 1302,
+  "analysisItemBytesEstimate": "3218415",
+  "largestAnalysisItemBytesEstimate": 3617,
+  "analysisBaseWriteUnitsEstimate": "3778",
+  "analysisAllProjectionGsiWriteUnitsEstimate": "3429",
+  "parts": [
+    {
+      "path": "_run-manifest.json",
+      "recordSchemaVersion": "scholarchain.run-manifest.v1",
+      "format": "jsonl",
+      "rowCount": 1,
+      "rowCountSource": "lf-count",
+      "byteCount": 1244,
+      "sha256": "8bec49ec1c1c517f18a9b90996e7787b241012788ee3ead6c5c92d96a94a38e9"
+    },
+    {
+      "path": "affiliated-with-edges/part-00000.csv",
+      "recordSchemaVersion": "scholarchain.graph-edge.v2",
+      "format": "csv",
+      "rowCount": 65,
+      "rowCountSource": "writer",
+      "byteCount": 20233,
+      "sha256": "3b0a95c2f70df1cb8474ff1727430e8999abc4babd710e8009dd3d616093387f"
+    },
+    {
+      "path": "affiliated-with-edges/part-00001.csv",
+      "recordSchemaVersion": "scholarchain.graph-edge.v2",
+      "format": "csv",
+      "rowCount": 78,
+      "rowCountSource": "writer",
+      "byteCount": 24064,
+      "sha256": "e8421a2906b29355ce85d67e75f320d71eaca623b2ce083eb259e64245a987e7"
+    },
+    {
+      "path": "analysis-windows/part-00000.parquet",
+      "recordSchemaVersion": "scholarchain.analysis-window.v1",
+      "format": "parquet",
+      "rowCount": 2,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 11845,
+      "sha256": "7a3ae57a23ddf3a9a2f4cf30918b2ac31f09c1031fb1a2757f31c68d6b5bc93c"
+    },
+    {
+      "path": "author-mention-vertices/part-00000.csv",
+      "recordSchemaVersion": "scholarchain.graph-node.v2",
+      "format": "csv",
+      "rowCount": 143,
+      "rowCountSource": "writer",
+      "byteCount": 28740,
+      "sha256": "a2b99340a56815ec7f31c169c1cefb4c65f054ffcb48fe9ae040bae21cc40307"
+    },
+    {
+      "path": "author-mention-vertices/part-00001.csv",
+      "recordSchemaVersion": "scholarchain.graph-node.v2",
+      "format": "csv",
+      "rowCount": 0,
+      "rowCountSource": "writer",
+      "byteCount": 75,
+      "sha256": "6e8d093b283a6c0b9104f8fe1c6484cf9d7be359fc86437003c523f7a3a13107"
+    },
+    {
+      "path": "authored-edges/part-00000.csv",
+      "recordSchemaVersion": "scholarchain.graph-edge.v2",
+      "format": "csv",
+      "rowCount": 60,
+      "rowCountSource": "writer",
+      "byteCount": 18365,
+      "sha256": "4606fa2a28e7b91e37786af65b62a306bcec69e7caa5958c08060071dfb3290f"
+    },
+    {
+      "path": "authored-edges/part-00001.csv",
+      "recordSchemaVersion": "scholarchain.graph-edge.v2",
+      "format": "csv",
+      "rowCount": 83,
+      "rowCountSource": "writer",
+      "byteCount": 25452,
+      "sha256": "0d5ea0e945cf5ef258770feb6f4cbd0d0343c197b397246a230bb0c736641e89"
+    },
+    {
+      "path": "bridges/part-00000.parquet",
+      "recordSchemaVersion": "scholarchain.bridge-measure.v1",
+      "format": "parquet",
+      "rowCount": 98,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 20092,
+      "sha256": "3b224e8b86a1e0f256594fdcf576ec315c17bbef831fa659acaa5d4951039f98"
+    },
+    {
+      "path": "bridges/part-00001.parquet",
+      "recordSchemaVersion": "scholarchain.bridge-measure.v1",
+      "format": "parquet",
+      "rowCount": 78,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 20225,
+      "sha256": "9053cfdf7edbe2da6f5b2c592573ecdbac73c2c8d4b21c6cf70602db431e8070"
+    },
+    {
+      "path": "coauthored-with-edges/part-00000.csv",
+      "recordSchemaVersion": "scholarchain.graph-edge.v2",
+      "format": "csv",
+      "rowCount": 133,
+      "rowCountSource": "writer",
+      "byteCount": 46006,
+      "sha256": "3d3f82338d8b9362e8e0abe0b28cc0c4a6f38e141b0f141f2ad957a9c92e933f"
+    },
+    {
+      "path": "coauthored-with-edges/part-00001.csv",
+      "recordSchemaVersion": "scholarchain.graph-edge.v2",
+      "format": "csv",
+      "rowCount": 126,
+      "rowCountSource": "writer",
+      "byteCount": 43499,
+      "sha256": "83fa32090a33965dd6f3d04555e0307a899a75a6de18c4e486b7e9dfdf1d5c67"
+    },
+    {
+      "path": "communities/part-00000.parquet",
+      "recordSchemaVersion": "scholarchain.community-membership.v1",
+      "format": "parquet",
+      "rowCount": 89,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 20229,
+      "sha256": "c71f97defac355b6090534dd553988c321b9a9a43816ef013794bb5aab50916f"
+    },
+    {
+      "path": "communities/part-00001.parquet",
+      "recordSchemaVersion": "scholarchain.community-membership.v1",
+      "format": "parquet",
+      "rowCount": 87,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 23038,
+      "sha256": "46d02c37a1422a1e9f36c260e4bce999b4eaf606a8150231a8f5840eb355c429"
+    },
+    {
+      "path": "components/part-00000.parquet",
+      "recordSchemaVersion": "scholarchain.component-membership.v1",
+      "format": "parquet",
+      "rowCount": 95,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 17014,
+      "sha256": "fe564e4096ed4165d72bec6896cdb4c3f0d1a22cf48048f8c53e76fa0e3aa243"
+    },
+    {
+      "path": "components/part-00001.parquet",
+      "recordSchemaVersion": "scholarchain.component-membership.v1",
+      "format": "parquet",
+      "rowCount": 81,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 17869,
+      "sha256": "86d43f7a7cb9cb3bef88aac8489f03c5b5719890c7658e8b21131255ca636d72"
+    },
+    {
+      "path": "coreness/part-00000.parquet",
+      "recordSchemaVersion": "scholarchain.coreness.v1",
+      "format": "parquet",
+      "rowCount": 84,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 12821,
+      "sha256": "e2ae4c9ab6592dc41d035981c11aa0118fc6a18f49f8fbb474da908602754abe"
+    },
+    {
+      "path": "coreness/part-00001.parquet",
+      "recordSchemaVersion": "scholarchain.coreness.v1",
+      "format": "parquet",
+      "rowCount": 92,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 16325,
+      "sha256": "9fd9dd7c07f8af1109553109330a4ad5bdac09201c0af916457599487ff61bf0"
+    },
+    {
+      "path": "edges/part-00000.parquet",
+      "recordSchemaVersion": "scholarchain.coauthor-edge.v2",
+      "format": "parquet",
+      "rowCount": 137,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 35862,
+      "sha256": "a6603ff549903a8bc4d06329d985990301f49a1cecf00d3bc9fc0bdde2d610f4"
+    },
+    {
+      "path": "edges/part-00001.parquet",
+      "recordSchemaVersion": "scholarchain.coauthor-edge.v2",
+      "format": "parquet",
+      "rowCount": 122,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 34417,
+      "sha256": "f57f5e0fdfc1659029dd9b25b422bce0ecda3a326f4b92159eb1d0be477b26bf"
+    },
+    {
+      "path": "entity-summary-inputs/part-00000.parquet",
+      "recordSchemaVersion": "scholarchain.entity-summary-input.v1",
+      "format": "parquet",
+      "rowCount": 7,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 16002,
+      "sha256": "44a227dd30f6e702d11192165a7fcf4542bc0e43cd6f39ced8b73478a39e7c2a"
+    },
+    {
+      "path": "entity-summary-inputs/part-00001.parquet",
+      "recordSchemaVersion": "scholarchain.entity-summary-input.v1",
+      "format": "parquet",
+      "rowCount": 6,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 17707,
+      "sha256": "8d2bb46d98dd1bbabe441afe5fd3daf73a04e79ff8f801ead663f15c7352fba1"
+    },
+    {
+      "path": "evidence-paths/part-00000.parquet",
+      "recordSchemaVersion": "scholarchain.evidence-path.v1",
+      "format": "parquet",
+      "rowCount": 5,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 18735,
+      "sha256": "8a22023a654e46232aacaa08a265c8b8aabd644443504b79a0e92bee69cafb3e"
+    },
+    {
+      "path": "evidence-paths/part-00001.parquet",
+      "recordSchemaVersion": "scholarchain.evidence-path.v1",
+      "format": "parquet",
+      "rowCount": 4,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 18865,
+      "sha256": "266fc0f967d7f75509ffefe617d51a09b41697bdc2bb25eaa4f769b7eca49f14"
+    },
+    {
+      "path": "graph-edges/part-00000.parquet",
+      "recordSchemaVersion": "scholarchain.graph-edge.v2",
+      "format": "parquet",
+      "rowCount": 375,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 95822,
+      "sha256": "c701ca60216a10c2dd3be2d33acbbbf120b56c7ccedf71aa0c72694488f3eb9c"
+    },
+    {
+      "path": "graph-edges/part-00001.parquet",
+      "recordSchemaVersion": "scholarchain.graph-edge.v2",
+      "format": "parquet",
+      "rowCount": 424,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 104229,
+      "sha256": "1baf048850355130340a1cddcf2c36f03654b17258b11d1589cc669203a9b598"
+    },
+    {
+      "path": "graph-nodes/part-00000.parquet",
+      "recordSchemaVersion": "scholarchain.graph-node.v2",
+      "format": "parquet",
+      "rowCount": 226,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 34218,
+      "sha256": "f50f146ed185c52a9b6e7c0eee1eb2025be8afd31ca5931162f80213f4440052"
+    },
+    {
+      "path": "graph-nodes/part-00001.parquet",
+      "recordSchemaVersion": "scholarchain.graph-node.v2",
+      "format": "parquet",
+      "rowCount": 233,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 22750,
+      "sha256": "2c8c7c18ba1915f977a4edacbb23a8718bed666ef65369d6ebb7873a4db88193"
+    },
+    {
+      "path": "has-topic-edges/part-00000.csv",
+      "recordSchemaVersion": "scholarchain.graph-edge.v2",
+      "format": "csv",
+      "rowCount": 20,
+      "rowCountSource": "writer",
+      "byteCount": 4664,
+      "sha256": "364e7632a2ff5722c976cc9c45f294a2f3b04dd0ec61f28d7879bdefc2e68968"
+    },
+    {
+      "path": "has-topic-edges/part-00001.csv",
+      "recordSchemaVersion": "scholarchain.graph-edge.v2",
+      "format": "csv",
+      "rowCount": 21,
+      "rowCountSource": "writer",
+      "byteCount": 4922,
+      "sha256": "6782936031670c7dba86f582d0245a271b8e6c1016330de6e33e0ac267816a33"
+    },
+    {
+      "path": "institution-vertices/part-00000.csv",
+      "recordSchemaVersion": "scholarchain.graph-node.v2",
+      "format": "csv",
+      "rowCount": 60,
+      "rowCountSource": "writer",
+      "byteCount": 8623,
+      "sha256": "125abcecb65660be5219901759e13dfedc8c6378e555c7d98d74d16fa76fd8a5"
+    },
+    {
+      "path": "institution-vertices/part-00001.csv",
+      "recordSchemaVersion": "scholarchain.graph-node.v2",
+      "format": "csv",
+      "rowCount": 0,
+      "rowCountSource": "writer",
+      "byteCount": 36,
+      "sha256": "9eab4faf5342929e958d1b8aa0a5f9c430e724fdcd05812dca95458a71de4c39"
+    },
+    {
+      "path": "metrics/part-00000.parquet",
+      "recordSchemaVersion": "scholarchain.researcher-metrics.v2",
+      "format": "parquet",
+      "rowCount": 83,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 19174,
+      "sha256": "07dfd8f425e609d458b393cb6307dae0c045d131b701b68732bb190537a77e6a"
+    },
+    {
+      "path": "metrics/part-00001.parquet",
+      "recordSchemaVersion": "scholarchain.researcher-metrics.v2",
+      "format": "parquet",
+      "rowCount": 93,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 23109,
+      "sha256": "2345266b7b5f614607fb6c0a19d876c72d9426acf4a7c2d2e2cb97bf2f7387cc"
+    },
+    {
+      "path": "path-length-estimates/part-00000.parquet",
+      "recordSchemaVersion": "scholarchain.path-length-estimate.v1",
+      "format": "parquet",
+      "rowCount": 19,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 18928,
+      "sha256": "c97b47c238a31426558fcd88d6aa3903a9b47e51b82ba1197f8d2a707c8aaea3"
+    },
+    {
+      "path": "path-length-estimates/part-00001.parquet",
+      "recordSchemaVersion": "scholarchain.path-length-estimate.v1",
+      "format": "parquet",
+      "rowCount": 18,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 19138,
+      "sha256": "cba2e8f399cc08ec87c70fce4a0d9ff13a086583afe0f0086c3b2192b9dac6e1"
+    },
+    {
+      "path": "published-in-edges/part-00000.csv",
+      "recordSchemaVersion": "scholarchain.graph-edge.v2",
+      "format": "csv",
+      "rowCount": 27,
+      "rowCountSource": "writer",
+      "byteCount": 6533,
+      "sha256": "fd5f543da5f9ecefef188946039c50b4a622ad95ef02abb3ea08bcc8bdc618a8"
+    },
+    {
+      "path": "published-in-edges/part-00001.csv",
+      "recordSchemaVersion": "scholarchain.graph-edge.v2",
+      "format": "csv",
+      "rowCount": 43,
+      "rowCountSource": "writer",
+      "byteCount": 10363,
+      "sha256": "f08614ddf810c1a0ed0fa027e3f73e19ec190811cc2e7392138af2b31580c76a"
+    },
+    {
+      "path": "researcher-vertices/part-00000.csv",
+      "recordSchemaVersion": "scholarchain.graph-node.v2",
+      "format": "csv",
+      "rowCount": 23,
+      "rowCountSource": "writer",
+      "byteCount": 3206,
+      "sha256": "4c64a2bdecd3a27c8793cf4981dfe6eb9a714c091cc90b10e4a99d7f2e9a8854"
+    },
+    {
+      "path": "researcher-vertices/part-00001.csv",
+      "recordSchemaVersion": "scholarchain.graph-node.v2",
+      "format": "csv",
+      "rowCount": 94,
+      "rowCountSource": "writer",
+      "byteCount": 14221,
+      "sha256": "1ed3dc4347cbdf3bd7ec563a5d69434bb51c49643b1d02c2c3fdfb847a702721"
+    },
+    {
+      "path": "resolves-to-edges/part-00000.csv",
+      "recordSchemaVersion": "scholarchain.graph-edge.v2",
+      "format": "csv",
+      "rowCount": 70,
+      "rowCountSource": "writer",
+      "byteCount": 24971,
+      "sha256": "e05b90f42ac05e85c8cb125775fdb5da5027b386ec695097fdc4d7eb76f0d5d9"
+    },
+    {
+      "path": "resolves-to-edges/part-00001.csv",
+      "recordSchemaVersion": "scholarchain.graph-edge.v2",
+      "format": "csv",
+      "rowCount": 73,
+      "rowCountSource": "writer",
+      "byteCount": 25959,
+      "sha256": "8dc6dae89701d224f2b4422516f388b5b2dabc610df1089280998627a1b0463f"
+    },
+    {
+      "path": "summary-inputs/part-00000.parquet",
+      "recordSchemaVersion": "scholarchain.semantic-summary-input.v1",
+      "format": "parquet",
+      "rowCount": 114,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 51619,
+      "sha256": "19973ceeaa26e804a94f2954bb9b0d2bdf5229b23c84aefefaa1a22e3365dd51"
+    },
+    {
+      "path": "summary-inputs/part-00001.parquet",
+      "recordSchemaVersion": "scholarchain.semantic-summary-input.v1",
+      "format": "parquet",
+      "rowCount": 122,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 51437,
+      "sha256": "3b8d2fbb441d229fd45e1900e9c6161451debfb0a6ea16f122547723c3b0552b"
+    },
+    {
+      "path": "temporal-changes/part-00000.parquet",
+      "recordSchemaVersion": "scholarchain.researcher-temporal-change.v1",
+      "format": "parquet",
+      "rowCount": 56,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 21882,
+      "sha256": "b60ed379abd45c34835b68a9320f202e4be8e61ef3c29ebb4a900f32e5b0040a"
+    },
+    {
+      "path": "temporal-changes/part-00001.parquet",
+      "recordSchemaVersion": "scholarchain.researcher-temporal-change.v1",
+      "format": "parquet",
+      "rowCount": 56,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 25254,
+      "sha256": "c538464ec54375b3b81b84b22a9fb7b954d4fc0c2e3ddc8aa9ed012941f59997"
+    },
+    {
+      "path": "topic-vertices/part-00000.csv",
+      "recordSchemaVersion": "scholarchain.graph-node.v2",
+      "format": "csv",
+      "rowCount": 0,
+      "rowCountSource": "writer",
+      "byteCount": 36,
+      "sha256": "9eab4faf5342929e958d1b8aa0a5f9c430e724fdcd05812dca95458a71de4c39"
+    },
+    {
+      "path": "topic-vertices/part-00001.csv",
+      "recordSchemaVersion": "scholarchain.graph-node.v2",
+      "format": "csv",
+      "rowCount": 30,
+      "rowCountSource": "writer",
+      "byteCount": 4076,
+      "sha256": "db7592ab799d9258721abfc0b79b6967dd21e8a04b3979099994e859cf5416e2"
+    },
+    {
+      "path": "venue-vertices/part-00000.csv",
+      "recordSchemaVersion": "scholarchain.graph-node.v2",
+      "format": "csv",
+      "rowCount": 0,
+      "rowCountSource": "writer",
+      "byteCount": 36,
+      "sha256": "9eab4faf5342929e958d1b8aa0a5f9c430e724fdcd05812dca95458a71de4c39"
+    },
+    {
+      "path": "venue-vertices/part-00001.csv",
+      "recordSchemaVersion": "scholarchain.graph-node.v2",
+      "format": "csv",
+      "rowCount": 64,
+      "rowCountSource": "writer",
+      "byteCount": 8883,
+      "sha256": "1152b20252b1077fce9f83a1459c2c7ade712f6e77e79fa20525b79ac56e158e"
+    },
+    {
+      "path": "window-comparisons/part-00000.parquet",
+      "recordSchemaVersion": "scholarchain.window-comparison.v1",
+      "format": "parquet",
+      "rowCount": 1,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 12619,
+      "sha256": "81b97ecec6f0d44222e8bc6e7fddd42f2ad0fd9eda4363aca0ddae5a556e3d6a"
+    },
+    {
+      "path": "window-structures/part-00000.parquet",
+      "recordSchemaVersion": "scholarchain.window-structure.v1",
+      "format": "parquet",
+      "rowCount": 2,
+      "rowCountSource": "parquet-footer",
+      "byteCount": 13655,
+      "sha256": "b1df4e1896e2d3e3e928143995371ce8263b65871452fcf63d2bebf03bcf38b1"
+    },
+    {
+      "path": "work-vertices/part-00000.csv",
+      "recordSchemaVersion": "scholarchain.graph-node.v2",
+      "format": "csv",
+      "rowCount": 0,
+      "rowCountSource": "writer",
+      "byteCount": 71,
+      "sha256": "66c11172303dc505045eed7d1b73d9c63fa7e0b26abb850a81dca801438f0700"
+    },
+    {
+      "path": "work-vertices/part-00001.csv",
+      "recordSchemaVersion": "scholarchain.graph-node.v2",
+      "format": "csv",
+      "rowCount": 45,
+      "rowCountSource": "writer",
+      "byteCount": 5606,
+      "sha256": "69197e4c6d94f6a5f3f46c3f6a755c7df15df78d9a3ae2b13495fdcb40394e9e"
+    }
+  ],
+  "embeddingWorkManifest": {
+    "schemaVersion": "scholarchain.storage.embedding-work-manifest.v1",
+    "runId": "run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40",
+    "loadId": "load:596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c",
+    "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+    "dimension": 256,
+    "items": [
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:0183953c1cbe867fb55ae7f80a03865556ffafe952e7ae7e4fb20b30fa19d14e",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:0183953c1cbe867fb55ae7f80a03865556ffafe952e7ae7e4fb20b30fa19d14e",
+        "textSha256": "916c9bd645059f764feb1db65918a2222db050dfd6b90d72294b6b45dfbc30f0",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/3e0af53ba4c80c64f8f6f3e9baad7c8efb54e7d8d47c224783345eb5c0fc2d9c.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:01d907eb09aa6b63233ba9da7114cca364299d01b02bd73dc083fc144f2cfc87",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:01d907eb09aa6b63233ba9da7114cca364299d01b02bd73dc083fc144f2cfc87",
+        "textSha256": "2adb1a4ae9657b80fe80018df9e11c6ff0cb48071c0ccd10a5a9f319646448a0",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/bd79dde46806c116a2802ae644daf4b946fee524c45a5afd4b00e25d2c2b1b9b.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:042d5b51665982f91d04febebb659d91bb0cf3727465ee208b3db971070f3ebb",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:042d5b51665982f91d04febebb659d91bb0cf3727465ee208b3db971070f3ebb",
+        "textSha256": "0a3cae7f5b851403909454a336592046ced0164819cd2e24ce9f95566ba24cef",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/b43edbf8d559afd942fd885ea051a88528b5693d467efb57caf4d20025107f32.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:062f853d5ebcf075f5e376829c5c58ddc3f45177a885341b61d8bc178b49180d",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:062f853d5ebcf075f5e376829c5c58ddc3f45177a885341b61d8bc178b49180d",
+        "textSha256": "0fc2ef2f800503327d96fa9ad1567098da6a5213e4d52a8231e70c3cea2bf8e7",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/6b19427cb9c9daf8d4a95489fd1f54fa52e70e8d22b82e77e6e0f170931c9c5a.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:08859c9e4e73773ae28a1c571a8357259a943fe58ef0ef224cef7fbd5ca605d0",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:08859c9e4e73773ae28a1c571a8357259a943fe58ef0ef224cef7fbd5ca605d0",
+        "textSha256": "f4559d8122658768d3f6ff22e6e5d68553531527b341afb9a7d0a45d3f357326",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/ce1acb5647873b7a46d7a162577e5a06b1000ecd3e409a5c6c4bcc39aa2a3244.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:0a00bc6e90a328c5edf8ce7e75d64ee7d5d09b57d4794ea699ce93b1593fdf03",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:0a00bc6e90a328c5edf8ce7e75d64ee7d5d09b57d4794ea699ce93b1593fdf03",
+        "textSha256": "c08a7c4f8e40113233579b0009f8aa68693d74c79defb82ba34d47dab618e4e1",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/19582467ade4d63290ff0d57842645abe1a2023a30df4d81fcf4d16477c8de1b.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:0e223054547661f867a221a1596e72f8f59be2c7a1e06169ebfb1a35891ab271",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:0e223054547661f867a221a1596e72f8f59be2c7a1e06169ebfb1a35891ab271",
+        "textSha256": "7149c20aeaf577de7c7066330a59071bcb090b34150f53bc5033c9b8081ae9bf",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/2de26ed92b4ac52d25aa99cf654118152238fa263baf82322782c46a94c9352e.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:10ed07c10d783f4e0a4977ded82c98d23dfcf1024666f663791afecaed6a7aaf",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:10ed07c10d783f4e0a4977ded82c98d23dfcf1024666f663791afecaed6a7aaf",
+        "textSha256": "34cf725237fa77fcb38f2c0eb3bab1b103081b5553dfa08fe09fbf46fe8dec41",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/db6cb71e28704400003ed921c24a110793ad9ba8e0c71edb0a02eea76bfe3d21.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:11cf0be9b54210c8293b9f0a717687e5c0d410c6140d088accf92631eca42780",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:11cf0be9b54210c8293b9f0a717687e5c0d410c6140d088accf92631eca42780",
+        "textSha256": "8327821c1c7622777cbb3c67166d57f58d98e15e6257bcffbda7dd0f5db45b0f",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/9bd5929c46bdb95919229f54dd3503f851343be95783d3db7d1f238791a5f215.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:127bfbe9dc3c505d1d7d9275fa5cec15a8ed16f40d34cc439467de19f64649b8",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:127bfbe9dc3c505d1d7d9275fa5cec15a8ed16f40d34cc439467de19f64649b8",
+        "textSha256": "d36d2000e5ea2499294168ee5d1b73b51eaa5a13a8b087320a215e296e05dfda",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/70ae0cbc57aa6c9955f8a71c39b82faee881ecf6f78402e1155ab5e62e9c0b9d.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:136ffab763de0ca4cbc4855581c40bdf7e3ea0bedddc4ca97cae8b6e3343a808",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:136ffab763de0ca4cbc4855581c40bdf7e3ea0bedddc4ca97cae8b6e3343a808",
+        "textSha256": "8b3edba2eac1b34fe09ab747f44dfbd926a469157d55faa50460862fe192c587",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/62b3624eab2b49fd19716872aeb058596a40590abc5546f04c5540d921d96a62.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:13d078904179360e70114e1a8cba23e34f18c8a13fd198ca45b2e4813fa78884",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:13d078904179360e70114e1a8cba23e34f18c8a13fd198ca45b2e4813fa78884",
+        "textSha256": "abedffb1b8f5725ab98cb55a8aab4467086c8906db214ce86cc391216a1b401a",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/4950805c83ac69a4689db5b3c46063cf99f462cd7984d39527c0d5bf78300a24.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:14260953aa770651eb360c6150e552123f81f8fe890607e32acb9d215d1c6381",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:14260953aa770651eb360c6150e552123f81f8fe890607e32acb9d215d1c6381",
+        "textSha256": "8e7da63173eec4e540bd10c2ccaf5d9e64755cede19c69e7cab4076f9974d66b",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/6520809a9dea33ce9f7bacc5c24c7e926a79da951223a630b6552b04db69fb0f.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:1575e0a0697abccaaad41e067e5345147cbfdafb3a00047f185d2d65fc06efdd",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:1575e0a0697abccaaad41e067e5345147cbfdafb3a00047f185d2d65fc06efdd",
+        "textSha256": "0ecb4a71a0b9f0ebfbc10c1e306eea1af25485eba47480dd8b6786083da78212",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/f7c6691399ad1e6e8881e34b23a710e739853ff7905da161499a82d45b81753a.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:17024441686c8ead2164ede825b3c43d39b4eb893722050d991b9cc3062c72e4",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:17024441686c8ead2164ede825b3c43d39b4eb893722050d991b9cc3062c72e4",
+        "textSha256": "10851ea4fdb79a19af8d19647909aada557251ba1467d3ca87d35fbdb443f291",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/4f5780a9a6a373b29c16e1a3b451210768755af2cfd9959e5ff1af73a9f7a9fc.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:18e1d0cc8f3d6ba4771220bde26380c71f6a17e82307f021379b519ae6896a01",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:18e1d0cc8f3d6ba4771220bde26380c71f6a17e82307f021379b519ae6896a01",
+        "textSha256": "a96472c17c26870cb382ec46824bd3e3da7abdd39880ed4d8e9d6fb6c6a87679",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/7c1b6f1701d150f53faf6f6be8c17c895abc6401ba58482e811225e2fcd2d871.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:18f33f811e103afcf4e52612e30a1aaa72e89ebe1e0be9aa8532cd2225e82ed6",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:18f33f811e103afcf4e52612e30a1aaa72e89ebe1e0be9aa8532cd2225e82ed6",
+        "textSha256": "ea599109570865771444f884a734309eaeb8765a197b9ccc00aa48981655e7d2",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/f7ebf7e5c185777993288ae67267289b2c4b0f3acb4039a12d4d222eb71ac61b.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:1bfa71a18cd56e23b9d0605d6d17d48ddcaa3989955892e9f5667d756f210fc5",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:1bfa71a18cd56e23b9d0605d6d17d48ddcaa3989955892e9f5667d756f210fc5",
+        "textSha256": "5b12c4d3508573249e16afe677e6324ae7db0f0ec4371fd29e8801f9e1ac10ec",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/81b73690b3333343a4fe88c0d4e0ca6973e80282756440582b9c7718ed8c662b.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:1dfc74d3ca3e65a89d213a61e57b4bc108ad7fa201ada14ce35e2788d99b4759",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:1dfc74d3ca3e65a89d213a61e57b4bc108ad7fa201ada14ce35e2788d99b4759",
+        "textSha256": "ca0cc0e7cce3dbaebc554b4c914d7b0b659b5fada52bec7c270788b068c5b68e",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/1fd68aa35ffb6f0e6ea6a5a45fdac5cf4a5810b5629d1016a07c2a21dd4d99f3.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:1e94812ce036c37cf873ffb416666bcc48d5ca472470c886643af50f1ebf5e01",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:1e94812ce036c37cf873ffb416666bcc48d5ca472470c886643af50f1ebf5e01",
+        "textSha256": "542b30ebf19e5fa06afaa2507dd0b304dec9830d84caef5bb1f8fcc4ee52b9de",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/a8121609f2bd64d892ccb711d3decaf7b29641932c79187e53d1d6819355ad9e.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:1ec8c6ec1070a4d2336fea507b9ebee60d07b024ee22656872ac7297654ef3fb",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:1ec8c6ec1070a4d2336fea507b9ebee60d07b024ee22656872ac7297654ef3fb",
+        "textSha256": "6a7d1ce8c49089eed477c5dafa8d973a2b38cf68f4653df7ed2a2f0dd2077aac",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/ca477839dbb6377c6af4bed45679c2722df668a9376e43799c7d038187be2bbe.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:21b95491a44360ae8a93b00e7d73c446242600519f14b9a61267100556cac0ce",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:21b95491a44360ae8a93b00e7d73c446242600519f14b9a61267100556cac0ce",
+        "textSha256": "2aa7c409ff699c5887c5f58e3ca8e1c1791501acb62a5ecc600a97fc0b3a234a",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/ef7cb0c1274225e1ee86a854e8dc6f9fbb43dfee2004de429c8760aabf3bcdfa.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:2249bbf44b0bad3cdfaaf095ed088d90390432ace6480a679ad43c60354dbccb",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:2249bbf44b0bad3cdfaaf095ed088d90390432ace6480a679ad43c60354dbccb",
+        "textSha256": "ee10931016cff45626b4e565dd4ecd0de29483dc78c5356f4e73f1e651d95c09",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/af2be029d9585f42cc6060ede7fc791c9796401e50282064ff1b50dbd90f0c5f.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:23b6c57f37a504c189292eb8c4a43ab9ab10ec69b8c32e402318205f3a518c9b",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:23b6c57f37a504c189292eb8c4a43ab9ab10ec69b8c32e402318205f3a518c9b",
+        "textSha256": "b9a7fddbcfb59c14be885a3b529007cdec64ea3120fb69efbadd1d9932d8fcc9",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/e7b482cb81b30715f7663f552c5b4a12aae371d157d24116cef6a31a3a3f0c88.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:25d49f46f1b66e2ad01835e7856d2ad73d65fbcef2cddc9beccdf7a5a27d8a54",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:25d49f46f1b66e2ad01835e7856d2ad73d65fbcef2cddc9beccdf7a5a27d8a54",
+        "textSha256": "9064fd761ce6b4755b09bef13a9856f6e12578f72b83bdcf15fdde35a7f8133a",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/e5fcf1b491632b232eae908f6e221a5e05d76d084335bccd4786968def4c7ef1.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:26080de950d37431d9b40ed86e95929fc8eff68bee2d28a401f52886bd9c020b",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:26080de950d37431d9b40ed86e95929fc8eff68bee2d28a401f52886bd9c020b",
+        "textSha256": "0a71b11bbd7f9ae361e794005f24966aa9865e15cbbf11f4e026761bbad581c8",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/d8e997fece5de77ce90159836a9fc64a428a592a98261cb4ec5e2ecb39b83754.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:268a749e1a1960892af8772be326067ab6870317d2f89690025cdb859da7f8c6",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:268a749e1a1960892af8772be326067ab6870317d2f89690025cdb859da7f8c6",
+        "textSha256": "815bd0b8e1d76b7d5c03f2d1c8c22e24b343a5753c672a5a605b8d6c6d778b12",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/6f14e2def36d3b4591be339f5b1843ffd36aba0348a59151843f33f2c6f4f213.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:2775febb90a65646840a5128741323036f88256a7120480df3d8a28a9e3d8c1a",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:2775febb90a65646840a5128741323036f88256a7120480df3d8a28a9e3d8c1a",
+        "textSha256": "0df86fa41e7314fc1c7466e93e01904f471434da957af2997e9e6d861ab3ffa6",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/2d34cdb0635c9bccb74642d9e193edd8a76d2a5e4f865079786132886b890b27.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:279a2be03f6cd41720bb65d99f6d9c0299b31baed136e3e7d3c4e7d6facfadad",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:279a2be03f6cd41720bb65d99f6d9c0299b31baed136e3e7d3c4e7d6facfadad",
+        "textSha256": "df1d847966f4531c2fe3272499e90eaf57ecaa7e4fcdcbf8f444bc16b9468bfe",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/8c2fde269132b53fc55bb60c914e32a32a39d63363b2dc5a83a8e89c0bce10a0.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:27d58808187de8d7195a346c6673171f5f5abac14215b2973980c18945a88b1f",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:27d58808187de8d7195a346c6673171f5f5abac14215b2973980c18945a88b1f",
+        "textSha256": "ad0ac39de7d33668f9156b30668089da77997e2a7f0d7dc6144421203a4d38b6",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/ade5ed5c50ccee1797eca6f528ec549c544027f8111f34305f56dc941e39b34f.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:2828180219d8faf544376ee12ea32ff7e5cf7cd3fcb269b1e026162794f51dd8",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:2828180219d8faf544376ee12ea32ff7e5cf7cd3fcb269b1e026162794f51dd8",
+        "textSha256": "35a3c7a13375221b66d26d0b2f12e8b37333eda830e609d7557aeb5225450866",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/be28ebfc061dcb420ea9fa2a3223407f98764a1cabe06558abc1c7935d118d2b.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:2be0616fdc0814f6eb1c7304c53e341d7b0bcfae5c4b263c6c1341806d608cf7",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:2be0616fdc0814f6eb1c7304c53e341d7b0bcfae5c4b263c6c1341806d608cf7",
+        "textSha256": "8c0e79026a606aa65d2cf7390240c8efe0cb1abfe89a1b8ff63234f639d0c9fb",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/49d7035939e9e50479fab31898129c4917e51c8d322ec984bd6757992e0673df.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:2dd4e9b005f22954f5040bd3ba23e6cddd186a92f613be6b5e17ac8f60667711",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:2dd4e9b005f22954f5040bd3ba23e6cddd186a92f613be6b5e17ac8f60667711",
+        "textSha256": "7dfb9470ef48f95a336204d86494beb390113315f594fa2ffeb43db60685e83e",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/c121d80ec601a64163632f8463975ae701514a8081d27ac1ebe3d35e83b8d8bf.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:30bcc59179593f33c504136358e24226edc910d2cd30b4bd3d3ffde34bd126d1",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:30bcc59179593f33c504136358e24226edc910d2cd30b4bd3d3ffde34bd126d1",
+        "textSha256": "470ec2379c6435f5f49173700a8609f1cacb734cad799f3200d62d4700b61b86",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/d5aeee8c7c55aff34a5ec74d999acf96492ad58cc5674412ba7a905cf88dd2ea.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:30cb4b84736e88921ef108e881839dcb3dd9a4aca802d5a303185f8d2d6611f6",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:30cb4b84736e88921ef108e881839dcb3dd9a4aca802d5a303185f8d2d6611f6",
+        "textSha256": "a4e9167dcf0e4c41d4888e7abb446cc7eca334a59dc9cfd3ad7c27821e376357",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/56f06243852e566f23b6b40edf5d38d615a593a00140c8ce96fc0fb6d0be6dd0.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:318cbadb59c59c84fa47336a114eb8f717fef9d0b6e4d893c1fd879d5528759d",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:318cbadb59c59c84fa47336a114eb8f717fef9d0b6e4d893c1fd879d5528759d",
+        "textSha256": "e8ebb5a1149f102b9424ebd6efea656501ef090a2ae40f4b05c76189f7dcb1bd",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/97b16744ef7a6fd6747c6328a7e576f81ae08c82064c4b6600c4a6e311e8b9ef.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:31f5d434e0a616057004ff3a0a780ac5b0cb4fc62a43d7a3366d8a3558693ba0",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:31f5d434e0a616057004ff3a0a780ac5b0cb4fc62a43d7a3366d8a3558693ba0",
+        "textSha256": "124006542378bd6373d66ad9f957ca2db9581ab8a852ee37870f4a8b19df20fd",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/b61575a6f64837987a812942f7cf142553f85a8bd3a430e39dc3a21c5cfb7d1e.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:3379a194fc2123a01fef250997859dbc70675c1a4ed12a23b17fbb92d92efb50",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:3379a194fc2123a01fef250997859dbc70675c1a4ed12a23b17fbb92d92efb50",
+        "textSha256": "6224a3714d657636d42fa23773233b09e9b2261eada71ecbfe434144365b56b1",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/6dc3e1d18f0f5d0f3f4de4aebd8d79cf9fd69eb2f450f324eed2cbc35d61ab72.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:3653bb2c1a844704f0cd5e042c8a0600d0fdd1f3a279fe88e32b2a7018bc3505",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:3653bb2c1a844704f0cd5e042c8a0600d0fdd1f3a279fe88e32b2a7018bc3505",
+        "textSha256": "8f696a7a360e4b9e3573237400385651358d8d949642934de885b4d8dc741c03",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/576af3ba9c153f8578829d875da2457c86ee10ce484925a641f7381755db9a1c.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:36a93880cbd1a79f70d7f6f370f1b0a5c971247897df659c569b420a53471f71",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:36a93880cbd1a79f70d7f6f370f1b0a5c971247897df659c569b420a53471f71",
+        "textSha256": "9c582d6a016554320e92f6509fea5a88c9215eebe8438d09917b20ae51deb82b",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/707982509cd64a0a4bcc3efb348d86aee47c52a1066b544a7863310f5d103e1d.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:36bd80adcc3420de67c53074cb279f04e4356bb15633bb164e9247719a553bf7",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:36bd80adcc3420de67c53074cb279f04e4356bb15633bb164e9247719a553bf7",
+        "textSha256": "e4e9e11ca06aa869613860b3b02ea27beed9fcefb1bcec6d317bc68d7178250b",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/8c3f2398276435e2c0612d748db35b8b16525645de0ed2275b0aa1e70db062a4.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:36d299b3eb06b320c96e8e325726944926686c2379322e208d3d04b2135aaa29",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:36d299b3eb06b320c96e8e325726944926686c2379322e208d3d04b2135aaa29",
+        "textSha256": "aa0450ba51dce0c4fb50155b2a46fc31c5c01ebacea0b84a126c7252ce943ddf",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/29dab0ef2b73f7c75a5ad4915a95cc3d2c412fc10ad36378f1c8ecdb281b0587.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:3a46fce67d8a0711ff7919cba96ffb51f24f1eef98acdc93b42961c67449af08",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:3a46fce67d8a0711ff7919cba96ffb51f24f1eef98acdc93b42961c67449af08",
+        "textSha256": "3d1bcab975bbf052744d50353cc4bb314d4a8d1740aa28b1fa1b6503b3398ce8",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/24bb5d817c11ce39e162c0f29a8a719c240fe0c140134cfa5b92c61e7a947fcf.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:3aa5429004bc968a6fb9597462c5fae5b38bb5e67fbe4cb04a5932fe4c0fb47a",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:3aa5429004bc968a6fb9597462c5fae5b38bb5e67fbe4cb04a5932fe4c0fb47a",
+        "textSha256": "4e865ee3de8195fa75c3d6d542bbbc5ea5b950dd264894c255610502e76b9d88",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/fee80b9b3b913ab1913d8ce9cee708fe3a76878277bb154ae454750fe9a1c752.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:3d1c9780c12b6588a1eab0544ff08651946093a13ad0e64df1f68b17083d2356",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:3d1c9780c12b6588a1eab0544ff08651946093a13ad0e64df1f68b17083d2356",
+        "textSha256": "8e5f10262662e694b93f7d19b7bb89cb54fa9691611c6626ed9ba9ec6c43596f",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/183e3a03ec596445401bb8e893c67b806216e7061b4b95062ab4c63585e267d5.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:3e9dc2b2ad4f0deb6fb388c54c82c7ed031a8b03da38ce6633e6ff3cb2a59d17",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:3e9dc2b2ad4f0deb6fb388c54c82c7ed031a8b03da38ce6633e6ff3cb2a59d17",
+        "textSha256": "b85579043b540114439fa60fefa34ed49004e0886dd187152d262e885dfcc453",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/d8059b172b1083b9c0c3e92540e807ef3893279ee1af7e9314431770e4753bbf.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:3eb943e11470538a1703a5328028ed99594395087ba72e7cfb32e39a4517c4d9",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:3eb943e11470538a1703a5328028ed99594395087ba72e7cfb32e39a4517c4d9",
+        "textSha256": "eee809d874748ed93c1063c433be53cd0da0b1ecdb7c7e3828afbac5f9ea54c8",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/c32870aa9e7ca1dabaf6dfeeec7ab913d20ddfa1964e812a4436b37332a3faa4.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:40a9c3a6c6cdc9bab6669d48d11eb4262dac6774d5589b05845a9783fdb2b379",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:40a9c3a6c6cdc9bab6669d48d11eb4262dac6774d5589b05845a9783fdb2b379",
+        "textSha256": "5fe566b9aac5cf284d27023a8e08ce299a6bcde0c088b7a2a42034b74f6c6929",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/619f536b9bb990e7711db2604c2c276815f6e0ff64798d8ca630e816dac2c7c4.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:421fcf0adca87ee53eecfd9fc048b93dfa718e8b880f6a2c34969efb3695ce98",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:421fcf0adca87ee53eecfd9fc048b93dfa718e8b880f6a2c34969efb3695ce98",
+        "textSha256": "80fb1463a24617b756c471d27a9502f528e753a81e115261b6332b86551c433d",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/e68d16697b3371ab32e38cc58a7d075e6464bd4c21706b40ca19067c80d6f0e2.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:43fb1de69505d78db312d1103fea2dbcbd420ef5124ae2ababf38517e6163a9c",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:43fb1de69505d78db312d1103fea2dbcbd420ef5124ae2ababf38517e6163a9c",
+        "textSha256": "75af20781d86c9c152e91214039eb80dc648b0d232d2d4318de8a64e29a81dc4",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/17835303e5bd9cf609d6ebb2c202ed76081dd18d798ffe63747e60f2830934c0.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:45d05d520f69d1f38d836ef8feb9d233e171f3542a333d9b359b674e28fe4c50",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:45d05d520f69d1f38d836ef8feb9d233e171f3542a333d9b359b674e28fe4c50",
+        "textSha256": "e5a3e4d331c9e0ed33052aa216ea132fe77ef1658d24109cabaa3634789e3e37",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/61b1be4ebe9d8036f6c7822e9dea932c26d2a7fcf3c49802756b7643f09f9341.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:461f325e1ec6e7bed8e8a2f9abbf2fe16ea4de1420f4a1ec76b404aa6c22a9f3",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:461f325e1ec6e7bed8e8a2f9abbf2fe16ea4de1420f4a1ec76b404aa6c22a9f3",
+        "textSha256": "d64433b2f460cdd3bb8fa254c4888bae0eeac3a04acd6e73cc1b9c317cff176c",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/6138087483acbc01ba046240807df1fc124f521ccf5e2c33959683dff5b8c63d.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:493ca000364af678d8b75c924763ee4a94e4483ce35ab8efedbd2e0a896b36b2",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:493ca000364af678d8b75c924763ee4a94e4483ce35ab8efedbd2e0a896b36b2",
+        "textSha256": "d381d1ddc2f1ecf643774e1afcba53cfe0923ff8355cbee4bf7a557ea419dfb4",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/0b5cdf1bcdae8b576d41d78fcbdee2f8ca994bd3c7a9a42875304c47ec050091.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:49c90ef75554a3f0ef690602a21014c22d1cc8da0532a66a32d4f6c79751be49",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:49c90ef75554a3f0ef690602a21014c22d1cc8da0532a66a32d4f6c79751be49",
+        "textSha256": "67e8b57445208f0940bd30eb087e6427fda18ade0b6aec79d50069f0516e4b7f",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/44fc4d530b0f52dd7b65b4f33bc4d91356b964723990eb0886151d6852f93314.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:4a6bbf317e26e1977f685bb88da4fe0123cb6440cc4606c3ef7f75ebd33d4bdf",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:4a6bbf317e26e1977f685bb88da4fe0123cb6440cc4606c3ef7f75ebd33d4bdf",
+        "textSha256": "6796a6cd3d38220f576f9759c55d6b8613ac502dad3074fd4624d6c631d5103f",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/3b42a2c60839cbb4feaf7a95571bf4f128bf18b1ced0961f9cbc8fe3d911fa07.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:4dd8b606a8139083b48f2eee260a4453935d71f4d0ff008065da40b9d2be38c6",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:4dd8b606a8139083b48f2eee260a4453935d71f4d0ff008065da40b9d2be38c6",
+        "textSha256": "91a36c8ed80e0d8f8c5d6463ffb7152922c1fb1c2074c559ec839e850d0461a5",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/0b9fb8314f4739bfaa9a5ee1683b74a9d130c1ac21e3adf06887fd1aaed0a662.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:4e825722de45588bb9b9c19f9cca1175eea6a6cebd3a2a1f0307ef8e3b8bada5",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:4e825722de45588bb9b9c19f9cca1175eea6a6cebd3a2a1f0307ef8e3b8bada5",
+        "textSha256": "184dfd6ada3eff0e7272eff391a6b5d72c88a54fd278b44c8db28c9933b5dd83",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/9370cf9609a2d0b3b6ad5e77c40ad54916f66dfb0c656568baadb1ab43a8e75b.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:50018b84e269f5b737b36a938b3db3dc05314d7cd827279aaf6d27075ea25fd1",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:50018b84e269f5b737b36a938b3db3dc05314d7cd827279aaf6d27075ea25fd1",
+        "textSha256": "1caa932a0f4270fe631ef55f183950305dae73c8df6e3d51248a59f6eea155c7",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/ecc60b9a1eb686b34e20e511664444288965e3a1c087d1815ebbfb380b43ba2b.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:5026910285c379b15a533bfeac211ab26ab09d4cb2ddcb0fb51f063f0aec50c4",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:5026910285c379b15a533bfeac211ab26ab09d4cb2ddcb0fb51f063f0aec50c4",
+        "textSha256": "de1a4bc7292da58c52a52507f6f501d7d09df19d877b4ff988aa942bf482221c",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/6eca39c782e4b73f8f2ecbf78d9955faeb0cb635d0a43c6d43aed03a764a1540.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:502cd5db40037a6c8ae68e52bec275f29d640da2bb0ba69d8d6dc7cd93edc676",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:502cd5db40037a6c8ae68e52bec275f29d640da2bb0ba69d8d6dc7cd93edc676",
+        "textSha256": "a245cd18b2fa99faeda918c0721090753e58502ccf291fe1348137b3627e717a",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/2187141f6257b8891688db56cada7ffc8dce73145662c66e54591ebd247b0f0d.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:5063186a42f35850dd69fd412acaf31b32d998e86aa59b141ef5d823deea1730",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:5063186a42f35850dd69fd412acaf31b32d998e86aa59b141ef5d823deea1730",
+        "textSha256": "eaa6bd670a35dd355c4ecce24f732474d5f6eef1007df2eb05abf02a6c1f5388",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/eeba963843011c353c0df0c4f7c735772a6543a333c45e3ac34ae89a59f0d1c2.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:507e66a3e0b3efb8484f9ca048b8fb3fd277b0feff993dbab68beeb1ba25d127",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:507e66a3e0b3efb8484f9ca048b8fb3fd277b0feff993dbab68beeb1ba25d127",
+        "textSha256": "d898b1583199d457bcd6995570dff351e7849564e4d068b976edcbf9423f8a5d",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/7694118afcdb94dbf8098dfe547e8c8d1cc37172c41bf264c4db0377ed18b651.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:511eda0dba747df58650eaa4fff53f8993718a710677afd81c3fc58d38900cc3",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:511eda0dba747df58650eaa4fff53f8993718a710677afd81c3fc58d38900cc3",
+        "textSha256": "3359ef826b8ad8c10bdc2837e254f35be471a434752cf71771e54343f31a4290",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/5cab1d376293595dbd0b5ac4b254c41a7c47c8053cdaee3700ba048ab11b81dc.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:52049270341b505ac55b0ac6497696d36f16eda757643ec21f5d63f60c462c99",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:52049270341b505ac55b0ac6497696d36f16eda757643ec21f5d63f60c462c99",
+        "textSha256": "4067b21bcd1f6d29be0932facf0df217699e6175a02c9cf543204e963d97a0d0",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/67f6fc5abefba54b71ad560feb5df3a1d8b385367067585ec7dfa15df5dae0a4.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:524903bf24268b22041530d487b9c2358a988d63e3d62ffbceda84eae65a2190",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:524903bf24268b22041530d487b9c2358a988d63e3d62ffbceda84eae65a2190",
+        "textSha256": "6642bd40bc85c6aec8dc58699556bb6fa7b28eaac39160a1f549f4659902b910",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/62a9c8cb46545667effc7bf80bed386d6232945a1f68151f165ca5a3c47875ae.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:540c82ba42c3a52335f35947d4ecee0dd43ad8ebfbd9b3e1af498ef312b5420f",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:540c82ba42c3a52335f35947d4ecee0dd43ad8ebfbd9b3e1af498ef312b5420f",
+        "textSha256": "cd89312b9dc3d91367ab6a65e11a6452ea265789ccf7bc0f682a74b8553193a0",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/18c560a88a2942e075ac95d1ff0fdef64f138428036270ffb4f6e97ede871495.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:544710207e23935cf78c4e5632c09280663adddf4272e7efe64ce3a4602af0ef",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:544710207e23935cf78c4e5632c09280663adddf4272e7efe64ce3a4602af0ef",
+        "textSha256": "d018e4107d389c63e5b06f33fc8b75f9f7d2768e97c34e30592e686711c43338",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/2d32df6f11994508547190a03042a89c15ef7320fb53669b2792aa6bd180f777.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:550ed98268892a87694c2192a042465d6bb2bea50445b1699a5555bb05085959",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:550ed98268892a87694c2192a042465d6bb2bea50445b1699a5555bb05085959",
+        "textSha256": "bb2b64d99a7cad3f4f41dbad622fcd941ee885c0a8b6a127dfbcd05e3a85b52c",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/50e493020b53bb26d65b7d9657f3a021a74b4583ed94009b087a656afdeaaae4.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:5514f17e453e73bb288a76e020bd95fa7c5698430c573e7d60b2ec0d9a0e2bdd",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:5514f17e453e73bb288a76e020bd95fa7c5698430c573e7d60b2ec0d9a0e2bdd",
+        "textSha256": "67386ca587ff9e71e353b6fd23b80ee3f997074450178b7f138a2308b4fbcd80",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/8277419ad2b8e0eaef8bede29b4b837b723f5736bdebbf28394b003f3ed3f250.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:57485ab95e66ed0ee8c19513d8afaeef3dc52a42ff3c9f122715c98ff544901c",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:57485ab95e66ed0ee8c19513d8afaeef3dc52a42ff3c9f122715c98ff544901c",
+        "textSha256": "fc6a170af8e6dcd76724ad1362fc04e07c665ca3f06c2b2336566f28dc724e4f",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/a58ac66a2567824ce5474b308fcefdca369ef59ac3004bc1ce31d309c7e55775.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:576578e74f3f58043b64e98c16b9d52b6c101bb7d52ba5574e83d886c7be785a",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:576578e74f3f58043b64e98c16b9d52b6c101bb7d52ba5574e83d886c7be785a",
+        "textSha256": "40caa59612fc922e89d29c2cf36232ddc28942cde8d2372ba7a8aca47ac4b6c8",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/2ab4b9d68a2ee6885ce3e1d824f2066fb5ecfa9b1d267f60e9d6b868c02352f3.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:5985a2634c19f9e2f0438408ba53ec00ded13c2f9823d7988d8c3581c85f741e",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:5985a2634c19f9e2f0438408ba53ec00ded13c2f9823d7988d8c3581c85f741e",
+        "textSha256": "abef6d2d3e040f059dbc8d6a0b08e6f750fa202a27db89044a102f63a74ad228",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/bef70032716fab8ee26876a08399fedb3f8f592fe7ee8af0ea6a6247b20efe51.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:5a377538dbf466956f00f002206ac8a2d0870fe5f8581cb4588f7af6de9b069b",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:5a377538dbf466956f00f002206ac8a2d0870fe5f8581cb4588f7af6de9b069b",
+        "textSha256": "ec181b0b313a4f6a23cb8c902f13ed0047c2ff99e793d594a7fcc937e3953d47",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/b06f5abe7b36235b8168b8a27d2bfac0c077284e26f50afdd66c4f8ed9745395.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:5b7ca21e30aeaffd0bca03b53f745c2c2fa9cdc17258ff2997d775bfd6b3565d",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:5b7ca21e30aeaffd0bca03b53f745c2c2fa9cdc17258ff2997d775bfd6b3565d",
+        "textSha256": "a57fc11d5e30a97de6aa3ba229dd24bddbcff656c2b479a0d819bfe4331ad695",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/ab08ee9190a776eca3c7175c3a633226c1d70309c590fd11c80d2b88f5c75940.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:5bdb51500c24e43dbb7f957e0d1737cca90bc7bdf176b14101a023411c3076f3",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:5bdb51500c24e43dbb7f957e0d1737cca90bc7bdf176b14101a023411c3076f3",
+        "textSha256": "48fa284885536f1284c072c144b5d48418c5dd5456bb3c5c24786b6a86b083b6",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/bb85d0f1071ffa9de604a1fa98ac23965feccf48a8f050e5635638035d5da413.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:5c0b601b0bc137c91a92d599539e0cfecf8d091bf766c22b8af2112fccc3fc53",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:5c0b601b0bc137c91a92d599539e0cfecf8d091bf766c22b8af2112fccc3fc53",
+        "textSha256": "f6a9e7498c72ebc0cd1384e18a11e1484d914444220db328649caec15907f614",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/3c34ce1efa9e23820ded1845e9a0dff2412025f18490e1bc5234ad5daa8eeed6.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:5e33aeb65549db7e70dd23aba6375c57bd70e076e82608ff007edc7fcab2ffbc",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:5e33aeb65549db7e70dd23aba6375c57bd70e076e82608ff007edc7fcab2ffbc",
+        "textSha256": "792208d7711d4daea80ec1fa1cf2047bef539e6e49ec8b99f3881153ff60fc30",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/da1863b563051e6f99ab90528296c04355a437f1137d90a28f2932edd45ae1c6.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:5e63731780cb931cb5534da550d921c6aa0f2d5c65e64e7b4ce3fea1ca72b5a2",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:5e63731780cb931cb5534da550d921c6aa0f2d5c65e64e7b4ce3fea1ca72b5a2",
+        "textSha256": "4a8805877599d524904f5dabc70b792cd54df44503c130cd363d1067a5b6ab31",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/f7cdb374993a5ba46cf8df70c55d99dda1226fa54512be4009345171ba20304d.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:5eda419f0d5298a223c83f6bf578db2a8976ec844ced922bf06eadd2a94be078",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:5eda419f0d5298a223c83f6bf578db2a8976ec844ced922bf06eadd2a94be078",
+        "textSha256": "8c4d2f54dab4e4489da283a618c265e1414f3412a8b0289c72f00d2bc687e5cd",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/372cff7c79e4318156e22443533f9ff67952a43d5b41da1b7df12416d03814be.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:5f162cf85eda29310c5629bfe04e20998caa8112ef0f2db58f60c90d0cb030e1",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:5f162cf85eda29310c5629bfe04e20998caa8112ef0f2db58f60c90d0cb030e1",
+        "textSha256": "474cb60954933399f6e19e0ce01d334c5dc56b7483932da94c3c579d06838e7e",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/44547a2bd37d603d38fef9c0b9800e7396dfbb74f483d13bd1f7aa352bbd87ad.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:62cdb13751b874e7ea22ad1f611ae3b96906fac008a397f79ef2d98e5ebaf2d0",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:62cdb13751b874e7ea22ad1f611ae3b96906fac008a397f79ef2d98e5ebaf2d0",
+        "textSha256": "14d9111ffeb435eb8bb27a333bae0678e9c07061e672ad53f5c023930e4c8d74",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/20a3ccc349af6acfc325ea8fee4d1576fc0db796f1ffb458b60ca915fbe17841.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:654f829a7077d49fd6200d7ac910aada4729b2fa9ae6fd5c7e38d6459711f2b7",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:654f829a7077d49fd6200d7ac910aada4729b2fa9ae6fd5c7e38d6459711f2b7",
+        "textSha256": "3a33a035be98eb8a1e0991dc8e822ceb055b4b88e2c072c92818bd762d19cf4f",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/61bd57d384691eccde9df4e43089ae3a4c39a80a98c57556042ebebadc9085c6.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:65a6f0e43e90e76b313cb476cf465fff6d20b7c692eb1d10c658dcd771678d33",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:65a6f0e43e90e76b313cb476cf465fff6d20b7c692eb1d10c658dcd771678d33",
+        "textSha256": "141f8ecb2f4895bb507735ada6e0943e95eb882fb3d62e7268935060f6217520",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/41ae4264f98b0b0b998c3e09528a4aabd8757e5006ba96c097361cac7d269d10.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:671f8f2b8b8bad0e4a708c48ce0a60023ba1d5329514481e0893df3880fbb2ff",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:671f8f2b8b8bad0e4a708c48ce0a60023ba1d5329514481e0893df3880fbb2ff",
+        "textSha256": "dc4c207c3a698a89a2007d88ca9d68ea235810e995807784be9b1df689f4f571",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/b513f66302589287d10c88b0f4418e132ec45eceda74ae0699f6fe27494d20c6.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:680c83e7b5163d57fffd3f134f38a91a41f2e6045f34c83ea1621365d3f5c0a8",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:680c83e7b5163d57fffd3f134f38a91a41f2e6045f34c83ea1621365d3f5c0a8",
+        "textSha256": "530aef30fc26e635c8940ae05faeb66512933649bf80f4624d1762601b5d4515",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/8a806ddabcceb472db412c395cf3af31bc903f4ca262565720a398b051e38829.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:68ddbc0f14437ba2588329db3e96d8138e31169788ba7807fc1a351cce13a059",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:68ddbc0f14437ba2588329db3e96d8138e31169788ba7807fc1a351cce13a059",
+        "textSha256": "110b4b04ef7dcd6a281b5baadd818076373948575c500bd5f49c29441105c579",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/860c8349d59af9f2e59b7a3952c940bf9909bf002ec836fa998ce55d8718e1c0.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:68e9bb9e36838e6b9244beea003d5681c93d472930ba441f21a1e2defbe3cdf6",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:68e9bb9e36838e6b9244beea003d5681c93d472930ba441f21a1e2defbe3cdf6",
+        "textSha256": "f9fcb8050a4deb0c2d98e81cfe5601471f32a1f3d18b7d1251299cf5bc295701",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/4387420e0ac8ac74b96ca4b2f0ab03eb5a87ca044339608762041b4595c2d544.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:6a3453a880a4d42b0b4081ee9c4eb28dbe81e3fa8e6bbb91344fa3267ebe6554",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:6a3453a880a4d42b0b4081ee9c4eb28dbe81e3fa8e6bbb91344fa3267ebe6554",
+        "textSha256": "29786df7177d9f0626682f200a08ac451d1cab968292e3911f9f78f1b2564ef4",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/007e461031305479f1047b55d9272db68901090cddd835afc7f58c353cca28f3.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:6a4564aac096d16cb3801a0c1bdc675a3e3e1a41809fccf01414cd2c7b19afe6",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:6a4564aac096d16cb3801a0c1bdc675a3e3e1a41809fccf01414cd2c7b19afe6",
+        "textSha256": "6dc02534c2587ac919c25edfe17892b0cd04283c81d01a5b0f580348ff26bc9a",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/b346a3786a58c8ef03cb3ed53a1638fae429894cd7bfcc1a64b51c2bdfe6cc0b.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:6bdfa5f23306bde8d9819ac37d4541801af0bfa6b001feebf312c558ce8b9890",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:6bdfa5f23306bde8d9819ac37d4541801af0bfa6b001feebf312c558ce8b9890",
+        "textSha256": "e9723cfde1cc62448739f1c1c8f58cbe4a63e86e1571b6e8f37ca9254551ed2d",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/2eeec69c9b53f8aea37d13a7e20c327c00adc3da5d76cbf23c76d666ca1bd999.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:6c4c1c8e8273d6e7d33aa7dce94062fe2752623e270d9ffc725ccf145f502a96",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:6c4c1c8e8273d6e7d33aa7dce94062fe2752623e270d9ffc725ccf145f502a96",
+        "textSha256": "bdb4b0cded16e605852e5e4d09f735172b141fa491102edd0d3ea9aedc79528d",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/2f5be5b7e18518cb291cecd332cc8f6bd4f886d7ae4bea7a92ffb98b25301a27.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:6dd047e4f423dfb1aaca0ff417268f68cc10dc6b844dd4a4bb8c3ef4d009f6c8",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:6dd047e4f423dfb1aaca0ff417268f68cc10dc6b844dd4a4bb8c3ef4d009f6c8",
+        "textSha256": "31cd54f20751e62a22bc1759f9dc891f35c03c01d79651b263addad95ac0f052",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/2e184ed579607bc1b9073ef1e89c4ac1c46a8e83010892cd2b8f00773896b62d.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:6f3cfc8d06e91e5861881edd17725f997420182cc77310e8b961c58212f849b5",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:6f3cfc8d06e91e5861881edd17725f997420182cc77310e8b961c58212f849b5",
+        "textSha256": "38c149ed0e16e0bf80f83d02e83141b0f741cdecdbf092207588313eb4613e52",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/0469cea233b5d0fb26f50c830983193ce0e2e5e6fb3a7f79498b364d277a3bbb.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:6f83bd9087bdfab2f777225c78ba236bb29db05c3baa79e03efd83e84fcb6a1a",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:6f83bd9087bdfab2f777225c78ba236bb29db05c3baa79e03efd83e84fcb6a1a",
+        "textSha256": "307b12bd9e543099ac8857122cf200cee2f198fa96da358aaa0f0d7ffe75cb56",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/34955047ee4300010be981b27c8920205b2fe8a408c96130939820d17d8a6552.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:702879ab0ce448dd57b7e46b6690cbd19fd6cb4a50c153d3fe769cc933db6247",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:702879ab0ce448dd57b7e46b6690cbd19fd6cb4a50c153d3fe769cc933db6247",
+        "textSha256": "acebeb5b13fa05812950dd00ef8e39f0e4f4f2fb0a9e65f980dd66e06f1d0e91",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/6b9665597c83def98d2175c79ac379d17e824a46a1daff1bb7b2e821714acdab.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:7044cb2203db25ce9e017a7b8c6dd6e2b85e61427a7b3d78aef4970f051e4cd9",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:7044cb2203db25ce9e017a7b8c6dd6e2b85e61427a7b3d78aef4970f051e4cd9",
+        "textSha256": "5fc2e86c1a6fd2be2278d84b172f93f9f6ff0b38f0891cc0bd59b0e617ba999b",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/9d020aab7c095d85a4b41ca05ff61e35523bcc73c0e78f7045c35c2e59a52b1d.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:73791236adfa7dbf1e167d740bdfa9c4dc17497bfa35f472a8c502969602ddba",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:73791236adfa7dbf1e167d740bdfa9c4dc17497bfa35f472a8c502969602ddba",
+        "textSha256": "d29ed821c5c5005c71117aa8c5673f0d32ad6c2a0cdecb04ca99d4d35aaf98dd",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/8b17fc7c50ba2b4461533cbf34a2e64f53f18a0b4890dfe4bf60daa4e5cba117.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:749f4dea18fcfbd472ae2e40b4b609fcd562451e776fc7720771e567cf47f042",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:749f4dea18fcfbd472ae2e40b4b609fcd562451e776fc7720771e567cf47f042",
+        "textSha256": "270430aa566ee80b1f6e79b27e093115d35ecab75a199412f851a39b938d5911",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/19a90999d349e73a08351c064b1893f55e459b722361d9bf05889dd6788a4ee1.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:76ab223d8d471fd85578091e6757bae21c88f6c97f29cc97e205c2f4a47bf66c",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:76ab223d8d471fd85578091e6757bae21c88f6c97f29cc97e205c2f4a47bf66c",
+        "textSha256": "a38357d7f7bd66bfa4f97161f616a4b6e8852fd1e0326e7802a2fe28f6a6787f",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/2adcb401b5909795c3c829dc4cc0514c2d2f867dfdb20a87ff5bb6c2e79bd489.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:76d296dd1d67c61922e5034290b5a7eecb9942e740bce3fa4a8f78ed25894de1",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:76d296dd1d67c61922e5034290b5a7eecb9942e740bce3fa4a8f78ed25894de1",
+        "textSha256": "5289437b34ecf058ac4bcc321e367a67b0dbadc5a0ba58f20d83975a6a8c3999",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/508c3a7e61e1660eb44d3c528f9d982b086fae90b48b30a98edf46caa6d33ceb.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:7828b57545365162664ce754ff4ddf4a5b3c201d6d42a3c87fc76fba945e2760",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:7828b57545365162664ce754ff4ddf4a5b3c201d6d42a3c87fc76fba945e2760",
+        "textSha256": "8d39ddd6a3659d66314543ba10bda5555319375242100d22b019209138a07f42",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/18eddd498e7103869c49bc6151bb58d7aa87a2ba11da7823694017f5d25b9048.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:7970f56352e3d33c4c2c4822d6d7173cbb02816a3274ec2395b663e678ee5224",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:7970f56352e3d33c4c2c4822d6d7173cbb02816a3274ec2395b663e678ee5224",
+        "textSha256": "0ea861eebf4fd13f1e312dcab26ec21e9d34faa50923ce52a0608cb6b250b3f0",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/d03a99ffd7793ab0c70e0aa22d48c60c72b9bf97c16c1f25c4e2ca4bee5b8f48.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:7abcae7de8922eddd1e990f4e777a343da87748a477daf6c561df81988b53beb",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:7abcae7de8922eddd1e990f4e777a343da87748a477daf6c561df81988b53beb",
+        "textSha256": "3f3b4a56511ed3a4f08d8d46af13a6365f3393fa6f9b9efcdc2842ffc13f2d4c",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/98e04eb0be49e56497d9f3280407b1013455c7955b3912925d055d2e8d7d274a.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:7e27bbc35d09fa2ebe04b13079dd9965e4d4c49b6f4d82896aa854b9b0c7f8fc",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:7e27bbc35d09fa2ebe04b13079dd9965e4d4c49b6f4d82896aa854b9b0c7f8fc",
+        "textSha256": "43572f70437f8ce59383cff71dd3b26679ec4cb2b7978ef1df169a7e4f991116",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/2c2b0621b86fc08d89365430e3a2adb0900feb074696aaafb277d45e321a61c7.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:7e700c0466341baa093bacda38526247791dee5353bc4f332381f914ece0ca1b",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:7e700c0466341baa093bacda38526247791dee5353bc4f332381f914ece0ca1b",
+        "textSha256": "35df5c47303508ee219200844e8e8dba63529de3b35dde7df8dab502afced4d8",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/7db7a271a96bf11918ee4d08a5a8da3b4ee67217ff9dd948317f0b14018cc9bf.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:80873133e02412ac56be3f072e42a207deee411d0902c6a611f615d7fae043f3",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:80873133e02412ac56be3f072e42a207deee411d0902c6a611f615d7fae043f3",
+        "textSha256": "77631ff5568af3ea8c707d81ef1b34cb04924f04837bafaa8d6cdb1aea92b545",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/a916f56c68b5128651268b451b0dd54b70472d5ccb7f132526b240508097e3e5.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:809840bfd1c5959686bfb081d7308259549645218a0d201ceff03857b6519df0",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:809840bfd1c5959686bfb081d7308259549645218a0d201ceff03857b6519df0",
+        "textSha256": "1a244bc4ede60dbcf3678e9d31f9eb2c57fcef33e3efcff2e01437a80f19a92c",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/c499164e12a9ac69903896b6a023b4fd38be8e1b5d2bca17577b169ea6441940.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:855172b0ec6b3ada9673271a4a9f73bfc700ac865e5bf43be46857173cffdd81",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:855172b0ec6b3ada9673271a4a9f73bfc700ac865e5bf43be46857173cffdd81",
+        "textSha256": "0b61bea8276aaf84c287e791e5ff20777eec2cbe0be715bc1f9908f487fb8b10",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/3d8283ba2aa1ae9f37033cba8f502353459e257f281e77bb8c161d4bef04d886.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:86b587fa09fb862dd7dd1ebfbbbfe1be59841de9a12708d33c0733d44e652f8e",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:86b587fa09fb862dd7dd1ebfbbbfe1be59841de9a12708d33c0733d44e652f8e",
+        "textSha256": "651107559bdd900bef05bba22f44ced4fa4845a6a93997aaef4ec05c99bad20a",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/9ee9a1e47a82837ca823e69340098e7cbbec95bb6704be820de54abd1abffc5f.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:87bebd061e576388f5bb882b4189c6f4629ee5f1d84e38d993ae5d6b40a60eea",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:87bebd061e576388f5bb882b4189c6f4629ee5f1d84e38d993ae5d6b40a60eea",
+        "textSha256": "68c8dcb3456ed982bd8b5576f2248dddc8213b8ca4bca51ad1aa4861ddbbf461",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/00248b2aac4699d7b1e70e6246ea3c7c100cbf9314d27afdbf1335e790fd9a23.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:8a2f47e88e43023df70eacd8342dad38d4041f152d77f5ca43b6c9759c8e6a9a",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:8a2f47e88e43023df70eacd8342dad38d4041f152d77f5ca43b6c9759c8e6a9a",
+        "textSha256": "243dbc4b1566706fec1101e85d4ea56fc6dcb71ce97fc79f87eae13971682a50",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/d7ffc835fe969a93064a84f532d34e571bb2cc1907639c183e5ed3750da86dd4.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:8d9c3a503941aac75c4c39817314985d2d964ed098ef68f6cbbd036a654e87c4",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:8d9c3a503941aac75c4c39817314985d2d964ed098ef68f6cbbd036a654e87c4",
+        "textSha256": "2768e896fb49c4daa27d4bae4ee5424e9047a1a4377d265cb84ebbed6441a6f5",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/c8ae40977cff11933e9c13fc0022f5549506d3724e708e2498c07d4d35243ceb.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:900b959108b2cc4ec15eb8378449ba9c9f3a4cfeefa3edae15d5c59d1516bf58",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:900b959108b2cc4ec15eb8378449ba9c9f3a4cfeefa3edae15d5c59d1516bf58",
+        "textSha256": "371929f83ce89025032759aeccd42763ba42f400b409e6b5ae81c502ec9ee36f",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/090d5c5972e0fe2d7a9d559d0e8c94ff9c54c2a8a4b2c9c937bd6561399b8b43.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:92d261c5a8db18dc674509d60da8774108d983c2e310f5898a7e1a12072286d1",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:92d261c5a8db18dc674509d60da8774108d983c2e310f5898a7e1a12072286d1",
+        "textSha256": "0be62558e3e2a28a4e5cfd7d38160e45c2a7d38b92abfcc77706eb0548b38445",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/30168664c14119161f14c5a6c0868ab025786ba7c80b9e473509749515ad5966.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:9823791c8ecc018aa2114133ee516caa18933a1b1f7ba5327d23f9c88f277b38",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:9823791c8ecc018aa2114133ee516caa18933a1b1f7ba5327d23f9c88f277b38",
+        "textSha256": "d0745cc44549f7c8b2aa8c7533f804e6327aa53a31cb4c69f44d3e8dcb447814",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/6fb5a0f43177103539b0792c1ac709c73ed5f8faa296d9bd6d2a7ef9e07f185a.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:989e4c48108c159bad813636e9dfb38302bb99c95ca1feba6da8921e278a2143",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:989e4c48108c159bad813636e9dfb38302bb99c95ca1feba6da8921e278a2143",
+        "textSha256": "c2e885e26d68f6bf5c39ead307c17907525d5747f7aca6726552c7a58cd00e62",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/54838442a6131508ecf9013f9ade5b1364ad6d4c96b5aeb638b4fb430a5faa11.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:9c04ed541bfaa1c7b3bc352aebdf0c6156bcc73402981e9e8e18ec3f6c68dc56",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:9c04ed541bfaa1c7b3bc352aebdf0c6156bcc73402981e9e8e18ec3f6c68dc56",
+        "textSha256": "e6d2f95d903344db9e67996962584fa2adc30131692a1f7f040e357c555330ab",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/8a5fa5e3e95693694c90e5abbd8879d99b5511cfa2f6113ee7a0893702b4b4f3.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:9c9b116bb6e92493ca31a80309e309179f3c1ae5e3168db87c2a8a21831729e1",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:9c9b116bb6e92493ca31a80309e309179f3c1ae5e3168db87c2a8a21831729e1",
+        "textSha256": "d100f513fc4d794a04dae547cab86f0c6b4d48f9fabbe8d623823d533885e665",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/408fda18f5626ee18ff27730f2a3b06dccf8d2b5b7a70ced53cb68fdf786df46.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:9ccb75f3ab85a554a41e05eadb3e862ab76684f63068b11bbbe47455b49e1876",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:9ccb75f3ab85a554a41e05eadb3e862ab76684f63068b11bbbe47455b49e1876",
+        "textSha256": "dd7208bcc175fd291a121879506bfb2184bbfec2b3d7f7bd1e8aae1c1e98576c",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/61e64440e25a97628c78d6181116a6803e17730eae34772ec47703cad4f8f4ca.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:a0b3063d72570d3909111d9d617c86f0aaff3eed98916255d99a433adbc42803",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:a0b3063d72570d3909111d9d617c86f0aaff3eed98916255d99a433adbc42803",
+        "textSha256": "37dcdae8cb735d900be5046e0653c5371afa6fe909bad1fc6735e3540775d79e",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/531367b6a6843158c778eed7a09a9a6e6019897746b8dcb6443441ee5843c68f.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:a15ebf132a4bc9e44b408c5c686b63d99a5cfa4089cc483f7a96f7c74ba95b60",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:a15ebf132a4bc9e44b408c5c686b63d99a5cfa4089cc483f7a96f7c74ba95b60",
+        "textSha256": "5e62ce2b6a677de2519563784e10bd3a315bee6f4cc427a4cc664443633ccfcb",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/0bcfd173459ec485b8ec8e4be794c9587fb76125f3bb7e282e04345e073f33dc.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:a16488ba0c6c266bc7ad9babb223c2a14b21ff8a63571758f89fb55df5b76e35",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:a16488ba0c6c266bc7ad9babb223c2a14b21ff8a63571758f89fb55df5b76e35",
+        "textSha256": "4eea599e12198d985d5d88fb3c7c91957ce0cd86ad4c024380fa176fa84b6435",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/17506743a0b3aa868cd6297322b4f6cf50949ca5dfc82db983556b5f3b10c3c4.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:a17e6e7684805e3ce581f7a679087c795181816264a2dfa17edcc53aad21aa34",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:a17e6e7684805e3ce581f7a679087c795181816264a2dfa17edcc53aad21aa34",
+        "textSha256": "8b93a76d9f8df3f37515500f6b9115c5302911720a8f65b779aff3661acccdde",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/60d3f1c223fec997db1e0f429b496006038713da77fabf28efbc7b7d0d2e2bba.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:a316a19d3c60ac4be723b6962ef9f5047fb241ebf255671a147fc7299b2ef9de",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:a316a19d3c60ac4be723b6962ef9f5047fb241ebf255671a147fc7299b2ef9de",
+        "textSha256": "aef6e1b691df42c852b193e205f506162d5499d57403ae72a79bb1065bedee20",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/e270316547787b8d510c1a2ab83b63127229c1b653ffedaf24182e3ae655b444.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:a33f57493ddb60c5ae19e0cef97922ef991d299a05c3069f12318decc9d12293",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:a33f57493ddb60c5ae19e0cef97922ef991d299a05c3069f12318decc9d12293",
+        "textSha256": "9938c866a194def0e1a067f0c903575d6a87ca13e82571024c623d7da1885aa8",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/6fb18783f72cd63a96e50e95503af6fa3ef46de0b4aa247646b30f8e81871f6f.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:a6187eed5ef67ed4c6fcd9a3daba409a46bb095cc75f943b9e82535c1e49ccda",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:a6187eed5ef67ed4c6fcd9a3daba409a46bb095cc75f943b9e82535c1e49ccda",
+        "textSha256": "5dbab9b4f0c714a93e7f225e151ab65e1fb40207f33d5e85efb4cd1279d97450",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/28755950da6c1e25921f32ada99ce057cfa3242db27fa243dae231596499d3d0.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:a831756e4ae9270edda1046030482e236face4b223e5011cf3208698d6ed1482",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:a831756e4ae9270edda1046030482e236face4b223e5011cf3208698d6ed1482",
+        "textSha256": "9d1f5faa08d4ba973d78b2a105b97203fc409891ec9bd3aa15f4d9a1a44f1674",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/610f8a6b8f41f81a0738695f28c3beaa9f77010a31f5f47cdb5912bf7508134c.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:a91a8077f30491dcd7238e5cfe779aa15c7f619116eec92ceeb711422803ee42",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:a91a8077f30491dcd7238e5cfe779aa15c7f619116eec92ceeb711422803ee42",
+        "textSha256": "aa044a8d915c07839e8d933b33c3888421446bc22c24ba63b4a39a969d6d6de5",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/df5fb1953eb1c147dbd1df5f58c13b6de696b4acdd881cb556c4fa4428625cc4.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:aaf5042430626ef33bb59433d63c972e097f237e7fea050197c641da97ba4c6a",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:aaf5042430626ef33bb59433d63c972e097f237e7fea050197c641da97ba4c6a",
+        "textSha256": "7e7f47941d814340960dd317bb349c0f3715eea40e2310b883aa0e3c1e35d6a0",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/31cacace9fbc4a220d802f408d16941f3a92fd686f6492550d3683328bd0ef80.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:abb4d2841218efe4296dbb35854ef3935c788029a483be2666524038c21e8418",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:abb4d2841218efe4296dbb35854ef3935c788029a483be2666524038c21e8418",
+        "textSha256": "20bfb9dfe03c0c514a5ceb43c92b5452a403ef6f117fe39a409ead09ff59749a",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/9105f644bad0c606a6516e3a14c701719822d33cd0c123de098eb0c5246bf100.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:ae887e2868f16481b8a3d1f93ed3b6fa506b9f6b22e7b63071186adeb37d18d5",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:ae887e2868f16481b8a3d1f93ed3b6fa506b9f6b22e7b63071186adeb37d18d5",
+        "textSha256": "1a2035276afbc25ddaf55b1ae694f90806ebd9ae1bbfe2f09d38e3ff3bedf870",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/e043462c0f862c6bfc4f1f5af083ceadbf12e19853109ce5c242f75fef593ac4.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:ae88fc51436734cdf0db73d66fc9029b0177b0ae4049a4b1fd55a99f25c32a74",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:ae88fc51436734cdf0db73d66fc9029b0177b0ae4049a4b1fd55a99f25c32a74",
+        "textSha256": "dbefab7a7ea37324cd335389566a26e6ab6b96cc8dc9a23f58ca4f24a68566ac",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/f26450155f5447f863b3adf6bd6aafc0a7e563dd8303d16bdc5b6612a8874eee.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:af32456b817027862c1d12650a4607b1817e28ba22fdee3c9eb03692cf8b2ee2",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:af32456b817027862c1d12650a4607b1817e28ba22fdee3c9eb03692cf8b2ee2",
+        "textSha256": "c2a14b2c79b47fb62ffa820ed14dee1dee8a9ee8e70b4332d1a2d64c41a624c5",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/e1a2e01c7b129940278da9cb39df0d08db9f36a612f1ce37ffc33645160246f6.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:af52fada83aea689b073c6bf6170519128abb1aa29fc3c20f9c5cde076fa4cbd",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:af52fada83aea689b073c6bf6170519128abb1aa29fc3c20f9c5cde076fa4cbd",
+        "textSha256": "991c922a3cc77451ab4153f66287209c5a470db33878e4f138429f2774066d54",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/ee4d5848cdd3eb8cdc057a2fe10a3fa2e9c6548506770e3d85a0316fa89fe337.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:b0294572952caf620953a822b24d5ef39045a93c175f5192b1ea2d12b70b6d21",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:b0294572952caf620953a822b24d5ef39045a93c175f5192b1ea2d12b70b6d21",
+        "textSha256": "57e97ef70f0bd832cef309beffd9a71d4c57edc3089d57288a7d1dd6eba49072",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/3e9d97726c7457476f153e6a9f6a5ccbbd511996854d111567d2b609ca9e01e1.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:b02c0e3beae8ccfc45f68d8bec030a1ef99935fe585ebbb2792eadaf76b84b2d",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:b02c0e3beae8ccfc45f68d8bec030a1ef99935fe585ebbb2792eadaf76b84b2d",
+        "textSha256": "2f6b71610b72d1252084371c5584f2be3d75ea2a45da9635712989ccd113fc93",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/b80005c6e83bdae051a04c611aa596a0d75a86d0f7426015bd48677472d448e9.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:b0aa0bc0c015d0f2778cfcacb771cb9a8e8bfed181997d13f4beecfd2f6125bc",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:b0aa0bc0c015d0f2778cfcacb771cb9a8e8bfed181997d13f4beecfd2f6125bc",
+        "textSha256": "45ddb380b0bdcd24dc0c392ee12e5c7667cc80bac0117c3c6c072fe29f238b23",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/37081b2b65120eaa7fca38f20da58e3e056ac517688c1f3bb28d768f47007ae4.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:b1a9f4dfbf1b4ffe6152a3b6b9ce89ff67eeebfd683b7432c229b90aa855a689",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:b1a9f4dfbf1b4ffe6152a3b6b9ce89ff67eeebfd683b7432c229b90aa855a689",
+        "textSha256": "e17810ea185fe758bd1975c154f8c6ee5ac4f041734002eee5f3574243bb8a8d",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/1e723ce8a9d674fc4ce98f46c898b5b315bff93587c92d684fb8f0e0493e0ec9.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:b292074dfb77b771575f1b249c06d814f1ae192590a380fc278e36e1c3482abb",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:b292074dfb77b771575f1b249c06d814f1ae192590a380fc278e36e1c3482abb",
+        "textSha256": "54e2116dfa5398fcdbaa8845e869dcd106232d5e2a0448c9ecd4d5e639d0f14c",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/fab075dd5e316ceeba96334dc4e3e764a22ad7d0e73a64c64a4b87a47ca0ea81.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:b44b55849362477b1cf78aa3050b752895c7ad2d5d9447c3533913f1dc086c1e",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:b44b55849362477b1cf78aa3050b752895c7ad2d5d9447c3533913f1dc086c1e",
+        "textSha256": "26e56ff91767faf8185a3d59279f748d4dc00b2351bf1db7c27b261f3e098b51",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/cc533a0f11e6158b43101bbd3d79b4a4096ae8486a11633f6a1d1db5b09093cd.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:b656d04cb4e6b3b5e9f33c8a16646939f9a3ca242cdb12d927c9985bdccb01cf",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:b656d04cb4e6b3b5e9f33c8a16646939f9a3ca242cdb12d927c9985bdccb01cf",
+        "textSha256": "c9cdab2a28cd59aae5c239b2cb34d2db1788b805a9fdba8c6e5473856a8fa219",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/1a1bd37a8e4028f3bb25f52084f30a6518ecba2be2a22639be37f6571bb59b00.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:b8ae8bc9d5b1667e923b38ba236e77144d0983289477c4652317a4f172e4994c",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:b8ae8bc9d5b1667e923b38ba236e77144d0983289477c4652317a4f172e4994c",
+        "textSha256": "bc87e713a96d2c0074c8bcd5239fe3e9077fabdbc82ed3cba0060be268e058b7",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/31c541b58afbf7623d2791754c4162320acd2af8c50becc0bb76840865ae27f3.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:b95111ce09f4854cec03cb5e8991dbc44b2d53c842d4bfa34bfbf1de954a34ec",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:b95111ce09f4854cec03cb5e8991dbc44b2d53c842d4bfa34bfbf1de954a34ec",
+        "textSha256": "6dd576838b429eb8222f9f0d15883bc4776c08e70692aedb3e3e4e97096f13bc",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/016394c9c291e0172e7116a8ad856021282338da59ab297b023cb867dc368de4.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:ba9978ccd069299fa27cbad1bf2a7b719e088124efe8beb65ab3749ba919e930",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:ba9978ccd069299fa27cbad1bf2a7b719e088124efe8beb65ab3749ba919e930",
+        "textSha256": "5d98d425531690c7aaa6479435de1d3949a5094b1c271fa14e3e90a419f06fb0",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/38b68b5bd90c45a9f918d91d677dfa66c7ff5c06efd8ed9850e56c650d421e5e.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:bc233e96be3f196d0b7bd93697e22fb2d4dfa546a16e98e46ec59a95ac02727a",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:bc233e96be3f196d0b7bd93697e22fb2d4dfa546a16e98e46ec59a95ac02727a",
+        "textSha256": "a9923bf4d56d79af8242c57c3978d3218d56211ede87b77ee4f82d6212ce3b11",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/f1387ba5f3860e7582b3d51f4ed291add62512b621a8caf44183a3764fde34d6.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:bc3594288b3b62ff013a59c2f3b9ff132520a62cc65c92a25c2d238a24411a03",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:bc3594288b3b62ff013a59c2f3b9ff132520a62cc65c92a25c2d238a24411a03",
+        "textSha256": "2e559bfe54b1be6f92528f16fb8cc52c865c888746dc045586c499a5c776637a",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/13e70828f39306501819d48098b5f887af0c1b9670f52afb17c9900f646da6f8.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:c08786ad9d708334b616315534bec24a844f0be1a3266dcf0e5f319e23a23502",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:c08786ad9d708334b616315534bec24a844f0be1a3266dcf0e5f319e23a23502",
+        "textSha256": "134823c4d331f26eaec662873dc1cc5c0cac82d258cc0ed5d093ee729420520b",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/c8e4695228e7de9e8c7d9c6363fc265eb239358558a751fd1b6774cd60bcfd17.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:c192c6e878f1a76da6cf2518946178bfb56bc200f54f906e5c1f45fd198da3af",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:c192c6e878f1a76da6cf2518946178bfb56bc200f54f906e5c1f45fd198da3af",
+        "textSha256": "85098c297d13d3fc764e636e99912eed2fe32b9a5330a1e435f797a8bb494aa5",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/dd2d274a251e7e00fe00ecf2dfbb6550fbc80554b1ef15f7511d6dc943aaf417.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:c36b40cb96b70b7b1c7e74fc1207f6c1e535a121e971e34da3f32447efb58bec",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:c36b40cb96b70b7b1c7e74fc1207f6c1e535a121e971e34da3f32447efb58bec",
+        "textSha256": "8e212675d756b87fdac86cc44caae18ff70833d648e10e7552c7d8255a54c89d",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/af72954f78ecb407114de9a3c088a176941b4b8cbeb1ef1afad1fbbe6e07a686.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:c407e26a02852bf38571684077887140e7e3f10385248f9e98e97dd3facb4d94",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:c407e26a02852bf38571684077887140e7e3f10385248f9e98e97dd3facb4d94",
+        "textSha256": "099d9a99dc53d60e8b4b7a308f566a5a511a90932c023f68050bda446e67da4c",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/ad86adc31e2ac0820c036061788ae4821588c416c25ac457b8c72b24b8f7c2a9.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:c4fb2642180d78fd1037f0b736d313e0e81d4bd0fca956f8dba6ba2f93e22b1a",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:c4fb2642180d78fd1037f0b736d313e0e81d4bd0fca956f8dba6ba2f93e22b1a",
+        "textSha256": "372538072686f5651e4b226ca5fd3679b90f1812984e5f0e5198872e8ccb3c1a",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/ea60d2b94d328a4955b9eadcb9cd93d42c202d935082164f563c686ec94fc342.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:c79c02bab0f69d713bb51a731e416940fabbbb50a0a93188e6ec54646efedfda",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:c79c02bab0f69d713bb51a731e416940fabbbb50a0a93188e6ec54646efedfda",
+        "textSha256": "9f73539576fb9e0eadf0be568088f321bf2fa709d104920d04d00a54bad70346",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/578d8d49930336239853e61529fa27662f9fab76e0cae8e8a4d18c62b465eda7.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:c8020a8cedd4a094ffee6791b4ffe751e80675f252b7aa583b8fb6bd8d6ff811",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:c8020a8cedd4a094ffee6791b4ffe751e80675f252b7aa583b8fb6bd8d6ff811",
+        "textSha256": "13b1ce7569e8edf6694a2f4057f057dcc95ec65bbf1321630d250d186f403082",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/d3352242d99f3c015b5af023af1bf34f281bf8637e963e81c568cdaa5ce689b5.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:ca6032253ad36cd3f162237237d451ef67d4c657b37baf497f0a5ba7571455e8",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:ca6032253ad36cd3f162237237d451ef67d4c657b37baf497f0a5ba7571455e8",
+        "textSha256": "2629c95d969c8bf51ccc1ec8e1037487c01ab6326bf0208f25c834d959a09aa6",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/cfcc2e3a822ee8912cee08ee0701f9873239f8bf335af3e77094d051362eb2cf.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:cbe8e1ef29444816ead21f6abbafe5d21b59312ccdb6d2e12deed80bf8151ee8",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:cbe8e1ef29444816ead21f6abbafe5d21b59312ccdb6d2e12deed80bf8151ee8",
+        "textSha256": "8c9de8a828a720ce26f2824d8ccee45703e7c7c75b8a4a9183004ba8236bf128",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/8b1f6b313eb180b35ee901d094790a6897e775543280a65868e272314f83d4e8.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:cd6e0a10d4c7874d019d0cbe48ecc2b61127651ef564f5e2bc65cc641e16419a",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:cd6e0a10d4c7874d019d0cbe48ecc2b61127651ef564f5e2bc65cc641e16419a",
+        "textSha256": "4a84c973c083b5d788081d7b0bc6bd33e2103e7c5f56a26fc9e7a48458cf2f04",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/96a589e3e29f9e522aa02bd2bbe44893b5b426596caa6a214250c46e8315144e.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:d0713da9b8601e32e0c60d185dff862c06b8df06c04e54f8ae8fd43a2e48b30c",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:d0713da9b8601e32e0c60d185dff862c06b8df06c04e54f8ae8fd43a2e48b30c",
+        "textSha256": "949f7f0ecadea79e6ed2ac0e8a23ab00a51d7d6464f16edf4a92322070c2a212",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/4eafade5b29df2541429211f54c7ea8bcf74c695293e0aaf2c7d8b35e86ba5ca.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:d87c072bdd6f7e390ff2889e244c644c2053f0a9ad043d1c26fb4ae327da083d",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:d87c072bdd6f7e390ff2889e244c644c2053f0a9ad043d1c26fb4ae327da083d",
+        "textSha256": "0ccf2347218fdc8ad8fcc4f2d4399c77219d39a79be7f4b7946c2bc0cda12634",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/b5083b660eade7914d8841b0a0dd350b25392f00504c61d3dd44e99ff312eb10.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:daa97de4cb385ce602279d76af4dc1d26ded33a86b454b3163a5806da6484b30",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:daa97de4cb385ce602279d76af4dc1d26ded33a86b454b3163a5806da6484b30",
+        "textSha256": "21ce3fbb0eb3abc93e4d67e3e38598ffc27805d9b60a2183165c44346184d383",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/012a2621745b2078bdbade1e6e9a7bfc0096c2e943c99aa60dcf880647795ee5.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:dc98ce9ab8740eaefaa2d3defee664bf9e4c360ca27011b936aeddd28310e50a",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:dc98ce9ab8740eaefaa2d3defee664bf9e4c360ca27011b936aeddd28310e50a",
+        "textSha256": "b811fc492ca9797f128efbc69231d4412c15f3f8e23681acbe1ff4e9966a713f",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/11ed2982f5380e13086327ef34bd6a35eeb792d475d82f3a219fb2b54320f309.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:dcef13943ca8c47c6b4a5dfd7cb3504622e8dceb2e78929b4847baafc5c69bdd",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:dcef13943ca8c47c6b4a5dfd7cb3504622e8dceb2e78929b4847baafc5c69bdd",
+        "textSha256": "74e52f027dde763bcf04a634a7c147f458b0a27d6d434d7f184c2046e6a39648",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/672c46c414fb490ccb97c1f8119914d1998c431e28cf22acb2a8979f82ba67c4.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:e11a1d4493ac191d6b442bbea4e92b164781228f5c6a3ea898d8a6380db9b621",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:e11a1d4493ac191d6b442bbea4e92b164781228f5c6a3ea898d8a6380db9b621",
+        "textSha256": "9619ccfd3276febb8c1b5200eea395fae51c6505fd0a0eec3cac83faabada49e",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/8c2636f8d853df3e51e23052dedf9b537b1d16031f0f4e9c847381471ea35d27.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:e1ae55358736133b87dfbd9134bd0b98c0277728e5720c623a3bc3365a06dce2",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:e1ae55358736133b87dfbd9134bd0b98c0277728e5720c623a3bc3365a06dce2",
+        "textSha256": "9d24856a5f3980532797b023fe06bad61b83a8757c5d38b85b01e12563da4736",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/d9352df452bcd0bfad4a5279d62f074d92b638581797c0f5867d1b9d7bbaede0.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:e32a596dd41966be0da418f14a06d1c80732fadf179e1bb48b55a680dc2d91b3",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:e32a596dd41966be0da418f14a06d1c80732fadf179e1bb48b55a680dc2d91b3",
+        "textSha256": "d45ad878224b7bf4e6bc2ecc25b1b4d425d8d3cea8aa6a6ca550dd337caa9543",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/4cc2c3d0b4e6a9c275aa08080fbcc792c8ab139d6b2ed68d0ed31b319d75909b.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:e3d7fe7297240fe5f7c5ef58775cf848528a28e9d90b2b5016c9df245a58ce9f",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:e3d7fe7297240fe5f7c5ef58775cf848528a28e9d90b2b5016c9df245a58ce9f",
+        "textSha256": "246656feea92954ae2df16fd6b688ddd862cd65869efcbc1846db5534933ad76",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/c5c2f9701ab7761006c121de655ec87142271492b9b81ea4678c00be9f97336e.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:e63c14093338ae8bd179f69a41887661876eaeda6eb9828de2f153253af05df6",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:e63c14093338ae8bd179f69a41887661876eaeda6eb9828de2f153253af05df6",
+        "textSha256": "80932aca3cd254d82e43fd010074f282a20632ea76607501b9d9e5e37cec0997",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/79ee717285ff772f143ae39f694c55fa040756279cf0de0313935b3b1762b789.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:eafbc1edf94e803aedb5d83a6d52d7ff284f227b9a8af546e9234d97e9d72685",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:eafbc1edf94e803aedb5d83a6d52d7ff284f227b9a8af546e9234d97e9d72685",
+        "textSha256": "bbcb1c2b5a49f4173654d826a94f016a4c62d4be2cf0154946472667f6abe777",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/8ae8b7bc69dc5674deb62492fdb4326a54cdadac316cf76e89a5e217f075f87d.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:ebf6bc3efcb1cff06a1293af9e1b0285ef2a0b84b9541a25551c335fbcae8cb8",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:ebf6bc3efcb1cff06a1293af9e1b0285ef2a0b84b9541a25551c335fbcae8cb8",
+        "textSha256": "c0ceeb4619c4a4acb7002769364405edb0f7a84bb1552e0dd4c463bb56571667",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/0bdac7cb951a462a922410b59efe78ddaaec7a128491ccde6538edebfc9c4988.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:ec5aff1ffaf8d720a3702c452836a79ce66e4f4b89ac6492f82ee2a8011359a4",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:ec5aff1ffaf8d720a3702c452836a79ce66e4f4b89ac6492f82ee2a8011359a4",
+        "textSha256": "3dc35f8a09f05333d5c4c0d3907dba38e3f47d90f8ad84af5946a586db625642",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/50bfa84bdd1d0e2f64b12a712fdfc6c5f22c8fa4feae128449887dab161d678d.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:ed1cf6b9000e3d9557d39f4074c192764ce67102d000cb981297f23480c8a304",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:ed1cf6b9000e3d9557d39f4074c192764ce67102d000cb981297f23480c8a304",
+        "textSha256": "3cd75aee8dbe3c93103c712a35887eb59f908fa9e80335fae03a9cb8d90d52de",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/2cb80523e1518d54ade7e1086b2e8888a56bf2f0202e6c8422911db6bf9efade.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:ed7cb23d5bb69533f98d6f7c5c63ce5492bb7ddcc13cf337e536716300ae3bfc",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:ed7cb23d5bb69533f98d6f7c5c63ce5492bb7ddcc13cf337e536716300ae3bfc",
+        "textSha256": "f6aabeb330fa9b3f7ff6cc2e40727d917c8c05bfda645a048d3a2cb8ace3df01",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/26e6e5f1431a21bb0215a2fcbc5adf1443cbb2fa55532a202bb777afb89c894d.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:ee7a330544e12d62e7e0186d3f4eada0fbb8302b4ff9d792c79d2bfaf4cf91b4",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:ee7a330544e12d62e7e0186d3f4eada0fbb8302b4ff9d792c79d2bfaf4cf91b4",
+        "textSha256": "c13f6dbb7a58986b12eb6b4dc8195e6662d2dfd790f370c0addeba9ca530efdf",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/043ac744db2f85f9811ffea45fbec24386db74cf228769faf0f543915353f53e.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:f28d5180df6c4f7e8e74f6efe79153ef78144a6b2c76186ea77ae3798f675edd",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:f28d5180df6c4f7e8e74f6efe79153ef78144a6b2c76186ea77ae3798f675edd",
+        "textSha256": "df988fed7dc82051a980f69d9fa611284fd4614f3d49e7bedacfc9ab5eb8dac4",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/7b1ffd0531a603699600f0e7b3e57621f7179727fa11e12a093c6e832226c1b1.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:f3ac0b6e4f4d426abe88914f5116c59aa6bfec11521257b45acb73cffd63781d",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:f3ac0b6e4f4d426abe88914f5116c59aa6bfec11521257b45acb73cffd63781d",
+        "textSha256": "249ce40628aab6cd57e3c9117921cb2ba942b59ce1e08d90e762ca8e6ea74899",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/9c66536ca6b37020544d72cee9535dbd729f69b0e91a4f794c037293bdd0ee08.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:f710a2bb5d70d59058375e6f44b698269bce1e8ef23e6eb053b68eb45d55a048",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:f710a2bb5d70d59058375e6f44b698269bce1e8ef23e6eb053b68eb45d55a048",
+        "textSha256": "38e3cafbd5a0600e5cb810c3ca311ee81c0aed1b887ac03af85870465fae4a62",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/9cbbf67a5cc2c1aee188f44f2b83074045493dfabca3e6869cb5ed9dcd49d695.txt"
+      },
+      {
+        "index": "researcher-profile-v1",
+        "inputId": "suminput:fa5abeb70af9bcaf22e3054f36be42e3c3e1610898c333a1edf6b0ecee764328",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "researcher-profile-v1/amazon.titan-embed-text-v2-v1-256/suminput:fa5abeb70af9bcaf22e3054f36be42e3c3e1610898c333a1edf6b0ecee764328",
+        "textSha256": "8c8fcef288ca589a8599e98bea46b0b8a497880c95d563b797a021cd81d76543",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/9b35ca61b4c2b75cfc33ed82b39063e744023bffc424f299c08b8dad46f995d7.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:063d8e8f46adfe5c874693232700c218fe191910ce9c4521cd4ad94befb9a01a",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:063d8e8f46adfe5c874693232700c218fe191910ce9c4521cd4ad94befb9a01a",
+        "textSha256": "058777f63018cbb82144252ca8cc426993f51131c5c8a305dd5a3610a4d42abb",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/6ea554b15a4451a809e4932fb6ddc252fdd15658c30c4f6359a6a634aec75798.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:0df8cc29aeb8cf758d27ab305aa624e758ed24bd3002325a89c764cfa72ced30",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:0df8cc29aeb8cf758d27ab305aa624e758ed24bd3002325a89c764cfa72ced30",
+        "textSha256": "db0d46ab742fd602e6de9e569e3c0b91796581202852a0c47d90c6bb04596d8f",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/b54515a977f949d598349ee58aef89fc90d7c94cb41907a92ce80c219e1e12ae.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:1064a6c08c07a44636b7e64f4f5597826476f64c2b30d47c41715a5a054f813c",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:1064a6c08c07a44636b7e64f4f5597826476f64c2b30d47c41715a5a054f813c",
+        "textSha256": "0840459f0041158f7bad6ee473693af63ca2cf44c9c7be0cc82d6780e8714106",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/f6a5ffe108513584a4b66e9d3de656ad845546fa85605d2c2aac6ce16f25aa13.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:13ca09fdf7a4def90d5e26aec59d26029b4a88656102dc7f59dc9c8396511ef0",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:13ca09fdf7a4def90d5e26aec59d26029b4a88656102dc7f59dc9c8396511ef0",
+        "textSha256": "3abb7c1a41e71bd0c849883ceb079a7e7a4031e63060ec866f20e210e4ec2e19",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/9876417d6b3174eaaa799a0a8d36fedcd1a2ac057ff2d7c6b9c6e6f93a480133.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:1531a90554c504b0b26e55f32cb6f7d1a81dd565bcea226c982abf72490eda22",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:1531a90554c504b0b26e55f32cb6f7d1a81dd565bcea226c982abf72490eda22",
+        "textSha256": "59bd7d0c5fb96961f3d17dcbd2b7a76d92629effd136a9eebd5551e171c18aa1",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/e3a8b4fd1b6be405f0d3ef9a4c9886d7e9bb9442f4e5d6691c85d045dc61b35b.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:1b2fe77b368e82aa4aa4d87ecf917aa2d5a60266af9eb7b26662ac9856b8cad5",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:1b2fe77b368e82aa4aa4d87ecf917aa2d5a60266af9eb7b26662ac9856b8cad5",
+        "textSha256": "a884b83a1ef071f44f8762ac89d7d23f2070665ae06887275fd36792df82f525",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/97050397a297194394f0b084aae8ef0926cda30c0bd0092d48eae0d925790ec2.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:1dbce3bc27c47b987ff3c71d38eb5abd6172f37f98a58035a9ddecc54985f5aa",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:1dbce3bc27c47b987ff3c71d38eb5abd6172f37f98a58035a9ddecc54985f5aa",
+        "textSha256": "4e676b2b7f59de2ae8f390b7053c57835ab38cbeb92b1bb7ab4df22a7d340400",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/0764d2745821a917065e7abba46d4ed009b587a66331c30e9230549325807e77.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:2082bc04e478b6769fe58d5eed6100315226fedbd376129ccc49c37db3afc1f1",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:2082bc04e478b6769fe58d5eed6100315226fedbd376129ccc49c37db3afc1f1",
+        "textSha256": "b9b0ddde4b1fda79250a964273b88bd7344bda4f13fcebdf60e5af49bdd233a4",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/2774a7b0ddc71027dc4cc193bce1f69d3ef9365a78ba821177f6b27219e59396.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:21f80b7113191a5c4dfc8019e7659fd0ed090dbd23eb45ee8470e5e6961a9280",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:21f80b7113191a5c4dfc8019e7659fd0ed090dbd23eb45ee8470e5e6961a9280",
+        "textSha256": "ce49b6b7660708c0af8959fb3fd6c5183d874bc992edd970cb8394a25c97b4c0",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/7faa8b1ec7d68fd27204c8d369c02b73dadcfadd095c192a795eca121c9eafd2.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:240cb4db7da8c81928f444b9b651312e66a7fd01326812eef8bf2caa80073c07",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:240cb4db7da8c81928f444b9b651312e66a7fd01326812eef8bf2caa80073c07",
+        "textSha256": "7a88ab3d3282f5a3aec793be7c45c310e529d338c62a6193305a7202ef82bbe3",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/98e4854018e7bef2c03b90c4d8a5c715e7186ff2ae0c14591a14f5286d0d1bad.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:295104a46c87d9c9f2e4676d4c7a63aaa8c85ebd2477c2817d538bee72b6710c",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:295104a46c87d9c9f2e4676d4c7a63aaa8c85ebd2477c2817d538bee72b6710c",
+        "textSha256": "73dd245004475102a25cecefbae2e554b541a6fa3eff7915701d0d34807ebeda",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/8ce12cb08b003cfa2b9122f1249c5670c3b8a5d8cfff0139c36064afd059b24a.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:39762e6268fe92b8759bfe520f44040ed23935b5877c3413da350e2c820c4521",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:39762e6268fe92b8759bfe520f44040ed23935b5877c3413da350e2c820c4521",
+        "textSha256": "2d1641849113e53ab234394d1c8ddbdced042580dceb864d56229d18983198e1",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/9019b33a4cdc21926a526e7b787da438ef7d18f8224b6cc379a20e3aa11a2f72.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:4691309c11fb336a392accedf330349a26048c1c3cf5f27ca0bcb9980dc60ae6",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:4691309c11fb336a392accedf330349a26048c1c3cf5f27ca0bcb9980dc60ae6",
+        "textSha256": "a2fc9d5231aca03eee2741a1e1f69f2f9ac6d40a90f68459888a98faf8dcd6ef",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/518a7011f4d181e5012bbe13b819edc97589275796f16a10722e7174d64c6f60.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:4b86c2b17bce9aa776f39525f1024b0ac7a314d32b8e7abaedee83467769217c",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:4b86c2b17bce9aa776f39525f1024b0ac7a314d32b8e7abaedee83467769217c",
+        "textSha256": "e60e91d281141e0e1a7440a904b1170366068bf2391352cfb80f2ade8add6379",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/c46b2ef10c5e5d9e2042428b3f7e44a473a70bd87910d5d47b435248b39fa027.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:535b518368ae959e02be1864bb4e3c9b4885a6ba974854820f81b24e4ec66510",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:535b518368ae959e02be1864bb4e3c9b4885a6ba974854820f81b24e4ec66510",
+        "textSha256": "7688b2e89a9b7be47102f6508e50bbf3a8893eb2c347eb179212ad0d0532be45",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/752964e09a27bd20a8a677c8e6b96fb7cc8e0a83d2c3a192b1ca60ecc63e5e96.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:596ff8492eedea1408c6cc6cdfb26dc3e1a34d3916f5b18fc58a258a118b0a62",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:596ff8492eedea1408c6cc6cdfb26dc3e1a34d3916f5b18fc58a258a118b0a62",
+        "textSha256": "fa69cb840f994ac7276e944ea5d2037f5eec6883ff5df76e88dd874f6d7a1f0a",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/a99e12205628c0f1fde407d48da1cd94efdba7a4f6109d7b78d4a61c421e1611.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:5f4baa555bca9a1d92a1dec0eff6e3dc9c0bcb393b2fab29b12b5582c6266789",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:5f4baa555bca9a1d92a1dec0eff6e3dc9c0bcb393b2fab29b12b5582c6266789",
+        "textSha256": "41590a825f4972d1080e4747ee9ba430ab9c042548d131a69e51547faf66a7d2",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/cd4318aa18e52a8dab11925fa6945f9146909b019d5410cb3a06945d99597677.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:6237d1c9a21be835ceab94637d2279083b70c66ff6c37d4642dd3d3f4c369d8b",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:6237d1c9a21be835ceab94637d2279083b70c66ff6c37d4642dd3d3f4c369d8b",
+        "textSha256": "26f4ee0c7673990eb8a99f7e2f31ba00bdc2cda4c80e80846e5cad2fc0e256f1",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/123ad464287d1b4cef4ae1700b55957c6bf09e14234d17a24bfb86406a0c530b.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:64dac796d0d38ace6a08114b45aa7ba1fe16db24ac8f73834e80cd082e027674",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:64dac796d0d38ace6a08114b45aa7ba1fe16db24ac8f73834e80cd082e027674",
+        "textSha256": "77f92a90d900966602dd398774a30dfe157876435b6ff702488ac70782b1151f",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/eb7dfd3ae8eec660398d716202bd6bfa98511f500cdcd56f9821511129025768.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:703afacf05a0fb9a5c866c0c3d1d94186a57c2b7fff46027a67b0533d5585c7c",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:703afacf05a0fb9a5c866c0c3d1d94186a57c2b7fff46027a67b0533d5585c7c",
+        "textSha256": "333749b472f2772a0b23152f9cc9ff15647a25103b177cc81cad54ec4b2a8f33",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/b3deea5d7baa94a079ab2ac2aca206772fae94fe09f1d1b0fc08d2eeb64c691e.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:76ffa4b4520873caeab06c750c5640237d15e757f25b9e9df45695c8e64885e3",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:76ffa4b4520873caeab06c750c5640237d15e757f25b9e9df45695c8e64885e3",
+        "textSha256": "320cc6e26a0084a645916f2ab7087fac81defc70b4222b59ceedd3108c9d0389",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/83c7fec68a56c1c2c53f735799c93e22abb1dbc7cad304b4b088350a465a6226.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:7b74103a57bcecb0b9a10551ab1b11030b76e45dfb7ee81140498a16211eaba4",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:7b74103a57bcecb0b9a10551ab1b11030b76e45dfb7ee81140498a16211eaba4",
+        "textSha256": "20c0613d9aaa9853f140c1436f7384ac6638bed6a12ec339d2c24b4b4e06acb2",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/77c563222106e64526366e3880c1aeea0813dc4747cb1f3f301a74e0fad559d4.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:7da3d675a6c9103658b61ba278aaf57477a14fb89ccef0c595963b0897d620ac",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:7da3d675a6c9103658b61ba278aaf57477a14fb89ccef0c595963b0897d620ac",
+        "textSha256": "d20d2844a2ff3fa30308b9a5a2fff24fb241241c5a216d8c3755a57927304261",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/9c5bd0383f4fb64f2662355c546b7108a5d3a60443129c12298b3666c65a6165.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:83a15099a7093eb88a6fced3d3afeee9be9a93b18acaae94a4b7952023bc75cc",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:83a15099a7093eb88a6fced3d3afeee9be9a93b18acaae94a4b7952023bc75cc",
+        "textSha256": "e8cb9b22ea2fd575f2937db0a71291202678fcb9e0b0b93e014850a19c7aea03",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/f214720222e64e5c9daa02782c23a538e1d8e2a9f74a7c07cb5c1dd33764c6a7.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:84caf1c44e777b294ea83063642f445e5463649509c349c9f697bdcd2da1ed33",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:84caf1c44e777b294ea83063642f445e5463649509c349c9f697bdcd2da1ed33",
+        "textSha256": "7628ca5c33fa0a3a13d2b314636fc5404a98c501d854c3022f34ce8cd558d73a",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/3282fbad1b86fe2c9564e210191c4b26cb0dc978217b87cd24652d969d5cc538.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:8c488790013b970adcc29d0f2e4e6bdc965bc363e9cf7f3c4cf9ec31808a4d18",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:8c488790013b970adcc29d0f2e4e6bdc965bc363e9cf7f3c4cf9ec31808a4d18",
+        "textSha256": "fe977431273d9ba603a8e5ea707b3af89bcf31aee26777f163651f747822dd1d",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/44e24ca3a1b91e9fcb28f77652dd4f713cdb3de648f911ed154fe61884b09c7e.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:8cf510807cc812501bbd62977737b0472811c91519bf6adfc84746f18654ac18",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:8cf510807cc812501bbd62977737b0472811c91519bf6adfc84746f18654ac18",
+        "textSha256": "b4c21ccc66db2d8d15de2807a55e2c707ef7c7263534043a9688b729fc29d09b",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/b68066940ad9e460005031b37ca37bad0a32083a5be59a82f5bccd184602e340.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:946c60246bad54c2a944dd78bd556e2ecaa239b36b5f7aaee27ff6a5d5705a62",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:946c60246bad54c2a944dd78bd556e2ecaa239b36b5f7aaee27ff6a5d5705a62",
+        "textSha256": "c429f639fcb625515316ba2d2a81bc402ff3d9b8c059cc802e87b07588e46771",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/667468c0d532aa70ae9201731e2622d0030e85fb0ff45384357449610e45ea56.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:9f49600ab12d5875e534c21eab9db22bfdf5dec5b1cccfdb085c491f9dbdd08d",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:9f49600ab12d5875e534c21eab9db22bfdf5dec5b1cccfdb085c491f9dbdd08d",
+        "textSha256": "b4a85c4317f792d14b8572d81cf4b3f40c86a4015e7fa2796fce02c277d02d06",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/6cc92230e738345e4bec72546b0b27f970fad7b696fac245c18ac82e5042008a.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:a1044945b4e83f25882ea1700afd8bdc46368e7b96adec94d97cef4d563b03ad",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:a1044945b4e83f25882ea1700afd8bdc46368e7b96adec94d97cef4d563b03ad",
+        "textSha256": "5fa97f9ea7dc4237a0337bca1f0debb27cfeef6bfec306d66796fa9e41e0727f",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/495bae9991baf37c22e4db09911a8affa03c3f55154fa824958420755cb637d3.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:b1bed8476e12bf2c10954dc17324e31a2048794ea6f8a2a45264fddd240a2f66",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:b1bed8476e12bf2c10954dc17324e31a2048794ea6f8a2a45264fddd240a2f66",
+        "textSha256": "255d70270d1706352fd6572b3a0e0f4da088b1550d8e083cc1797a74cc93c5af",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/c87e984a799d322c49721de936718b0a1c1b4125d2eba17d949ff2a1de206b12.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:b4bab91eb3ef3140fdd857d488e3b07dd2eb01c4e80139ff23be98e5289c45a8",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:b4bab91eb3ef3140fdd857d488e3b07dd2eb01c4e80139ff23be98e5289c45a8",
+        "textSha256": "700ec21dd5c9f384132cad6c3127b254c11bf968efb4a66e33b12e03455190c0",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/0447ac515b423e347e79a4f2637ba8cce3b7dabe20cb464abfa2c08e5a062a18.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:b7519f33e5c8fcf382548a66fc955a8b9aed3a06872cf703963bce6e52287918",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:b7519f33e5c8fcf382548a66fc955a8b9aed3a06872cf703963bce6e52287918",
+        "textSha256": "3b912d9dd0e95e44af4ea9a422af09720f96fca683989c9690ea9dd7d1d47a3e",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/2d655d3ec971a6c362580e6727b04f19230eeb424b909576cf20d5c50cf6632d.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:b8240c6dc14ce85b083e2171b7728ef56b9f782726889ea570bb48d9a35bca14",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:b8240c6dc14ce85b083e2171b7728ef56b9f782726889ea570bb48d9a35bca14",
+        "textSha256": "5259f3c72b0c87a7eca881f8013c6a6f707f0acf77b594fbebb8bdfd06f49e55",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/0002ad4e3a04862229b73b18a3f82b319c66633d23a1414dd0b5a8046e880e24.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:b989c6db7fe900ef524cc6fc00b79f8cdadb535595e833d058c2ebd898fb18b1",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:b989c6db7fe900ef524cc6fc00b79f8cdadb535595e833d058c2ebd898fb18b1",
+        "textSha256": "8a639868b2c6563be37ac632efadaba2985de325ea3a1f84ac633bd15e2ab239",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/109ea9c533c376add157dda5227a9192e5fb3fff99a17f2c562e60920b3fb703.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:bb9215378eb8ccdad4db389a4bb90c9f1a5b7c1438c2d58ac45b5983fad203a4",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:bb9215378eb8ccdad4db389a4bb90c9f1a5b7c1438c2d58ac45b5983fad203a4",
+        "textSha256": "b5095756509c36a930052be49cf2bbf40d6c4ec6336c09779b474cb13f0d62ec",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/7cbd7c60a3f370e463ec9443a5178dbcb9c466e319c8577c03560bbb6d3b1bcc.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:c709ac94bb94e15196b9b3dfa36c6d97732d6f2b74cde3d008e8f6e560325082",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:c709ac94bb94e15196b9b3dfa36c6d97732d6f2b74cde3d008e8f6e560325082",
+        "textSha256": "9c5aeac79bd8bca5c8d7335a8925c78fb74d2fbcf7f75bb15f83b03b9296a79c",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/b76c39db105c4c3097038817e43cc1f58c8d71b4c6d06f5257f1b4402f9fe71f.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:c94e13e64c78e710bda0c351d90e5dd624714ae7e0862fc89ce96753eee779e9",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:c94e13e64c78e710bda0c351d90e5dd624714ae7e0862fc89ce96753eee779e9",
+        "textSha256": "dfb6fa71727805a8e8f8f48148a0a809bc2a89ea2833d63545a0e33ba39b0367",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/c5ff4817c77e092d99abf4f02953fa73edf037ccaa8ce9f936e21e7cf1d6c07c.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:cdc6e09304c32edfb6e76cec2a77357236f0c76a6d434bf6e24b469a6a1db575",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:cdc6e09304c32edfb6e76cec2a77357236f0c76a6d434bf6e24b469a6a1db575",
+        "textSha256": "2f0e55d90407ad88a4147110141e861b7a64c89d8a511b68c80969c5b1ed59cb",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/96150359920e5bd061c861fc18f24b1703fed1416e9141ab25d7ef2326bd6366.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:ce75ca9e329408bbdef21321ab3d866f0472aa309eda04e678a153f6602b5df3",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:ce75ca9e329408bbdef21321ab3d866f0472aa309eda04e678a153f6602b5df3",
+        "textSha256": "e44f6456800d37a1d705b4f2dec65ee123fa4372e497f5f17748e57e33343944",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/c5a791ca6978c8b954dfc9583ea1a2ca1aec378d3fadfba08c1e1b3ff7412bc0.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:cf2153166cc9e07bd601af653fdadd90b6b2e678d05269cf021bc083d3d081f3",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:cf2153166cc9e07bd601af653fdadd90b6b2e678d05269cf021bc083d3d081f3",
+        "textSha256": "a42879edb65ab0f39fc4cba4a6ffdff189ebf967cf3dc5cff278fbcf72c8b646",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/2d480caf052b9294dc32e1073824dce19f874be0ffd947cd13f361ce4cc53dc6.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:d133e7e020cafdd3de9d2adbeb81de430ca4b45c7208878cf5bbd7d9eb574927",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:d133e7e020cafdd3de9d2adbeb81de430ca4b45c7208878cf5bbd7d9eb574927",
+        "textSha256": "4d556a3e0d27a0ce54d0c414d8e73a516999771d34e3371ad5322ae5bb44022b",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/5270b96689471ae7d3d513bc2d9d4c39fb0a7196d980fe27d530d37b2c98541e.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:d62e9ea3a5e6e466b3b44526e0e54177feaf2c6b0f51aa7570f18c8944be0147",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:d62e9ea3a5e6e466b3b44526e0e54177feaf2c6b0f51aa7570f18c8944be0147",
+        "textSha256": "1774dcb3d45577f6226ec219b1deac5711ac89cee45a8278b420110af9467a58",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/cec462e2dc0b559243dbbb7edc571e5ed7d973e741feefcf3aeaa442724bb284.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:d8985c1dbd81a6998741161d7bf49b7e8528779710c8bdbeae2b205796e7b505",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:d8985c1dbd81a6998741161d7bf49b7e8528779710c8bdbeae2b205796e7b505",
+        "textSha256": "a440e2a04e4a78bf5b667e260e40875fce4f727710a7583bb419d8ced8eca131",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/3fd851f16efb22c1cbcc6d772c60a6641ed5ce74a1c8cbb188960a470986c917.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:dd371214dca1c4d6c7638bbddbe6ae8fe7bf8b923f36d8bad14df2f3c156f8b3",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:dd371214dca1c4d6c7638bbddbe6ae8fe7bf8b923f36d8bad14df2f3c156f8b3",
+        "textSha256": "b71a6e3dfeca85a37b9ac6a76f66b8b261ea5eca9867a1b33a16fb3dbd4db06a",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/9936827c8608c423af6faf5069c9861255ac4956ad04cf850210eacfd9ed3cff.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:dee432fb46a230cb2a4408c954a7daffc669e25e6929581781526e156c2b37de",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:dee432fb46a230cb2a4408c954a7daffc669e25e6929581781526e156c2b37de",
+        "textSha256": "0d4794aaa90f0aa06652bb0cf33333ad3500e317506f1e2caba5a83ad3b4b00c",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/7b0ee70c9f3d44d4cd43a8b98596ae2aeaa2e303622553d52488d2574a2a425c.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:df8b9e492175f41e17d2653721e28f729c83760d46ad9ab6c5368f89a9ec9120",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:df8b9e492175f41e17d2653721e28f729c83760d46ad9ab6c5368f89a9ec9120",
+        "textSha256": "2605dec5f88e140b48cc94689ccb609c9865fa06bf9561a9be4ea5a908afde60",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/faa57c530db7814704d238f0ec27fbca548ca3c4c1a547c50265e9d3f98ac69f.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:e145b9eef231e37607f0889d5bcd2826fc596eb1f36b233ca47c40f0c05eba6c",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:e145b9eef231e37607f0889d5bcd2826fc596eb1f36b233ca47c40f0c05eba6c",
+        "textSha256": "56c3040e96ed5991174f5e669b371bcee56ab9b49c539d8a84ef3f4fe288a6a5",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/d3305f7da0c0df2eb74f0fc38fc8cde765a6aed77c1e005aeafc9db34c3bee25.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:e188eff32d779da0eddda5a63ebe9225484404e358664068892bfb8c08caa732",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:e188eff32d779da0eddda5a63ebe9225484404e358664068892bfb8c08caa732",
+        "textSha256": "84fa22f5ad9802188e791c7ede3b070132d322cc827d629c5ec62bfd15bd8a25",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/1ac3b7f8184f54baf571db6cce3546547a6b3c4c6dae4ed0c6b70b59aaaad5b0.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:e771e308cb3e93a100380ce226f989324a0202bb03a243edc10d6e9111c71f4a",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:e771e308cb3e93a100380ce226f989324a0202bb03a243edc10d6e9111c71f4a",
+        "textSha256": "751da89ed8ad2c0a5fcb55b0b826873ec85cacbef6b0bd97adabc66fb1307094",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/c1d5ee4dba88d26d8879c1f1f9a18fb6a8ce5d21dd60547b073866e8b38c9bcb.txt"
+      },
+      {
+        "index": "collaboration-community-v1",
+        "inputId": "suminput:edb12f2e157cb6d2cfa9eb78feffe49a0426fa73551a71f1e0e6b5e0357ac12d",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-community-v1/amazon.titan-embed-text-v2-v1-256/suminput:edb12f2e157cb6d2cfa9eb78feffe49a0426fa73551a71f1e0e6b5e0357ac12d",
+        "textSha256": "465d32bbe6b92509f1e8475f312acba2f198c21d1cfbcd1505f6ec996ec63e1a",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/af9f5a6d4c87083fa34889f5b5c2bc29197ac3c434e3dcafe7bca82e7c2b9184.txt"
+      },
+      {
+        "index": "paper-abstract-v1",
+        "inputId": "suminput:5d83a666f504a8409f0dcab48fc71c000c0185505cbd54a54996109df588c624",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "paper-abstract-v1/amazon.titan-embed-text-v2-v1-256/suminput:5d83a666f504a8409f0dcab48fc71c000c0185505cbd54a54996109df588c624",
+        "textSha256": "eb0c86e89a210204a16329501cf50adbc9dae4bc34664672c38bf13e7310e9fc",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/0edb34a9e831ee194b56889ec61d974515137e0c6a922c940874e139263248e5.txt"
+      },
+      {
+        "index": "paper-abstract-v1",
+        "inputId": "suminput:730003ad8f5eba101a586e729ffacd68da625edb6a70eb7b80dd2c622481cc13",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "paper-abstract-v1/amazon.titan-embed-text-v2-v1-256/suminput:730003ad8f5eba101a586e729ffacd68da625edb6a70eb7b80dd2c622481cc13",
+        "textSha256": "117f84ef4682f1d6e0ce2f17b91ad4d462690c9311637dc9ef8b916c6b125088",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/504d4c1059fa1e57aeeed932c2b83e5cc285297726a9f42a80de275f97d4c1a1.txt"
+      },
+      {
+        "index": "paper-abstract-v1",
+        "inputId": "suminput:80d5800d731996de73fcce52149afbaeebd2260dc5b0546007b8cf285c09e8e6",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "paper-abstract-v1/amazon.titan-embed-text-v2-v1-256/suminput:80d5800d731996de73fcce52149afbaeebd2260dc5b0546007b8cf285c09e8e6",
+        "textSha256": "d8f63e384f0a1d28b1e111a8c399b8e86588f55a2d9e7c63ac0e02de8977a67a",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/837e6132e65f51d9b75a8091cc4e944fcac80ebc8b5fb7c737d8d1f89ea66f61.txt"
+      },
+      {
+        "index": "paper-abstract-v1",
+        "inputId": "suminput:b3610b4616cbae5e1bbe3fd4ef95caf62e57848dd1b4bfa2f652d2ec67fd3d78",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "paper-abstract-v1/amazon.titan-embed-text-v2-v1-256/suminput:b3610b4616cbae5e1bbe3fd4ef95caf62e57848dd1b4bfa2f652d2ec67fd3d78",
+        "textSha256": "dea734f75cc5e25d48b814c20fe3cf5ac2a53bebeb43558a2b21dc542e9f54b8",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/30119cc15889e4ec143a3f95b299008a6ddff0ba7fe6462d81232e5c85c43106.txt"
+      },
+      {
+        "index": "paper-abstract-v1",
+        "inputId": "suminput:b3ae870d0b068dfc1f9cc59c6fc939c578711680d52604fd89be081052113e0e",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "paper-abstract-v1/amazon.titan-embed-text-v2-v1-256/suminput:b3ae870d0b068dfc1f9cc59c6fc939c578711680d52604fd89be081052113e0e",
+        "textSha256": "4befe8698adae1c82e3bbcd785339db0e8ef65f8032579e945bfd73142a3113b",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/e0f017f67300102de3101b55cfb96713a3a727f4fd4b9071ae9493e3631daff8.txt"
+      },
+      {
+        "index": "paper-abstract-v1",
+        "inputId": "suminput:bcdcb51b7d6bb4aa4cc47b66132d6a7a99c63c2a5740a44ad0a0c818c3b60d49",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "paper-abstract-v1/amazon.titan-embed-text-v2-v1-256/suminput:bcdcb51b7d6bb4aa4cc47b66132d6a7a99c63c2a5740a44ad0a0c818c3b60d49",
+        "textSha256": "b6bb695842aca783d9ff5cf74c44bb7da2ae2562fb99a9cbbca9c936f462caf2",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/d22c6546b558bbf5ca7713b9981721b9aa7c8a26bd6f8365d4576f2db4b97ef2.txt"
+      },
+      {
+        "index": "paper-abstract-v1",
+        "inputId": "suminput:c72174b62811b761c64bb573b8d61f33d95d30aee0f644def64e098e234b5840",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "paper-abstract-v1/amazon.titan-embed-text-v2-v1-256/suminput:c72174b62811b761c64bb573b8d61f33d95d30aee0f644def64e098e234b5840",
+        "textSha256": "e0bbac361f74698d48412a01467799dc10f71fd50698c426cdd19f62eba11a43",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/a53bd415058dc850e4703b1b8dc476e6da7dec6476bbddd8976b5c60f69a7829.txt"
+      },
+      {
+        "index": "paper-abstract-v1",
+        "inputId": "suminput:e89272a8124f1302bb0f8f6c6a07cbe6b514b97cc7097eef67c94ce44fb6fae4",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "paper-abstract-v1/amazon.titan-embed-text-v2-v1-256/suminput:e89272a8124f1302bb0f8f6c6a07cbe6b514b97cc7097eef67c94ce44fb6fae4",
+        "textSha256": "a28d883de076bdb5c17c6f494261ac9f60939108dde0799425162038b698a15f",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/427f6245bbd3bbc62dd5272d9ab596d7cc7ac7bcfc9c6a609c29fae9230d2949.txt"
+      },
+      {
+        "index": "collaboration-path-v1",
+        "inputId": "suminput:21b2f0b2a65074fa12b8586a12e1138a841f209f1e03cb818f340258d01ae7c4",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-path-v1/amazon.titan-embed-text-v2-v1-256/suminput:21b2f0b2a65074fa12b8586a12e1138a841f209f1e03cb818f340258d01ae7c4",
+        "textSha256": "9ce3b47356fb6a43f03f87e82841eba5b0d6a3cf940a9aa7da4a4232b3ce89cc",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/cf48b6b483efdaa3e5078e715521315408f1b2baf94ce5867449aba380ec2052.txt"
+      },
+      {
+        "index": "collaboration-path-v1",
+        "inputId": "suminput:43e57b4f00d5de4f5d63b29b52842f87b7bdb2047552331ccb9130ba4b5979d7",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-path-v1/amazon.titan-embed-text-v2-v1-256/suminput:43e57b4f00d5de4f5d63b29b52842f87b7bdb2047552331ccb9130ba4b5979d7",
+        "textSha256": "3cacfa9e995932c60c00a98466e947d9fec256da1ab67227b22b5edb016f8908",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/ebd9c0fcbbdd46c15220bacd1933180ad1ae9d8bd20a61b8a08020c3ea1b27ee.txt"
+      },
+      {
+        "index": "collaboration-path-v1",
+        "inputId": "suminput:533893880a7d059c0226aaae0ce2d1743713151805b3ae31650438487715d2e4",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-path-v1/amazon.titan-embed-text-v2-v1-256/suminput:533893880a7d059c0226aaae0ce2d1743713151805b3ae31650438487715d2e4",
+        "textSha256": "ca2b640bd03e66adb21dc604a9dd731ff51cf4f97bba712c1b033f78a342291a",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/92cce71510cf02d5dcbd106db844cd08343977135e309f85f61f3c24a6f7a105.txt"
+      },
+      {
+        "index": "collaboration-path-v1",
+        "inputId": "suminput:5548720e1f3cce5613a42f3dd3fb3c12b66b711cce41c3545e29d8af94d38fac",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-path-v1/amazon.titan-embed-text-v2-v1-256/suminput:5548720e1f3cce5613a42f3dd3fb3c12b66b711cce41c3545e29d8af94d38fac",
+        "textSha256": "55eb9a9cb328e92242520274f4318b50383e2cc30a0682e793955ed15c6178da",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/8b4db7a99f8dc84ecec376f8a2fed2a9508f05dbe0e184d7e5cbde6b81b5efa9.txt"
+      },
+      {
+        "index": "collaboration-path-v1",
+        "inputId": "suminput:6f9bb99e36410222e87c5a307c1fd14828cb6ea83fba3370a82ecebfbf105644",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-path-v1/amazon.titan-embed-text-v2-v1-256/suminput:6f9bb99e36410222e87c5a307c1fd14828cb6ea83fba3370a82ecebfbf105644",
+        "textSha256": "4d957924db2728044d025e71672429eea50e026ab0bbb0ac42d7f9cce02d5d69",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/9797b1295ab11ce09b70864391c521c5c25d4c9c86747bc3ac007bd7901489ad.txt"
+      },
+      {
+        "index": "collaboration-path-v1",
+        "inputId": "suminput:9f608136e1ffa270168efe9fb2d55c8a8cc1854f615682e18ba4acacb1b5bbe2",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-path-v1/amazon.titan-embed-text-v2-v1-256/suminput:9f608136e1ffa270168efe9fb2d55c8a8cc1854f615682e18ba4acacb1b5bbe2",
+        "textSha256": "7f42116526d024c105b78b935e827f647ba2810dee3485085e298459966ba010",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/4e875b86f6d1bca83dd3df720094504ce3f1139161a083cbbc88b9dbe2932268.txt"
+      },
+      {
+        "index": "collaboration-path-v1",
+        "inputId": "suminput:aa5495b8110b464de18fbf201491e188bc66f7882c4653c5885c63765b0028a5",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-path-v1/amazon.titan-embed-text-v2-v1-256/suminput:aa5495b8110b464de18fbf201491e188bc66f7882c4653c5885c63765b0028a5",
+        "textSha256": "8f915ea851a20cc765fedd7a69a3deb4dde5fd7d3ea95dfbe296969118611af7",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/beed0da886d917aef08456d028c12f2101a6dd42c8e82c526ca1042dcc186e59.txt"
+      },
+      {
+        "index": "collaboration-path-v1",
+        "inputId": "suminput:ba25e0d63617ccd4230791dd461f62e026bae498b616bdd4150d0690e4b0f117",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-path-v1/amazon.titan-embed-text-v2-v1-256/suminput:ba25e0d63617ccd4230791dd461f62e026bae498b616bdd4150d0690e4b0f117",
+        "textSha256": "847d7b6c3d43471ee4f91b9b34e92cfc8aa0421fd7a15e3880cb27dbbc09a548",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/b31bb9b71f0730116ebe150fecb6e7bb754f95abba67475e16cac2691fe63593.txt"
+      },
+      {
+        "index": "collaboration-path-v1",
+        "inputId": "suminput:be109f782d8b097eaf5440106d16486525e87f4fe39268a88615e4b8ad627e56",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "collaboration-path-v1/amazon.titan-embed-text-v2-v1-256/suminput:be109f782d8b097eaf5440106d16486525e87f4fe39268a88615e4b8ad627e56",
+        "textSha256": "b69f3cacc81275602bad0b8774a0079d0337aa090565211592b774e412e02360",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/b01a9c1d9dec75695d6cd15fe92b697da6c05ed26eed18d28aa79cd3c46b2e16.txt"
+      },
+      {
+        "index": "topic-institution-summary-v1",
+        "inputId": "suminput:350f6da8fc1e3c6f3a8a160da3e7f93b30eca775c165608121d997c9db41cdb9",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "topic-institution-summary-v1/amazon.titan-embed-text-v2-v1-256/suminput:350f6da8fc1e3c6f3a8a160da3e7f93b30eca775c165608121d997c9db41cdb9",
+        "textSha256": "9b01cc54e02f3e9432bcead122b686762fb90010d08c14799b6426537cf65115",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/9c25657fa349034e9c9004a604a35862248d306995c3c77e0b4130b4535cc0b4.txt"
+      },
+      {
+        "index": "topic-institution-summary-v1",
+        "inputId": "suminput:6a81002d5d9d933025c26d6b30fab19b54eb87068d4c90827d25537a4c27ee66",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "topic-institution-summary-v1/amazon.titan-embed-text-v2-v1-256/suminput:6a81002d5d9d933025c26d6b30fab19b54eb87068d4c90827d25537a4c27ee66",
+        "textSha256": "34b235a4f6d829dfdac06782d1833f631ab6b56a35022972a2c2e05aecdd372d",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/76b951260061a527a9cacc237f3005646afeb6878807fce0bfd228aaef70493b.txt"
+      },
+      {
+        "index": "topic-institution-summary-v1",
+        "inputId": "suminput:af985ee92853367c6edec6120e658e1ce1218ab5cf4dce973b0dd30aa6a320f1",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "topic-institution-summary-v1/amazon.titan-embed-text-v2-v1-256/suminput:af985ee92853367c6edec6120e658e1ce1218ab5cf4dce973b0dd30aa6a320f1",
+        "textSha256": "cc751921b6a73c77240088eb103123cdcc5d8247dcce56046f55ad1b629206da",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/3ce2f2d8ca116a1308c7e1c10406e8903f68190d36da9b7d7c0c6804fe6862e0.txt"
+      },
+      {
+        "index": "topic-institution-summary-v1",
+        "inputId": "suminput:c7a72410372ab9c612b4796fab121f91f50abf800db9738605651f41e53776bc",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "topic-institution-summary-v1/amazon.titan-embed-text-v2-v1-256/suminput:c7a72410372ab9c612b4796fab121f91f50abf800db9738605651f41e53776bc",
+        "textSha256": "ef10541811cabbca55a6d623b1823f4ac3bf38d62e222dd2172f6bc76efb4cd4",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/34222b0a3cfaa208cb89170aead1c69d163404066b745f7409c75be149aefef0.txt"
+      },
+      {
+        "index": "topic-institution-summary-v1",
+        "inputId": "suminput:fd043b9fcf0b462886f97bb902da0372350d431c1de59496bb5fe492aea53851",
+        "modelVersion": "amazon.titan-embed-text-v2-v1-256",
+        "vectorKey": "topic-institution-summary-v1/amazon.titan-embed-text-v2-v1-256/suminput:fd043b9fcf0b462886f97bb902da0372350d431c1de59496bb5fe492aea53851",
+        "textSha256": "1e5665e939cbbd80ab7df578ee29cfc8750358686b85388e27bf9052cec99d16",
+        "textS3Key": "semantic-context/loads/596602ad372652a86d751ffb961d7de45fffe7d3b0386783b4980a9f4a1d817c/text/832a6909b5e8e62d04071d0ff44ed42278eae0ea1342a71b0885ffb190de4957.txt"
+      }
+    ]
+  }
+}

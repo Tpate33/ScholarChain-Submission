@@ -3,7 +3,7 @@
 # scripts/plan.sh -- non-destructive Terraform plan of one stack. NEVER applies.
 # Owner: infra-engineer. Work order IE-P6-02 (lifecycle L2).
 #
-# USAGE   scripts/plan.sh <environment> <bootstrap|base|emr-run>
+# USAGE   scripts/plan.sh <environment> <bootstrap|base|emr-run|runtime>
 #
 # Runs from the repository root on a clean tree, with the READ-ONLY profile of env.conf
 # (aws_readonly_profile); the one first-plan exception for bootstrap and base is described at the
@@ -23,7 +23,7 @@ readonly SCRIPT_NAME=plan
 # shellcheck source=scripts/lib/common.sh disable=SC1091
 . "$(dirname "$0")/lib/common.sh"
 
-(($# == 2)) || die "$EX_USAGE" "usage: scripts/plan.sh <environment> <bootstrap|base|emr-run>"
+(($# == 2)) || die "$EX_USAGE" "usage: scripts/plan.sh <environment> <bootstrap|base|emr-run|runtime>"
 ARG_ENV=$1
 ARG_STACK=$2
 is_env_name "$ARG_ENV" || die "$EX_USAGE" "environment '$ARG_ENV' is not a short lowercase name"

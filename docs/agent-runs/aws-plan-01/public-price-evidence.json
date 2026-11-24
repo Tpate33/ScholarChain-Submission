@@ -1,0 +1,123 @@
+{
+  "retrievedUtc": "2026-11-23T23:08:38.294454+00:00",
+  "scope": "Public anonymous static AWS price catalogs only; no account API or paid operation.",
+  "rates": [
+    {
+      "service": "AmazonNeptune",
+      "source": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonNeptune/current/us-east-1/index.json",
+      "publicationDate": "2026-09-11T12:44:56Z",
+      "rawCatalogSha256": "6050dd3ebd128fd8592a6a3cf4d6009105056bbe5e33d535de1a291b185f1741",
+      "sku": "CH3E3XZENXTF7AHY",
+      "attributes": {
+        "servicecode": "AmazonNeptune",
+        "location": "US East (N. Virginia)",
+        "locationType": "AWS Region",
+        "instanceType": "db.t4g.medium",
+        "currentGeneration": "Yes",
+        "instanceFamily": "General purpose",
+        "vcpu": "2",
+        "physicalProcessor": "AWS Graviton2",
+        "memory": "4 GiB",
+        "storage": "EBS Only",
+        "networkPerformance": "Up to 5 Gigabit",
+        "processorArchitecture": "64-bit",
+        "volumeType": "Standard",
+        "engineCode": "22",
+        "databaseEngine": "Amazon Neptune",
+        "licenseModel": "License included",
+        "deploymentOption": "Multi-AZ",
+        "usagetype": "InstanceUsage:db.t4g.medium",
+        "operation": "CreateDBInstance:0022",
+        "normalizationSizeFactor": "2",
+        "regionCode": "us-east-1",
+        "servicename": "Amazon Neptune"
+      },
+      "unit": "Hrs",
+      "USD": "0.0930000000",
+      "description": "$0.0930 per Hrs for Neptune-DB-Instance:db.t4g.medium in US East (N. Virginia)"
+    },
+    {
+      "service": "ElasticMapReduce",
+      "source": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/ElasticMapReduce/current/us-east-1/index.json",
+      "publicationDate": "2026-11-17T17:14:32Z",
+      "rawCatalogSha256": "608c49c3be9fdc7d9e217e55d733756757b63206c33866f13c15d88bd4b81f44",
+      "sku": "394XAA9GGEC5BPZG",
+      "attributes": {
+        "servicecode": "ElasticMapReduce",
+        "location": "US East (N. Virginia)",
+        "locationType": "AWS Region",
+        "instanceType": "m5.xlarge",
+        "instanceFamily": "General purpose",
+        "usagetype": "BoxUsage:m5.xlarge",
+        "operation": "",
+        "regionCode": "us-east-1",
+        "servicename": "Amazon Elastic MapReduce",
+        "softwareType": "EMR"
+      },
+      "unit": "Hrs",
+      "USD": "0.0480000000",
+      "description": "$0.048 per hour for EMR m5.xlarge"
+    },
+    {
+      "service": "AmazonBedrock",
+      "source": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonBedrock/current/us-east-1/index.json",
+      "publicationDate": "2026-11-23T16:43:56Z",
+      "rawCatalogSha256": "c0c9bcf6d22d40b4e2d6ccb68711d9d83fecd9c390553b88ff08a1f2f0713cf7",
+      "sku": "CBZ6A6U7XK8WJ3KA",
+      "attributes": {
+        "servicecode": "AmazonBedrock",
+        "location": "US East (N. Virginia)",
+        "locationType": "AWS Region",
+        "usagetype": "USE1-NovaLite-output-tokens",
+        "operation": "",
+        "feature": "On-demand Inference",
+        "inferenceType": "Output tokens",
+        "model": "Nova Lite",
+        "regionCode": "us-east-1",
+        "servicename": "Amazon Bedrock"
+      },
+      "unit": "1K tokens",
+      "USD": "0.0002400000",
+      "description": "$0.00024 per 1K tokens for Nova Lite-output-tokens in us-east-1 (N. Virginia)"
+    },
+    {
+      "service": "AmazonBedrock",
+      "source": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonBedrock/current/us-east-1/index.json",
+      "publicationDate": "2026-11-23T16:43:56Z",
+      "rawCatalogSha256": "c0c9bcf6d22d40b4e2d6ccb68711d9d83fecd9c390553b88ff08a1f2f0713cf7",
+      "sku": "QRGWJ3P8FT28EYX2",
+      "attributes": {
+        "servicecode": "AmazonBedrock",
+        "location": "US East (N. Virginia)",
+        "locationType": "AWS Region",
+        "usagetype": "USE1-NovaLite-input-tokens",
+        "operation": "",
+        "feature": "On-demand Inference",
+        "inferenceType": "Input tokens",
+        "model": "Nova Lite",
+        "regionCode": "us-east-1",
+        "servicename": "Amazon Bedrock"
+      },
+      "unit": "1K tokens",
+      "USD": "0.0000600000",
+      "description": "$0.00006 per 1K tokens for Nova Lite-input-tokens in us-east-1 (N. Virginia)"
+    },
+    {
+      "service": "AmazonBedrock",
+      "source": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonBedrock/current/us-east-1/index.json",
+      "publicationDate": "2026-11-23T16:43:56Z",
+      "sku": "EDNQYEHQ3XQ8N7EY",
+      "attributes": {
+        "usagetype": "USE1-TitanEmbeddingV2-Text-input-tokens",
+        "feature": "On-demand Inference",
+        "inferenceType": "Input tokens",
+        "titanModel": "TitanEmbeddingsV2-Text-input",
+        "regionCode": "us-east-1"
+      },
+      "unit": "1K tokens",
+      "USD": "0.0000200000",
+      "description": "$0.00002 per 1K tokens for TitanEmbeddingsV2-Text-input-tokens in US East",
+      "verification": "Observed in a subsequent public catalog lookup; not an account API call."
+    }
+  ]
+}

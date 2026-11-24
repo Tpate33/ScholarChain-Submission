@@ -15,7 +15,8 @@
 //     followed by its generated target/local-runs/dev/er-run-roots.conf.
 //   - SCHOLARCHAIN_ROUTE_PROBE_MARKER: never read by the build; set by heldoutRouteProbe in
 //     its synthetic child JVM only (random marker, see verifyHeldoutOutputRoute).
-//   - PATH: used only to locate `git` (markTestRun and the local runs).
+//   - PATH: used to locate `git` (markTestRun and local runs) and `java` for worker relocation probes.
+//     Worker probes remove inherited AWS_*, SCHOLARCHAIN_* and JVM injection variables by name.
 //   - GIT_*: only the NAMES are used: project/LocalRuns.scala removes every inherited GIT_*
 //     variable from its git processes (so none can redirect the held-out checks), and
 //     erDecisionGroupingDev and sparkIT also remove them from their forked JVMs. The
@@ -55,6 +56,18 @@ lazy val pipelineDemoClasspath =
 lazy val productionLoadClasspath =
   taskKey[File](
     "Stages a separate production loader classpath with storage's optional reader libraries"
+  )
+lazy val workerBundle =
+  taskKey[File](
+    "Stages portable isolated loader and ER jars, launchers, archive and OCI definition"
+  )
+lazy val imageBuildContexts =
+  taskKey[Unit](
+    "Stages normal runtime and isolated worker OCI build contexts without building or pulling"
+  )
+lazy val verifyWorkerBundle =
+  taskKey[Unit](
+    "Extracts worker archive elsewhere and verifies checksums, isolation and offline launches"
   )
 lazy val verifyVersionLedger =
   taskKey[Unit]("Checks the version ledger, its tool-mandated mirrors, and literal versions")
@@ -559,6 +572,20 @@ lazy val services = project
     // percentage-based heap limits. No registry, tag `latest`, or cloud settings.
     dockerBaseImage := versionLedger.value("docker.java-runtime-image"),
     dockerUpdateLatest := false,
+    // Explicit writable materialization root, also when ECS overrides the default entrypoint.
+    dockerCommands ~= { commands =>
+      commands.flatMap {
+        case from @ com.typesafe.sbt.packager.docker.Cmd("FROM", _*) =>
+          Seq(
+            from,
+            com.typesafe.sbt.packager.docker.Cmd(
+              "RUN",
+              "mkdir -p /work && chown 10001:10001 /work"
+            )
+          )
+        case other => Seq(other)
+      }
+    },
     dockerRepository := None,
     // BE-P10-01: logback (Runtime) is on the Test classpath with no configuration; WARN in tests.
     boundedTestLogging(TestLogging.Logback, forceProvider = false),
@@ -637,6 +664,34 @@ lazy val root = project
       IO.write(out, cp.distinct.map(_.getAbsolutePath).mkString(java.io.File.pathSeparator))
       streams.value.log.info("Production loader classpath: " + out)
       out
+    },
+    workerBundle := {
+      val loaderJars = Seq(
+        (core / Compile / packageBin).value,
+        (storage / Compile / packageBin).value,
+        (rag / Compile / packageBin).value,
+        (services / Compile / packageBin).value
+      ) ++ ((services / Runtime / fullClasspath).value ++
+        (storage / Runtime / fullClasspath).value).map(_.data).filter(_.isFile)
+      val erJars = Seq(
+        (core / Compile / packageBin).value,
+        (entityResolution / Compile / packageBin).value
+      ) ++ (entityResolution / Runtime / fullClasspath).value.map(_.data).filter(_.isFile)
+      WorkerPackaging.stage(
+        target.value / "workers" / "stage",
+        loaderJars,
+        erJars,
+        versionLedger.value("docker.java-runtime-image"),
+        streams.value.log
+      )
+    },
+    verifyWorkerBundle := WorkerPackaging.verify(workerBundle.value, streams.value.log),
+    imageBuildContexts := {
+      val worker = workerBundle.value
+      val runtime = (services / Docker / stage).value
+      streams.value.log.info("Runtime OCI context: " + runtime)
+      streams.value.log.info("Worker OCI context: " + worker)
+      streams.value.log.info("Staging only: no image build, base-image pull or registry operation")
     },
     verifyBuildSources := {
       val log = streams.value.log
@@ -966,6 +1021,7 @@ lazy val checkSteps = Seq(
   "Test/compile",
   SparkItRuns.CompileCheckStep, // BE-P6-05: compiles modules/spark/src/it/scala; no archive, no run
   "verifyDependencyScopes", // BE-P7-01: resolved classpaths and services packaging
+  "verifyWorkerBundle", // portable archive, isolated workers, offline relocation probes
   "verifyTestLogging", // BE-P10-01: forked Test JVMs log at WARN or less verbose
   "verifyHeldoutOutputRoute",
   "verifyHeldoutGuards",

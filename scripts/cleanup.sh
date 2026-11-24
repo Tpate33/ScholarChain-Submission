@@ -9,8 +9,8 @@
 #   scripts/cleanup.sh <env> inventory [after-base]             read-only listing + empty-buckets tokens
 #                                                               (after-base: reads with the deploy profile,
 #                                                               the read-only role is gone with base)
-#   scripts/cleanup.sh <env> plan-destroy <emr-run|base|bootstrap>
-#   scripts/cleanup.sh <env> apply-destroy <emr-run|base|bootstrap> <plan sha256>      (token)
+#   scripts/cleanup.sh <env> plan-destroy <runtime|emr-run|base|bootstrap>
+#   scripts/cleanup.sh <env> apply-destroy <runtime|emr-run|base|bootstrap> <plan sha256>      (token)
 #   scripts/cleanup.sh <env> empty-buckets <base|bootstrap>                            (token)
 #
 # ORDER
@@ -216,7 +216,7 @@ case $ACTION in
     (($# == 2)) || [[ $# == 3 && $3 == after-base ]] || die "$EX_USAGE" "inventory takes no argument, or after-base once base is destroyed"
     step "inventory (read-only calls, profile $READ_PROFILE)"
     INV=""
-    for s in emr-run base bootstrap; do INV="$INV stack:$s=$(stack_resources "$s")"; done
+    for s in runtime emr-run base bootstrap; do INV="$INV stack:$s=$(stack_resources "$s")"; done
     for b in "$DATA_BUCKET" "$LOGS_BUCKET" "$STATE_BUCKET"; do INV="$INV bucket:$b=$(version_count "$b")"; done
     ACTIVE=$(aws_ro emr list-clusters --active | jq -r --arg n "scholarchain-$ARG_ENV-spark-run" '[.Clusters[] | select(.Name == $n) | .Id] | join(",")')
     INV="$INV active_clusters=${ACTIVE:-none}"
@@ -228,11 +228,11 @@ case $ACTION in
     say "RESULT INVENTORY-OK"
     ;;
   plan-destroy)
-    (($# == 3)) || die "$EX_USAGE" "plan-destroy <emr-run|base|bootstrap>"
+    (($# == 3)) || die "$EX_USAGE" "plan-destroy <runtime|emr-run|base|bootstrap>"
     STACK=$3
     DIR=$(stack_dir "$ARG_ENV" "$STACK")
-    [[ $STACK != base ]] || require_destroyed emr-run
-    [[ $STACK != bootstrap ]] || require_destroyed emr-run base
+    [[ $STACK != base ]] || require_destroyed runtime emr-run
+    [[ $STACK != bootstrap ]] || require_destroyed runtime emr-run base
     tf_env "$READ_PROFILE"
     tf_init "$STACK" "$DIR"
     rm -f "$DIR/destroy.tfplan"
@@ -245,14 +245,14 @@ case $ACTION in
     say "RESULT DESTROY-PLAN-OK"
     ;;
   apply-destroy)
-    (($# == 4)) || die "$EX_USAGE" "apply-destroy <emr-run|base|bootstrap> <plan sha256>"
+    (($# == 4)) || die "$EX_USAGE" "apply-destroy <runtime|emr-run|base|bootstrap> <plan sha256>"
     STACK=$3
     need_hex "plan checksum" "$4" 64
     DIR=$(stack_dir "$ARG_ENV" "$STACK")
     [[ -f $DIR/destroy.tfplan && $(sha256_file "$DIR/destroy.tfplan") == "$4" ]] || die "$EX_REFUSED" "$DIR/destroy.tfplan does not have sha256 $4"
     need_token apply-destroy "$STACK" "$4"
-    [[ $STACK != base ]] || require_destroyed emr-run
-    [[ $STACK != bootstrap ]] || require_destroyed emr-run base
+    [[ $STACK != base ]] || require_destroyed runtime emr-run
+    [[ $STACK != bootstrap ]] || require_destroyed runtime emr-run base
     if [[ $STACK == base ]]; then
       for b in "$DATA_BUCKET" "$LOGS_BUCKET"; do
         [[ $(version_count "$b") == 0 ]] || die "$EX_REFUSED" "bucket $b is not empty; run empty-buckets base first"
@@ -272,17 +272,17 @@ case $ACTION in
       *) die "$EX_USAGE" "empty-buckets target must be base or bootstrap" ;;
     esac
     if [[ $TARGET == base ]]; then
-      require_destroyed emr-run
+      require_destroyed runtime emr-run
       require_run_evidence
     else
-      require_destroyed emr-run base
+      require_destroyed runtime emr-run base
       require_evidence_dir
       [[ -f $EVIDENCE_DIR/listings/output-spark-prefixes.txt ]] ||
         die "$EX_REFUSED" "$EVIDENCE_DIR does not hold the base evidence (listings/output-spark-prefixes.txt); empty-buckets base checks it first"
       ok "evidence archive $EVIDENCE_DIR (base evidence checked when base was emptied)"
     fi
     INV=""
-    for s in emr-run base bootstrap; do INV="$INV stack:$s=$(stack_resources "$s")"; done
+    for s in runtime emr-run base bootstrap; do INV="$INV stack:$s=$(stack_resources "$s")"; done
     for b in "$DATA_BUCKET" "$LOGS_BUCKET" "$STATE_BUCKET"; do INV="$INV bucket:$b=$(version_count "$b")"; done
     ACTIVE=$(aws_ro emr list-clusters --active | jq -r --arg n "scholarchain-$ARG_ENV-spark-run" '[.Clusters[] | select(.Name == $n) | .Id] | join(",")')
     INV="$INV active_clusters=${ACTIVE:-none}"

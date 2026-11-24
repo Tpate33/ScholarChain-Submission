@@ -55,7 +55,7 @@ load_env_conf "$ARG_ENV"
 
 step "locate the approved plan"
 STACK=""
-for s in bootstrap base emr-run; do
+for s in bootstrap base emr-run runtime; do
   d=$(stack_dir "$ARG_ENV" "$s")
   if [[ -f $d/tfplan && ! -L $d/tfplan && $(sha256_file "$d/tfplan") == "$ARG_PLAN" ]]; then
     [[ -z $STACK ]] || die "$EX_REFUSED" "more than one stack holds a plan with this checksum"
@@ -80,6 +80,8 @@ if ((PLAN_DESTROY + PLAN_REPLACE > 0)); then
     die "$EX_REFUSED" "plan deletes or replaces [$PLAN_DELETED_TYPES] in $STACK; destroy only through scripts/cleanup.sh"
   note "plan replaces the transient EMR cluster only"
 fi
+
+if [[ $STACK == runtime ]]; then require_runtime_approval; fi
 
 step "aws identity"
 ID_JSON=$(aws sts get-caller-identity --profile "$ENV_aws_deploy_profile" --region "$ENV_aws_region" \

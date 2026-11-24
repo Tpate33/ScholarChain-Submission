@@ -157,8 +157,8 @@ load_env_conf() { # load_env_conf <env> [allow-expired]   (allow-expired: cleanu
 stack_dir() {
   case $2 in
     bootstrap) printf '%s' "infra/terraform/bootstrap" ;;
-    base | emr-run) printf '%s' "infra/terraform/environments/$1/$2" ;;
-    *) die "$EX_USAGE" "stack must be bootstrap, base or emr-run" ;;
+    base | emr-run | runtime) printf '%s' "infra/terraform/environments/$1/$2" ;;
+    *) die "$EX_USAGE" "stack must be bootstrap, base, emr-run or runtime" ;;
   esac
 }
 
@@ -204,4 +204,15 @@ plan_summary() {
   printf '%s\n' "$rows" | awk -F'\t' 'NF == 3 && $2 ~ /^aws_iam_|^aws_kms_|_policy$|^aws_security_group$|^aws_vpc_security_group_|^aws_default_security_group$/ { printf "[%s] PLAN-SECURITY %s %s\n", s, $1, $3 }' s="$SCRIPT_NAME"
   printf '%s\n' "$rows" | awk -F'\t' 'NF == 3 && $2 ~ /^aws_emr_cluster$|^aws_nat_gateway$|^aws_eip$|^aws_instance$|^aws_vpc_endpoint$/ { printf "[%s] PLAN-COST %s %s\n", s, $1, $3 }' s="$SCRIPT_NAME"
   say "PLAN-COUNTS add=$PLAN_ADD change=$PLAN_CHANGE destroy=$PLAN_DESTROY replace=$PLAN_REPLACE"
+}
+
+# Runtime admission stays separate from Terraform plan approval. The JSON has no secret values.
+require_runtime_approval() {
+  local approval_file=infra/terraform/environments/dev/runtime/approved-run.json sum
+  [[ $ARG_ENV == dev ]] || die "$EX_REFUSED" "bounded runtime is dev only"
+  need_tools python3
+  require_tracked "runtime approval package" "$approval_file"
+  sum=$(python3 scripts/runtime/approval.py "$approval_file") || die "$EX_REFUSED" "runtime approval package invalid"
+  [[ ${SCHOLARCHAIN_RUNTIME_APPROVAL:-} == "runtime-$HEAD_SHA-$ARG_PLAN-$sum" ]] ||
+    die "$EX_REFUSED" "human runtime approval must bind HEAD, saved plan and current approval-package checksum"
 }
