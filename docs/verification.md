@@ -1,4 +1,14 @@
-# Current update: DBLP-derived local query
+# Sanitized publication candidate status
+
+This document preserves historical observed results. The original source checkpoint
+was `e08aa0938bed6cb704b8cff990a6796aa7f2af50`; its source implementation for offline
+preparation was `09c3d4cda6b0935aa607dcddecfdbefab84b6ddb`. Source evidence recorded
+2,889 passed, zero failures/errors, one skipped, 243 suites; see the
+[offline test report](agent-runs/aws-plan-01/test-report.md). These are not new clean-clone
+results. Candidate verification is pending in the [publication record](agent-runs/publication-01/publication-record.md).
+[Publication notes](publication.md) explain derived history and replay limitations.
+
+# Historical update: DBLP-derived local query
 
 The separate real-data profile now loads the accepted Phase 6 dev output through
 `OpeningLoad` before starting HTTP. No test implementation or synthetic collaboration
@@ -66,8 +76,10 @@ services staging and the pipeline classpath completed at 3:22:29 PM. The existin
 [post-repair summary and log digest](agent-runs/integration-02/verification/closeout-full-check-summary.txt).
 Full log: `/private/tmp/scholarchain-integration02-closeout-check.log`.
 The earlier 2,850-pass result predates this repair. Human
-acceptance remains pending. The [human Git steps](agent-runs/integration-02/closeout-steps.md)
-are proposed instructions, not performed operations or permission to deploy.
+acceptance was pending at the time of that report and was subsequently recorded
+in the [original Integration 02 human gate](agent-runs/integration-02/human-gate.md).
+The [historical human Git steps](agent-runs/integration-02/closeout-steps.md) are not
+current candidate instructions or permission to deploy.
 
 Two minor synthetic-smoke issues remain deferred: optimized Python can disable its
 assertions, and a later failed replay can leave an older PASS summary. Recorded
@@ -81,7 +93,8 @@ No live storage, production-model or cloud readiness approval is given.
 
 Repository: `/Users/taufeeqpatel/Desktop/ScholarChain`.
 Remote: `https://github.com/Tpate33/ScholarChain-Project.git`.
-Base commit: `bdbf5df` on `main`; integration-02 work remains uncommitted.
+Historical base commit: `bdbf5df` on `main`; integration-02 work was uncommitted
+at the time of the following observations, before its original human acceptance.
 These are observed Codex results, not an independent review or human acceptance.
 
 ## Observed successful commands

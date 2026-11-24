@@ -1,0 +1,131 @@
+package scholarchain.storage.parquet
+
+import java.nio.file.{Files, Paths, LinkOption}
+import java.io.ByteArrayInputStream
+import java.nio.ByteBuffer
+import scala.collection.mutable
+import scala.jdk.CollectionConverters.*
+import scholarchain.storage.model.Bytes
+import scholarchain.storage.load.ParquetRecords
+
+object Audit {
+  private val counts = mutable.Map.empty[(String,String,String),Long].withDefaultValue(0L)
+  private var stringLeaves = 0L
+  private var stringBytes = 0L
+  private var numericLeaves = 0L
+  private var metadataStrings = 0L
+  private var binaryMetadataBytes = 0L
+  private val patterns = Vector(
+    "aws-access-key" -> "(?:AKIA|ASIA)[A-Z0-9]{16}".r,
+    "private-key" -> "-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----".r,
+    "credential-assignment" -> "(?i)(?:aws_secret_access_key|api[_-]?key|access[_-]?token|password|client[_-]?secret|authorization)\\s*[:=]\\s*[^\\s,;]{6,}".r,
+    "bearer-token" -> "(?i)bearer\\s+[A-Za-z0-9._~+/-]{12,}".r,
+    "provider-token" -> "(?:sk-(?:proj-|ant-)?[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,})".r,
+    "jwt" -> "eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}".r,
+    "uri-userinfo" -> "[a-zA-Z][a-zA-Z0-9+.-]*://[^/\\s:@]+:[^/\\s@]+@".r,
+    "private-evaluation-indicator" -> "(?i)(?:held[-_ ]?out|ground[-_ ]?truth|gold[-_ /]?(?:label|set|data|entity)|(?:true|target|human|private)[-_ ]?label|adjudicat|annotat(?:ion|ed)|is_match)".r,
+    "email-address" -> "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}".r
+  )
+  private def flag(file:String, col:String, category:String):Unit = counts((file,col,category)) += 1
+  private def scan(file:String, col:String, text:String, nested:Int = 0):Unit = {
+    patterns.foreach { (category, pattern) => if (pattern.findFirstIn(text).nonEmpty) flag(file,col,category) }
+    if (nested < 3 && text.length <= 1024*1024 && (text.trim.startsWith("{") || text.trim.startsWith("["))) {
+      try {
+        def json(v:ujson.Value,p:String):Unit = v match {
+          case ujson.Str(s) => scan(file,p,s,nested+1)
+          case o:ujson.Obj => o.obj.foreach { (k,x) => scan(file,p+".<key>",k,nested+1);json(x,p+".*") }
+          case a:ujson.Arr => a.arr.foreach(x => json(x,p+"[]"))
+          case _ => ()
+        }
+        json(ujson.read(text),col+".<json>")
+      } catch { case _:Exception => () }
+    }
+    if (text.contains("://")) {
+      try {
+        val u = new java.net.URI(text)
+        Option(u.getRawQuery).foreach(q => scan(file,col+".<query>",java.net.URLDecoder.decode(q,"UTF-8"),nested+1))
+        Option(u.getRawUserInfo).foreach(_ => flag(file,col,"uri-userinfo"))
+      } catch { case _:Exception => () }
+    }
+  }
+  private def row(file:String, col:String, v:PValue):Unit = v match {
+    case PValue.Str(s) =>
+      stringLeaves += 1; stringBytes += s.getBytes("UTF-8").length; scan(file,col,s)
+      if (col.endsWith(".provenance.sourceDataset") && s != "scholarchain-derived") flag(file,col,"unexpected-source-dataset")
+      if (col.endsWith(".provenance.snapshot") && s != "dblp-2026-10-03") flag(file,col,"unexpected-source-snapshot")
+      if (col.endsWith(".provenance.runId") && s != "run:a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40") flag(file,col,"unexpected-source-run")
+      val lineage = Map("groupingRunId" -> "run:84dd896fda43977b934008f10955191e78c2b93b80ec57c00f55dbb137dbd7d2", "decisionRunId" -> "run:736cb1706210a34f0958e658c061054c4e6b27b80847528db8619da84495b76a", "inputRunId" -> "run:2881724b5c86b561a235836d51946fbd884beed36a14f929b27c278cb5de8baa")
+      lineage.foreach((k,expected) => if(col.endsWith(".lineage."+k) && s != expected) flag(file,col,"unexpected-lineage-run"))
+    case PValue.Struct(xs) => xs.foreach((k,x) => {scan(file,col+".<field>",k);row(file,col+"."+k,x)})
+    case PValue.ListOf(xs) => xs.foreach(x => row(file,col+"[]",x))
+    case PValue.Null => ()
+    case _ => numericLeaves += 1
+  }
+  private def metadata(file:String, col:String, x:Any, depth:Int = 0):Unit = {
+    require(depth < 40, "metadata depth exceeded")
+    x match {
+      case null => ()
+      case s:String => metadataStrings += 1;scan(file,col,s)
+      case a:Array[Byte] =>
+        binaryMetadataBytes += a.length
+        scan(file,col+".<binary-text>",new String(a,java.nio.charset.StandardCharsets.UTF_8))
+      case b:ByteBuffer =>
+        binaryMetadataBytes += b.remaining()
+        val copy = b.duplicate(); val a = new Array[Byte](copy.remaining()); copy.get(a)
+        scan(file,col+".<binary-text>",new String(a,java.nio.charset.StandardCharsets.UTF_8))
+      case xs:java.util.List[?] => xs.asScala.foreach(y => metadata(file,col+"[]",y,depth+1))
+      case xs:java.util.Map[?,?] => xs.asScala.foreach((k,v) => {metadata(file,col+".<key>",k,depth+1);metadata(file,col+".*",v,depth+1)})
+      case other =>
+        val ms = other.getClass.getMethods
+        val byId = ms.find(m => m.getName == "fieldForId" && m.getParameterCount == 1)
+        val value = ms.find(m => m.getName == "getFieldValue" && m.getParameterCount == 1 && !m.isBridge)
+        if(byId.nonEmpty && value.nonEmpty) (1 to 64).foreach { n =>
+          val field = byId.get.invoke(other,Int.box(n))
+          if(field != null) {
+            val isSet = ms.find(m => m.getName == "isSet" && m.getParameterCount == 1 && !m.isBridge)
+            if(isSet.isEmpty || isSet.get.invoke(other,field) == java.lang.Boolean.TRUE)
+              metadata(file,col+"."+field.toString,value.get.invoke(other,field),depth+1)
+          }
+        }
+    }
+  }
+  def main(args:Array[String]):Unit = {
+    val repo = Paths.get(args(0)).toRealPath()
+    val root = repo.resolve("modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40")
+    val pmBytes = Bytes.of(Files.readAllBytes(root.resolve("_parts.json")))
+    require(pmBytes.sha256 == "749763adb05af272a3c0c5473ed3d90d071a3e762d67ef70ebef84295cc94907")
+    val files = ujson.read(pmBytes.utf8)("files").arr.filter(_("format").str == "parquet")
+    require(files.size == 29)
+    val limits = ParquetReadBounds.of(1024*1024,8L*1024*1024,100000L,8*1024*1024).toOption.get
+    var totalRows = 0L
+    files.foreach { f =>
+      val rel = f("path").str
+      require(!rel.toLowerCase.matches(".*(?:gold|held.?out).*"))
+      val p = root.resolve(rel).normalize()
+      require(p.startsWith(root) && p.toRealPath() == p && !Files.isSymbolicLink(p))
+      val bytes = Bytes.of(Files.readAllBytes(p))
+      require(bytes.sha256 == f("sha256").str && bytes.size.toLong == f("byteCount").num.toLong)
+      val part = ParquetRows.read(rel,bytes,limits).fold(_ => throw new IllegalStateException("reader refusal: "+rel),identity)
+      require(part.rows.size.toLong == f("rowCount").num.toLong && part.footer.rowCount == part.rows.size)
+      val records = ParquetRecords.decodeRows(rel,f("recordSchemaVersion").str,part.columns,part.rows)
+        .fold(_ => throw new IllegalStateException("layout refusal: "+rel),identity)
+      records.foreach { record =>
+        val companion = Class.forName(record.getClass.getName+"$").getField("MODULE$").get(null)
+        val contract = companion.getClass.getMethod("contract").invoke(companion)
+        val validate = contract.getClass.getMethods.find(m => m.getName == "validate" && m.getParameterCount == 1 && !m.isBridge).get
+        val errors = validate.invoke(contract,record).asInstanceOf[scala.collection.Seq[?]]
+        if(errors.nonEmpty) flag(rel,"row","core-contract-refusal")
+      }
+      part.rows.foreach(x => row(rel,"row",x))
+      val raw = bytes.toArray
+      val n = ByteBuffer.wrap(raw,raw.length-8,4).order(java.nio.ByteOrder.LITTLE_ENDIAN).getInt()
+      val footer = org.apache.parquet.format.Util.readFileMetaData(new ByteArrayInputStream(raw,raw.length-8-n,n))
+      metadata(rel,"footer",footer)
+      totalRows += part.rows.size
+      println(ujson.write(ujson.Obj("path" -> rel,"rows" -> part.rows.size,"sha256" -> bytes.sha256,"schemaVerified" -> true,"footerScanned" -> true)))
+    }
+    require(totalRows == 2809)
+    counts.toVector.sortBy(_._1).foreach { case ((f,c,k),n) => println(ujson.write(ujson.Obj("path" -> f,"column" -> c,"category" -> k,"count" -> n))) }
+    println(ujson.write(ujson.Obj("summary" -> true,"files" -> files.size,"rows" -> totalRows,"stringLeaves" -> stringLeaves,"stringUtf8Bytes" -> stringBytes,"numericOrBooleanLeaves" -> numericLeaves,"metadataStringLeaves" -> metadataStrings,"binaryMetadataBytes" -> binaryMetadataBytes,"findingCategories" -> counts.size)))
+  }
+}

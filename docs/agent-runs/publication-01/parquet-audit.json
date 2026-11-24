@@ -1,0 +1,145 @@
+{
+  "summary": true,
+  "files": 29,
+  "rows": "2809",
+  "stringLeaves": "73665",
+  "stringUtf8Bytes": "2405307",
+  "numericOrBooleanLeaves": "11167",
+  "metadataStringLeaves": "3025",
+  "binaryMetadataBytes": "79303",
+  "findingCategories": 0,
+  "head": "e08aa0938bed6cb704b8cff990a6796aa7f2af50",
+  "harnessSha256": "20df18e104234e462450a4ab09c82a0b9ad1fa21ae9b1e2e6bce33e2927dc679",
+  "scanLogSha256": "ce1991105d4583e298f463e8f021a498a1f32bbf0f83e5da6a94951ba6bcb753",
+  "manifestSha256": "749763adb05af272a3c0c5473ed3d90d071a3e762d67ef70ebef84295cc94907",
+  "allHistoricalVersionsEqualHead": true,
+  "coreContractRefusals": 0,
+  "originConsistencyMismatches": 0,
+  "credentialPatternFindings": 0,
+  "privateEvaluationIndicatorFindings": 0,
+  "emailPatternFindings": 0,
+  "scopeLimitations": [
+    "Pattern scan is not proof that all secrets or private evaluation information are absent.",
+    "Public dataset provenance checked against accepted dev manifests and expected derived-run lineage; no private label comparison or independent source re-fetch.",
+    "Decoded logical fields and footer scanned; no claim about arbitrary hidden or steganographic payloads."
+  ],
+  "historicalObjects": [
+    {
+      "oid": "85cb7fa3b35651e2c20ddb62659e9f7174611afa",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/analysis-windows/part-00000.parquet"
+    },
+    {
+      "oid": "1240ae4d95e5998c3a24a3b7c5867e7a1ff2632b",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/bridges/part-00000.parquet"
+    },
+    {
+      "oid": "860ffd3b24f26a9341518c8aa2a50e2c4ba4f928",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/bridges/part-00001.parquet"
+    },
+    {
+      "oid": "74753c1bf30eb2481e39df25d1039a60823c870c",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/communities/part-00000.parquet"
+    },
+    {
+      "oid": "68c5176d42a3dc42eb2f1b3ee55a0cbccdf09cde",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/communities/part-00001.parquet"
+    },
+    {
+      "oid": "0798dbaf2d2355816571ece7f8283c76d9acf9b3",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/components/part-00000.parquet"
+    },
+    {
+      "oid": "f0b387c86ca8921dc162e666fd24734b04382bc0",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/components/part-00001.parquet"
+    },
+    {
+      "oid": "fe309702bca9dc165686cef27b3cb48a9bb12702",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/coreness/part-00000.parquet"
+    },
+    {
+      "oid": "1e99fe5f0444f3d9ca99a93470fd3e831d4bad7f",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/coreness/part-00001.parquet"
+    },
+    {
+      "oid": "bea0c009764501ea7c92c6dcefc9dad23e0d5703",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/edges/part-00000.parquet"
+    },
+    {
+      "oid": "bd53ec34f4869fdcf2379a2c0b0bc1c234f76ba7",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/edges/part-00001.parquet"
+    },
+    {
+      "oid": "46ed14ebaf92e82d48b932d14d82ab3ea1666a29",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/entity-summary-inputs/part-00000.parquet"
+    },
+    {
+      "oid": "6a8bf949c1ad46c6acc56047beaaec81594f8fa9",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/entity-summary-inputs/part-00001.parquet"
+    },
+    {
+      "oid": "7666401ec26cdd9879be95d51f413ff526812911",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/evidence-paths/part-00000.parquet"
+    },
+    {
+      "oid": "d7091450b141e5c072595b06f21b08732ce31370",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/evidence-paths/part-00001.parquet"
+    },
+    {
+      "oid": "066985b8c8d08aa2e455b9fb14ad2f4cde056cca",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/graph-edges/part-00000.parquet"
+    },
+    {
+      "oid": "7ef0e016008e7e6f9fbae235b12e391549e94ead",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/graph-edges/part-00001.parquet"
+    },
+    {
+      "oid": "e44307c4a1447fb8db94f2b4bbca655a325e959c",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/graph-nodes/part-00000.parquet"
+    },
+    {
+      "oid": "4af58cc4d8aa79afa32f58039fad80ef510cb353",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/graph-nodes/part-00001.parquet"
+    },
+    {
+      "oid": "8cb3eb68bacc3a5bf2baeebc9ca0baaaec11d359",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/metrics/part-00000.parquet"
+    },
+    {
+      "oid": "a803499967416b905de5ed5558d2763ad0d9f7a1",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/metrics/part-00001.parquet"
+    },
+    {
+      "oid": "d4f66281224f35c6cd9a84dc21499ec8d4b82dea",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/path-length-estimates/part-00000.parquet"
+    },
+    {
+      "oid": "40b9a63113a4271b91dfae4d33678ac22cebad41",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/path-length-estimates/part-00001.parquet"
+    },
+    {
+      "oid": "ba6ee6f27de35a75204f2fa523f04f4ccaab0996",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/summary-inputs/part-00000.parquet"
+    },
+    {
+      "oid": "d5c8235373cfa01632aa896271c10ae387301eb5",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/summary-inputs/part-00001.parquet"
+    },
+    {
+      "oid": "e81ce6253b19787141fe63917c5886144fc634cc",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/temporal-changes/part-00000.parquet"
+    },
+    {
+      "oid": "05516a820c7bf874f82ccd2bb20876a5c8b5febd",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/temporal-changes/part-00001.parquet"
+    },
+    {
+      "oid": "85b425dbe3ab93da1c4ed551c115691173d12c3f",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/window-comparisons/part-00000.parquet"
+    },
+    {
+      "oid": "bffd1a82f84454f729911814f01e5eac0747c2a8",
+      "path": "modules/storage/src/test/resources/fixtures/phase06-run-1-local/run=a65f3f38b597fc4709fe24e0ddbd12ae09a0c79ad54f9d1f5378c06cfe8a8c40/window-structures/part-00000.parquet"
+    }
+  ],
+  "historicalVersionCount": 29
+}

@@ -17,6 +17,14 @@ concurrent builds in the same checkout. Preserve target evidence before cleaning
 | sbt cache permission denied in Codex | Approve the scoped local build cache access; do not alter hooks/markers. |
 | Repeated Claude test-marker hook | Preserve the log; stop competing writers; use the documented human-run check recovery. Do not forge a marker. |
 
+## Sanitized candidate reproduction
+
+Follow [publication notes](publication.md) for a fresh candidate clone. No new
+clean-clone gate is claimed yet. Existing committed DBLP demo fixtures remain
+bit-identical; do not copy an old `target/` directory. Historical ER/Spark runs
+require separately prepared dev inputs because rewritten ancestors do not satisfy
+their original identity pins. Never substitute held-out inputs or relabel old outputs.
+
 ## Deployment and rollback
 
 The new `ProductionLoadMain` uses the existing `OpeningLoad` with explicit bounded
@@ -31,6 +39,13 @@ The coordinator observed the new full gate pass with **2,882 tests, zero
 failures/errors, one skipped, 241 suites**, followed by successful loader/DBLP
 classpath generation and service staging. See the
 [production test report](agent-runs/production-connections-01/test-report.md).
+Subsequent original-history accepted offline preparation recorded 2,889 passed,
+zero failures/errors, one skipped, 243 suites; see the
+[offline report](agent-runs/aws-plan-01/test-report.md). It prepared portable workers
+and private runtime infrastructure, not a successful deployment. Healthy container
+verification remains blocked by a zero-byte base-image `libjvm.so`; Docker recovery
+and alternative environments remain deferred. This is historical evidence, not a
+new candidate build result.
 The core test-resource `production-workflow.conf` and `production-load.conf` overlays
 document the required non-secret fields and illustrative values, not deployable
 credentials or an approved resource selection.
@@ -51,7 +66,8 @@ imply 10K total vectors.
 There is no verified runtime deployment in this release state. Do not infer one from
 adapter code or successful local checks. Historical reviewed-plan scripts are
 `scripts/plan.sh`, `scripts/deploy.sh`, and `scripts/cleanup.sh`; their scope is the
-implemented Terraform stacks, not a complete runtime environment. Apply/cleanup
+implemented Terraform stacks including offline private-runtime preparation; no
+live runtime application is verified. Apply/cleanup
 require human approval and a direct interactive Terminal. No safe universal rollback
 command is claimed. Inspect the exact reviewed plan and prior release before acting.
 

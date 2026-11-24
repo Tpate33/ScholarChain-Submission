@@ -15,6 +15,9 @@ not establish live deployment; current evidence and pending gates are tracked in
 the [production preparation record](../docs/agent-runs/production-connections-01/status.md).
 See the [deliverable index](../docs/deliverable-index.md) for unmet requirements and
 [verification record](../docs/verification.md) for current command results.
+This sanitized publication candidate is unpublished and has not received new human
+acceptance. [Publication notes](../docs/publication.md) distinguish original accepted
+commits from derived history, unchanged demo fixtures and pending clean-clone gates.
 
 ## 1. Problem and motivation
 
@@ -74,7 +77,9 @@ Historical phase folders record prompts, repairs, reviews and acceptance decisio
 Integration 01 was accepted for local scope, with cloud and production residuals
 explicitly retained. Integration 02 was accepted as a local checkpoint against
 implementation `1079eac`, recorded in acceptance commit `19c5b1e`. The subsequent
-production connections remain unaccepted and uncommitted. A stale
+production connections were accepted in the original history; offline AWS preparation
+was subsequently accepted against original implementation `09c3d4c`. These historical
+decisions do not ratify rewritten candidate commits. See the publication commit map. A stale
 Claude test marker caused repeated stop-hook refusals during handoff; repeating the
 same refusal did not add verification. Actual check output, rather than a manually
 edited marker, is the basis for the current verification record.
@@ -227,8 +232,15 @@ at 4:24:21 PM.
 See the [production test report](../docs/agent-runs/production-connections-01/test-report.md)
 and [preparation record](../docs/agent-runs/production-connections-01/status.md).
 The loader classpath task has been built; no standalone CLI replay is claimed.
-The 2,851-test result above belongs to Integration Round 02, not the new uncommitted
-production changes.
+The 2,851-test result belongs to Integration Round 02; the 2,882-test result belongs
+to production connections. Subsequent original-history offline preparation recorded
+**2,889 passed, zero failures/errors, one skipped, 243 suites**. That gate ran on the
+source candidate before its original commit, not a fresh sanitized clone. See the
+[offline test report](../docs/agent-runs/aws-plan-01/test-report.md) and
+[historical acceptance](../docs/agent-runs/aws-plan-01/human-gate.md). No new candidate
+full-gate or standalone replay result is claimed here. Portable packaging and private
+runtime infrastructure were prepared offline. A zero-byte `libjvm.so` in the Java
+base still blocks healthy container verification; further Docker recovery is deferred.
 
 ## 19. Factory evaluation
 
@@ -276,7 +288,7 @@ acceptance and production verification remain outstanding.
 
 The required deployed end-to-end real-data system is incomplete. Missing items
 include live Neptune/DynamoDB/S3 Vectors loading/query verification, live model and
-Secrets Manager validation, runtime IaC/deployment, measured elasticity, a clean-checkout
+Secrets Manager validation, live runtime IaC application/deployment, measured elasticity, a clean-checkout
 bounded run and video. Corpus-scale requirements and instructor-approved deviations
 are not established for this project individually. The student reports published
 reduced-scale course guidance for classmates (10K/50K works, up to 10K real vectors,
@@ -317,4 +329,8 @@ The professor's updated requirement, as supplied by the student, is a **public,
 anonymously cloneable repository**. Actual visibility and anonymous cloneability
 have not been independently verified here. The student must submit its URL through
 the designated Microsoft Teams assignment before **November 25, 2026, 11 PM CST**.
-No final submission tag or video link exists in this working state.
+No final submission tag or video link exists in this working state. Publication must
+use a separately approved independent repository, not expose original private history.
+Historical ER/Spark identity pins cannot automatically replay through rewritten
+ancestry; new dev inputs/pins need separate preparation. The unchanged local demo
+fixtures do not require that pin repair. See publication notes for the bounded plan.

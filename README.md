@@ -55,8 +55,60 @@ Read the [verification record](docs/verification.md), [architecture](docs/archit
 [API reference](docs/api-reference.md), [data lineage](docs/data-lineage.md),
 [runbook](docs/runbook.md), [deliverable index](docs/deliverable-index.md),
 [cloud preparation](docs/cloud-preparation.md) and [report](reports/final-report.md).
-The [release manifest](release-manifest.json) describes uncommitted work; a final
-submission tag and video are still outstanding. The original assignment is preserved below.
+The [release manifest](release-manifest.json) is the historical Integration 02 manifest,
+not the sanitized candidate release manifest. [Publication notes](docs/publication.md)
+record original-to-derived history, verification limits and pending submission gates.
+This candidate is unpublished; preparing it does not authorize publication. The original
+private repository remains separate. A final submission tag and video are outstanding.
+The professor’s latest supplied guidance requires a public, anonymously cloneable
+submission repository and its URL submitted through Teams by November 25, 2026,
+11 PM CST; it supersedes the preserved private-repository instructions below.
+
+## Agent catalog
+
+The 18 submitted role files are under `.claude/agents/`; the authoritative ownership
+and complete tool fences are in [docs/agents.md](docs/agents.md). The main Claude
+session orchestrates one owner at a time; subagents do not delegate. The following
+are local entry points, not authority to invoke cloud or paid work.
+
+| Role | Purpose / owned artifacts | Primary verification |
+|---|---|---|
+| factory-engineer | Constitution, `.claude/**`, MCP configuration | Validator and human ratification |
+| build-engineer | sbt, dependency structure, packaging | `sbt check`, dependency fences |
+| domain-engineer | `modules/core/**` contracts | Contract tests |
+| dataset-engineer | `datasets/**`, manifest and sampling | Dataset validation, manifest review |
+| hadoop-engineer | `modules/hadoop/**` parsing | Local sample, counters and output invariants |
+| entity-resolution-engineer | `modules/entity-resolution/**` identity policies | Authorized dev evaluation and policy review |
+| spark-engineer | `modules/spark/**` graph analytics | Spark tests and bounded output invariants |
+| storage-engineer | `modules/storage/**` adapters/loaders | Offline contracts and authorized load checks |
+| rag-engineer | `modules/rag/**` planning/evidence/verification | Retrieval and groundedness tests |
+| service-engineer | `modules/services/**` HTTP/runtime | API tests and `sbt check` |
+| test-engineer | `tests/**`, designated adversarial test sources | Exact pass/fail report; no production edits |
+| code-reviewer | Read-only source and diff review | Verified findings and independent verdict |
+| infra-engineer | Terraform and operational scripts | Offline format/validation; reviewed plans separately |
+| deploy-engineer | Approved deployment operations | Human-approved plan and smoke evidence |
+| experiment-engineer | Experiment definitions and results | Reproducible bounded measurements |
+| documentation-engineer | README, reports and owned docs | Link checks and attributed replay evidence |
+| incident-responder | Incident diagnosis/recovery records | Human escalation and approved recovery |
+| dependency-updater | Approved version values | Version review, `sbt check` |
+
+Writer roles have only their role-declared tools and owned paths; the reviewer has
+no Bash/write/edit tools. External MCP tools in relevant cloud roles are additional
+prerequisites, never required by the credential-free local demo. Every invoked role
+must return `STATUS`, `OWNER`, `WORK ORDER`, `FILES CREATED`, `FILES MODIFIED`,
+`COMMANDS RUN`, `TEST RESULTS`, `VALIDATION RESULTS`, `ASSUMPTIONS`, `RISKS`,
+`MANUAL ACTION REQUIRED`, `BLOCKED-ON OWNER`, `BLOCKED-ON EVIDENCE`, `NEXT GATE`.
+
+## Reproducing the agentic workflow
+
+Historical versions and the bounded, unpaid validation/review exercise are in
+[publication notes](docs/publication.md#agent-workflow-exercise). Those instructions
+distinguish inert hook validation from actual model-backed generation, which has
+not been replayed for this candidate. They include the exact owner work-order
+template, prerequisites, report comparison and fresh-session boundaries. Original
+phase prompts/reports and their original SHAs remain historical evidence; they
+are not new acceptance decisions for rewritten history. The original assignment
+is preserved below.
 
 ---
 
