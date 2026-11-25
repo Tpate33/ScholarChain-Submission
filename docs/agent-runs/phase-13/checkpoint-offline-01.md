@@ -36,6 +36,13 @@ was not modified. Codex handoff: private `docs/agent-runs/aws-plan-01/offline-st
 - Review CR-P13-07 (read-only, working tree): release-scan-cr-rel-01.md:29 is a proposed `grep -nE` pattern command; parquet-audit.scala.txt:21 is the `credential-assignment` regex. Both name key identifiers with no value. parquet-audit.json and scripts/ have no matches. Verdict HARMLESS; no rotation required. Limitation: earlier committed versions of those two paths were not read by the reviewer.
 - Human decision: the 12-digit AWS account ID remains in pre-redaction public history (Phase 6 evidence, Terraform documentation). It is a non-secret identifier and is knowingly retained; history is not rewritten, to preserve cited commit SHAs and reproducibility. The current tree is redacted.
 
+## Post-commit verification (2026-11-25)
+
+- Checkpoint commit: `cc6c68cd9744da898a84e3f7d28f376eba8a7e3d` (observed by orchestrator: `git rev-parse HEAD`; parent `b1a8e06`).
+- Human ran `sbt check` in a Terminal after the commit. Marker observed by orchestrator: written_by `sbt markTestRun`, git_head `cc6c68c…`, worktree clean, 243 suites, 2,889 passed, 0 failed, 0 errored, 1 skipped (2026-11-25T06:34:54Z). The marker change was reported UNATTRIBUTED by the audit (Terminal run) and matches the human's report.
+- Human ran `scripts/check.sh` (human-reported, not observed): CHECK-OK; runtime Terraform validate PASS; offline runtime tests 14/14 PASS; script syntax, lint and configuration checks PASS; bootstrap, base and emr-run validate SKIPPED (not initialized).
+- Phase 13 gate status: "clean checkout can run all non-cloud validation through the documented script" demonstrated on the committed tree (two-step: `sbt check`, then `scripts/check.sh`). Remaining gates require AWS: reproducible runtime plan with archived checksum, real smoke query, and running the non-destructive scripts in dev; README reproduction instructions (documentation-engineer).
+
 ## Reviews
 
 CR-P13-01 REQUEST_CHANGES -> CR-P13-02 APPROVE -> CR-P13-03 APPROVE -> CR-P13-04 REQUEST_CHANGES -> CR-P13-05 APPROVE -> CR-P13-06 (public safety) APPROVE -> CR-P13-07 (history credential-pattern matches) APPROVE, HARMLESS. Open nits accepted: archive/plan hex-strip edge case; run-experiment token replay (no workload yet).
