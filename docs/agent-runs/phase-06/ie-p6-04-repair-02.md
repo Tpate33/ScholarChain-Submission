@@ -18,7 +18,7 @@ Dry-run output (verbatim, exit code 3):
 [run-bounded-spark] STEP start mode=dry-run env=dev at=2026-11-19T05:08:15Z
 [run-bounded-spark] CHECK ok head b41b249ce0a9e9d0f9dc5740c0c707aa3486d69a
 [run-bounded-spark] CHECK ok clean tree
-[run-bounded-spark] CHECK ok environment config infra/terraform/environments/dev/env.conf (account 663570374448, Region us-east-1)
+[run-bounded-spark] CHECK ok environment config infra/terraform/environments/dev/env.conf (account <redacted-account-id>, Region us-east-1)
 [run-bounded-spark] CHECK ok code scope (build.sbt project modules/core modules/spark) unchanged between code_version 148b4b91bc904a63680b94f91f275173f743c4b6 and HEAD
 [run-bounded-spark] CHECK ok run config infra/terraform/environments/dev/runs/spark-dev-run-01.conf
 [run-bounded-spark] BOUND instances=2 cap=2 source=config/HC_MAX_INSTANCES

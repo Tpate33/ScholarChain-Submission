@@ -34,6 +34,12 @@ resource "aws_service_discovery_service" "main" {
     routing_policy = "MULTIVALUE"
   }
 }
+# CR-P13-04 m1: the committed terraform.tfvars never names the account-bearing data bucket. Its
+# materialization manifests carry the literal token @DATA_BUCKET@, replaced here by var.data_bucket
+# (exported by scripts/lib/common.sh tf_env, derived like base).
+locals {
+  materialization_manifests = { for k, v in var.materialization_manifests : k => replace(v, "@DATA_BUCKET@", var.data_bucket) }
+}
 resource "aws_ecs_task_definition" "main" {
   for_each                 = local.tasks
   family                   = "${local.name}-${each.key}"
@@ -57,7 +63,7 @@ resource "aws_ecs_task_definition" "main" {
     stopTimeout = 30
     environment = [
       { name = "SCHOLARCHAIN_CONFIG_FILES", value = var.config_files[each.key] },
-      { name = "SCHOLARCHAIN_MATERIALIZE_MANIFEST", value = var.materialization_manifests[each.key] },
+      { name = "SCHOLARCHAIN_MATERIALIZE_MANIFEST", value = local.materialization_manifests[each.key] },
       { name = "SCHOLARCHAIN_RUN_ID", value = var.run_id },
       { name = "AWS_REGION", value = "us-east-1" },
       { name = "AWS_MAX_ATTEMPTS", value = "1" },
@@ -94,9 +100,21 @@ resource "aws_ecs_service" "main" {
   service_registries {
     registry_arn = aws_service_discovery_service.main[each.key].arn
   }
+  # query and evidence register with the API load balancer (alb.tf); graph stays Cloud Map only.
+  dynamic "load_balancer" {
+    for_each = contains(local.api_services, each.key) ? [each.key] : []
+    content {
+      target_group_arn = aws_lb_target_group.api[load_balancer.value].arn
+      container_name   = load_balancer.value
+      container_port   = var.ports[load_balancer.value]
+    }
+  }
+  health_check_grace_period_seconds = contains(local.api_services, each.key) ? 120 : null
   lifecycle {
     ignore_changes = [desired_count]
   }
+  # The target groups must be attached to the load balancer before a service registers with them.
+  depends_on = [aws_lb_listener.api]
 }
 resource "aws_appautoscaling_target" "graph" {
   max_capacity       = 2

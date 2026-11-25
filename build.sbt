@@ -572,12 +572,16 @@ lazy val services = project
     // percentage-based heap limits. No registry, tag `latest`, or cloud settings.
     dockerBaseImage := versionLedger.value("docker.java-runtime-image"),
     dockerUpdateLatest := false,
+    // BE-P13-01: the ECS task architecture (runtime_platform X86_64); RUN steps get no network.
+    dockerBuildOptions ++= Seq("--platform=linux/amd64", "--network=none"),
     // Explicit writable materialization root, also when ECS overrides the default entrypoint.
+    // BE-P13-01: each stage first fails unless the base JVM is intact (WorkerPackaging.BaseJvmProbe).
     dockerCommands ~= { commands =>
       commands.flatMap {
         case from @ com.typesafe.sbt.packager.docker.Cmd("FROM", _*) =>
           Seq(
             from,
+            com.typesafe.sbt.packager.docker.Cmd("RUN", WorkerPackaging.BaseJvmProbe),
             com.typesafe.sbt.packager.docker.Cmd(
               "RUN",
               "mkdir -p /work && chown 10001:10001 /work"

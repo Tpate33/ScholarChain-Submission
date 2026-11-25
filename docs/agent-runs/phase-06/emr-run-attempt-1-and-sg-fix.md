@@ -8,7 +8,7 @@ Orchestrator-condensed record; exact values and verdicts kept. The network.tf di
 
 ## emr-run plan and review (DE-P6-03, deploy-engineer, read-only)
 - HEAD d856047c043efbc0ee6e02fe43280e3ea3350b3d; tfplan sha256 438abdc6a8b78f90ea08bc1786f2abd4a9803fc14076551a92942a42c8be5198 = meta (plan_profile=readonly, add=4 change=0 destroy=0 replace=0).
-- aws_emr_cluster.run: scholarchain-dev-spark-run, emr-7.14.0, Hadoop only, 1 primary + 1 core m5.xlarge (EBS 32 gp3, root 15), no task group or scaling, idle_timeout 900, keep_alive true, termination_protection false, step_concurrency 1, no SSH key, private subnet, base SGs/roles/security configuration, log_uri s3://scholarchain-dev-logs-663570374448-us-east-1/emr/, core-site marker retention keep, yarn-site am.max-attempts 1, bootstrap path and 8 args equal to EXPECTED_BOOTSTRAP_ARGS. KMS endpoint: Interface, private DNS, tcp 443 from 10.42.0.0/24. Flags: none. Worst case 0.7314 USD over 86 min.
+- aws_emr_cluster.run: scholarchain-dev-spark-run, emr-7.14.0, Hadoop only, 1 primary + 1 core m5.xlarge (EBS 32 gp3, root 15), no task group or scaling, idle_timeout 900, keep_alive true, termination_protection false, step_concurrency 1, no SSH key, private subnet, base SGs/roles/security configuration, log_uri s3://scholarchain-dev-logs-<redacted-account-id>-us-east-1/emr/, core-site marker retention keep, yarn-site am.max-attempts 1, bootstrap path and 8 args equal to EXPECTED_BOOTSTRAP_ARGS. KMS endpoint: Interface, private DNS, tcp 443 from 10.42.0.0/24. Flags: none. Worst case 0.7314 USD over 86 min.
 - (A first DE-P6-03 attempt stopped on an UNATTRIBUTED audit refusal caused by the human's committed gate entry; rerun with sequential Bash calls.)
 
 ## emr-run apply attempt 1 (human Terminal)

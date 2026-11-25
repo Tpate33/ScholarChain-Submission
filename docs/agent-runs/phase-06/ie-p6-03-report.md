@@ -6,7 +6,7 @@
 ## Changes
 
 - Created scripts/.shellcheckrc (`external-sources=true`).
-- env.conf: aws_account_id=663570374448, aws_region=us-east-1, availability_zone_id=use1-az4 (in the human's list; KMS endpoint support there UNVERIFIED), admin_principal_arn=arn:aws:iam::663570374448:user/scholarchain-admin, owner=taufeeq, expiration=2026-11-26; login profile scholarchain-login documented (deploy profile scholarchain-admin wraps it via credential_process).
+- env.conf: aws_account_id=<redacted-account-id>, aws_region=us-east-1, availability_zone_id=use1-az4 (in the human's list; KMS endpoint support there UNVERIFIED), admin_principal_arn=arn:aws:iam::<redacted-account-id>:user/scholarchain-admin, owner=taufeeq, expiration=2026-11-26; login profile scholarchain-login documented (deploy profile scholarchain-admin wraps it via credential_process).
 - hashicorp/aws `= 6.0.0` -> `= 6.72.0` in bootstrap/main.tf, base/versions.tf, emr-run/main.tf; module private-bucket `>= 6.0.0, < 7.0.0`; required_version unchanged `>= 1.10.0, < 2.0.0`.
 - base/iam.tf whitespace only (fmt); README sections on version compatibility, state lock, vCPU quota, local checks.
 - deploy.sh: header "Operator: the human only, in a Terminal, with reviewed commands (decision D1 …; CR-P6-31 n1)"; emr-run only: read-only `aws service-quotas get-service-quota --service-code ec2 --quota-code L-1216C47A` with the deploy profile; exit 3 if below `EMR_RUN_REQUIRED_VCPUS=8`, exit 4 if the call fails or is non-numeric.

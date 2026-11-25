@@ -8,7 +8,8 @@
 # USAGE   scripts/deploy.sh <environment> <commit sha40> <plan sha256>
 #
 # Gates, in order: repository root; clean tree; HEAD equals <commit sha40>; env.conf committed and
-# complete; exactly one stack of <environment> (bootstrap, base, emr-run) holds a tfplan whose sha256
+# complete, and the human-local env.local.conf (account ID, admin_principal_arn, API ingress CIDRs;
+# gitignored, never committed) present with no dummy value; exactly one stack of <environment> (bootstrap, base, emr-run, runtime) holds a tfplan whose sha256
 # equals <plan sha256>; its .terraform/scholarchain-plan.meta names the same environment, stack, HEAD,
 # checksum, account and Region (written by scripts/plan.sh); the plan contains no delete or replace, except a replace or
 # delete of aws_emr_cluster in emr-run (a terminated cluster is re-created); the deploy profile

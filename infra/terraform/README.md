@@ -10,11 +10,19 @@ list.
 | base | `environments/<env>/base/` | S3 `scholarchain/<env>/base/terraform.tfstate` (lock file in S3) | VPC, private subnet, S3 gateway endpoint, EMR security groups (plus explicit node egress: HTTPS to the S3 prefix list, all traffic inside the VPC), data and logs buckets, KMS key, EMR security configuration, IAM R1-R3 and R5 (read-only) |
 | emr-run | `environments/<env>/emr-run/` | S3 `scholarchain/<env>/emr-run/terraform.tfstate` | one transient `aws_emr_cluster` (yarn-site `yarn.resourcemanager.am.max-attempts=1`), the KMS interface endpoint and its security group |
 
-Inputs: `environments/<env>/env.conf` (account, Region, AZ ID, profiles, tags; exported by
-`scripts/plan.sh` as `TF_VAR_*`) and each stack's `terraform.tfvars`. No variable has a default.
+Inputs: `environments/<env>/env.conf` (committed: Region, AZ ID, profiles, tags), the human-local,
+gitignored `environments/<env>/env.local.conf` (account ID, `admin_principal_arn`, API ingress CIDRs,
+API certificate ARN or `none`; template `env.local.conf.example`; IE-P13-02), both exported by
+`scripts/lib/common.sh` as `TF_VAR_*`, and each stack's `terraform.tfvars`. No variable has a default.
+plan.sh, deploy.sh and the run scripts refuse while env.local.conf is missing, tracked, not ignored,
+or holds REPLACE-ME or other dummy values. Teardown and evidence (cleanup.sh, archive-evidence.sh,
+`allow-expired`) require and check only `aws_account_id` and `admin_principal_arn`, so lost or stale
+API values never block teardown; smoke-test.sh does not read env.local.conf (CR-P13-02).
 Provider `hashicorp/aws = 6.72.0` in every stack (module `private-bucket`: `>= 6.0.0, < 7.0.0`),
 Terraform `>= 1.10.0, < 2.0.0` (the human's installed 1.17.2 satisfies it). Filled for `dev`
-(IE-P6-03): account 663570374448, us-east-1, AZ ID use1-az4, owner `taufeeq`, expiration 2026-11-26.
+(IE-P6-03): us-east-1, AZ ID use1-az4, owner `taufeeq`, expiration 2026-11-26; the account ID is
+in env.local.conf only. It was redacted from `infra/` and `scripts/` on 2026-11-24; historical
+evidence under `docs/agent-runs/phase-06` and git history still contain it (human decision).
 
 ## Version compatibility (IE-P6-03)
 
@@ -81,12 +89,27 @@ Expected on success: `fmt -check` prints nothing and exits 0; each `init` ends w
 `Success! The configuration is valid.` (warnings, if any, are listed above that line and need
 review); `shellcheck` (reads `scripts/.shellcheckrc`, which follows the
 `source=scripts/lib/common.sh` directives, so run it from the repository root) and `bash -n` print
-nothing and exit 0 (`scripts/run-bounded-pipeline.sh`, an earlier phase's committed script, is not in
-this list: it has pre-existing SC2154/SC2329/SC2016 findings); `check-submit-args.sh` prints 4
+nothing and exit 0 (`scripts/run-bounded-pipeline.sh` is shellcheck-clean since IE-P13-02, via
+justified directives only); `check-submit-args.sh` prints 4
 `[check-submit-args] CASE ok accepted ...` lines (plus the argv of the first), 18
 `[check-submit-args] CASE ok refused ...` lines, no `CASE FAIL`, and ends with
 `[check-submit-args] RESULT PASS`, exit 0. Any other output or a non-zero exit (`echo $?`) is a
 failure to report.
+
+## Full non-cloud validation order (IE-P13-03, CR-P13-01 M1)
+
+```sh
+sbt check          # 1. first, as its own command: tests and the test marker .claude/.last-test-run
+scripts/check.sh   # 2. then: every other non-cloud gate; reads the marker, never runs sbt
+```
+
+`scripts/check.sh` does not run sbt: the shell-write audit accepts a change to the test marker only
+when the command is exactly `sbt check` or `sbt clean check`, so sbt inside the script would be
+reported as marker forgery. Its `test-marker` gate only reads the marker and fails (with "run
+`sbt check` first as its own command") unless the marker is a regular file written by
+`sbt markTestRun`, records `tests_failed=0` and `tests_errored=0`, and its `git_head` equals the
+current HEAD. A marker written on a dirty tree passes with a NOTE: it binds HEAD, not the
+uncommitted changes, so re-run `sbt check` after any edit.
 
 ## Cost bound (cluster side)
 
@@ -113,7 +136,9 @@ Worst-case window = provisioning 20 + idle 15 + step 31 (30 + 1 kill) + idle 15 
 
 ## Network
 
-No internet gateway, NAT gateway or public IP. Nodes reach S3 through the gateway endpoint and KMS
+base and emr-run: no internet gateway, NAT gateway or public IP. (The runtime stack adds an internet
+gateway and two public subnets for its API load balancer only; the private route table that the EMR
+nodes use is unchanged. See `environments/dev/runtime/README.md`.) Nodes reach S3 through the gateway endpoint and KMS
 (local-disk encryption at boot) through the interface endpoint with private DNS. Not added, because
 no node-side call to them is expected: `elasticmapreduce` (the EMR service reaches the nodes through
 the service access security group), `sts` and `ec2` (credentials come from the instance metadata
@@ -149,7 +174,7 @@ construction (`--self-check`) for accepted and refused sample `fs.defaultFS` val
 ## Identity and profiles (human decision 2026-11-17: no IAM Identity Center, no AWS Organizations)
 
 One IAM user for the human (console password + MFA, no access keys), `admin_principal_arn` in
-`env.conf`; the CLI signs in with `aws login` (AWS CLI >= 2.32.0, short-lived credentials up to 12 h,
+`env.local.conf` (not committed); the CLI signs in with `aws login` (AWS CLI >= 2.32.0, short-lived credentials up to 12 h,
 managed policy SignInLocalDevelopmentAccess on the user). Roles: R3 `scholarchain-<env>-operator`
 and R5 `scholarchain-<env>-readonly` (AWS managed ReadOnlyAccess), both assumable only by that user.
 The bucket-policy delete exceptions name that user only.

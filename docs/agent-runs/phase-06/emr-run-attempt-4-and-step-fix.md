@@ -25,7 +25,7 @@ Orchestrator-condensed record; exact values and verdicts kept. The diffs are rec
 - CR-P6-47: APPROVE. m1 (procedure): a non-existent cluster ID stops add-steps at its implicit DescribeCluster before the step transform; use a terminated real cluster instead. Nits deferred: n1 cancel FAIL text always claims the cluster-side bound; n2 emr.steps records the CLI input shape.
 
 ## IE-P6-11 (infra-engineer): read-only role reads the auto-termination policy
-- base/iam.tf: inline policy scholarchain-readonly-emr-extra on R5 (scholarchain-dev-readonly), one statement: elasticmapreduce:GetAutoTerminationPolicy on arn:aws:elasticmapreduce:us-east-1:663570374448:cluster/* (local.emr_cluster_arns); no tag condition (support unverified; fail-closed risk). GetManagedScalingPolicy not added. Expected base plan 1/0/0. fmt -check and base validate pass.
+- base/iam.tf: inline policy scholarchain-readonly-emr-extra on R5 (scholarchain-dev-readonly), one statement: elasticmapreduce:GetAutoTerminationPolicy on arn:aws:elasticmapreduce:us-east-1:<redacted-account-id>:cluster/* (local.emr_cluster_arns); no tag condition (support unverified; fail-closed risk). GetManagedScalingPolicy not added. Expected base plan 1/0/0. fmt -check and base validate pass.
 - CR-P6-48: APPROVE; nit (comment says WAITING/TERMINATING, evidence says alive) deferred. Residual: the provider's full Read call list is unverified; another missing Get* would fail closed at the next live-cluster refresh.
 
 ## Deferred

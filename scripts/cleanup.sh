@@ -26,7 +26,17 @@
 #   Gates: base needs emr-run empty; bootstrap needs base and emr-run empty; empty-buckets needs the
 #   evidence directory and the stack(s) above it destroyed first (emr-run for base; base for bootstrap).
 #
-# Profiles from env.conf: listing and plans with aws_readonly_profile; deletes and apply with
+# Profiles from env.conf; account ID and admin_principal_arn from the human-local env.local.conf
+# (lib/common.sh, teardown mode: only those two keys are required and checked; refused when missing
+# or dummy). The API keys (api_ingress_cidrs, api_certificate_arn) are not read here, may be absent,
+# REPLACE-ME or stale, and never block teardown (CR-P13-02 m-B); the runtime destroy plan gets inert
+# teardown-only values for its two required API variables (TEARDOWN_API_* in lib/common.sh).
+# RECOVERY  if env.local.conf is lost: in your own terminal, copy
+#   infra/terraform/environments/<env>/env.local.conf.example to env.local.conf next to it and set
+#   config_version, environment, aws_account_id (the real 12-digit account) and admin_principal_arn
+#   (arn:aws:iam::<account>:user/<your IAM user>); the API lines may stay as in the template or be
+#   deleted. Never commit the file (it is gitignored). Then rerun the cleanup action.
+# Listing and plans with aws_readonly_profile; deletes and apply with
 # aws_deploy_profile (the human's IAM user via `aws login`; the bucket policies exempt only
 # admin_principal_arn from the delete denies). Destroy plans are written to <stack>/destroy.tfplan (gitignored).
 # MARKERS  [cleanup] STEP / CHECK ok / INVENTORY / PLAN-CHANGE / PLAN-COUNTS / PLAN-SHA256 /
@@ -50,7 +60,8 @@ need_tools git terraform jq awk shasum aws
 step "start env=$ARG_ENV action=$ACTION at=$(now_utc)"
 require_repo_root
 require_clean_tree
-# allow-expired: teardown must remain possible after the expiration tag date (IE-P6-03).
+# allow-expired: teardown must remain possible after the expiration tag date (IE-P6-03), and without
+# valid API ingress or certificate values in env.local.conf (CR-P13-02 m-B).
 load_env_conf "$ARG_ENV" allow-expired
 DATA_BUCKET="scholarchain-$ARG_ENV-data-$ENV_aws_account_id-$ENV_aws_region"
 LOGS_BUCKET="scholarchain-$ARG_ENV-logs-$ENV_aws_account_id-$ENV_aws_region"

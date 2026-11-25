@@ -13,3 +13,14 @@ output "runtime_inventory" {
     monitor          = aws_lambda_function.deadline.function_name
   }
 }
+# Copy query_base_url and evidence_base_url into ../smoke.conf (a reviewed commit) after apply. With
+# HTTPS, the certificate names a custom domain, not the ALB DNS name: use that domain (pointed at
+# alb_dns_name by the human) in smoke.conf instead.
+output "api_endpoint" {
+  value = {
+    alb_dns_name      = aws_lb.api.dns_name
+    scheme            = local.api_scheme
+    query_base_url    = "${local.api_scheme}://${lower(aws_lb.api.dns_name)}:${local.api_listener_ports["query"]}"
+    evidence_base_url = "${local.api_scheme}://${lower(aws_lb.api.dns_name)}:${local.api_listener_ports["evidence"]}"
+  }
+}

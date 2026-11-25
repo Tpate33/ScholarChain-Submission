@@ -91,10 +91,10 @@ I accept SP-P6-05, SP-P6-06, BE-P6-09 with repair 01, IE-P6-02 with repairs 01â€
 Evidence: last reported agent sbt check had 1570 passed, 0 failed, 0 errored and 0 skipped. My local Terraform init -backend=false and validate succeeded for bootstrap, base and emr-run with hashicorp/aws 6.72.0. The submit-argument self-check returned RESULT PASS. ShellCheck on scripts/cleanup.sh and bash -n scripts/cleanup.sh both exited 0.
 
 Manual account setup outside Terraform:
-- Personal AWS Paid account 663570374448; root MFA enabled; no root access keys.
+- Personal AWS Paid account <redacted-account-id>; root MFA enabled; no root access keys.
 - ScholarChain-monthly budget alert: USD 10/month. This is an alert, not a spending cap.
 - IAM user scholarchain-admin: console password, MFA, no access keys, AdministratorAccess and SignInLocalDevelopmentAccess.
-- CLI profile scholarchain-login uses aws login. Verified caller: arn:aws:iam::663570374448:user/scholarchain-admin. AWS Organizations and IAM Identity Center are not enabled.
+- CLI profile scholarchain-login uses aws login. Verified caller: arn:aws:iam::<redacted-account-id>:user/scholarchain-admin. AWS Organizations and IAM Identity Center are not enabled.
 - Requested quota L-1216C47A in us-east-1 increase to 8; AWS Support approved 16 vCPUs at 13:26 on 2026-11-18. Effective quota remains unverified until rechecked. Cluster deployment must refuse below 8.
 - Read-only checks confirmed emr-7.14.0 and m5.xlarge offerings in use1-az6, use1-az2, use1-az1, use1-az5 and use1-az4.
 

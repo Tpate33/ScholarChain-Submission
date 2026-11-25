@@ -6,7 +6,8 @@
 # USAGE   scripts/plan.sh <environment> <bootstrap|base|emr-run|runtime>
 #
 # Runs from the repository root on a clean tree, with the READ-ONLY profile of env.conf
-# (aws_readonly_profile); the one first-plan exception for bootstrap and base is described at the
+# (aws_readonly_profile); the account ID, admin ARN and API ingress CIDRs come from the human-local,
+# gitignored env.local.conf (refused when missing or dummy; see load_env_local_conf in lib/common.sh); the one first-plan exception for bootstrap and base is described at the
 # profile selection below (human Terminal only, refused once the read-only role exists). Steps: terraform init (backend from env.conf, provider lock file read-only),
 # validate, plan -input=false -lock=false -out=tfplan, then prints the add/change/destroy/replace counts,
 # stateful, security and cost-relevant changes, the plan sha256 and the deploy command. -lock=false:
@@ -36,6 +37,9 @@ load_env_conf "$ARG_ENV"
 DIR=$(stack_dir "$ARG_ENV" "$ARG_STACK")
 [[ -d $DIR ]] || die "$EX_USAGE" "no stack directory $DIR"
 [[ -n $(git ls-files -- "$DIR") ]] || die "$EX_REFUSED" "$DIR is not committed"
+# Runtime: the committed terraform.tfvars must be filled (no REPLACE-ME) and the human's TF_VAR_*
+# identifiers exported (IE-P13-05; require_runtime_inputs in lib/common.sh).
+if [[ $ARG_STACK == runtime ]]; then require_runtime_inputs "$DIR"; fi
 
 # Profile selection. Default, and always for emr-run: the read-only profile (role
 # scholarchain-<env>-readonly, created by base). First-plan exception (chicken and egg): before base

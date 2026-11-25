@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2154 # PARAM_* and SCAN_* are assigned indirectly by printf -v (manifest parameters, local scan); every one is checked present before use
 # =====================================================================================================
 # scripts/run-bounded-pipeline.sh -- bounded EMR smoke run of the ScholarChain Hadoop pipeline
 #
@@ -914,6 +915,7 @@ WORK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/scholarchain-brp.XXXXXXXX")
 STEP_ID=""
 STEP_STATE=""
 FINISHED=no
+# shellcheck disable=SC2329 # invoked by the EXIT trap below
 cleanup() {
   if [[ -n ${WORK_DIR:-} && -d $WORK_DIR ]]; then
     find "$WORK_DIR" -type f -exec rm -f {} + 2>/dev/null || true
@@ -973,6 +975,7 @@ CL_STATE=$(cj '.Cluster.Status.State')
 in_list "$CL_STATE" "WAITING RUNNING" || die "$EX_AWS" "cluster state is $CL_STATE (need WAITING or RUNNING)"
 [[ $(cj '.Cluster.ReleaseLabel') == "$RELEASE_LABEL" ]] || die "$EX_AWS" "cluster ReleaseLabel $(cj '.Cluster.ReleaseLabel') differs from $RELEASE_LABEL"
 [[ $(cj 'any(.Cluster.Applications[]?; .Name == "Hadoop")') == true ]] || die "$EX_AWS" "cluster has no Hadoop application"
+# shellcheck disable=SC2016 # $k is a jq variable, bound by --arg
 tag() { cj --arg k "$1" '[.Cluster.Tags[]? | select(.Key == $k) | .Value] | first // ""'; }
 for k in course project environment owner expiration; do
   [[ -n $(tag "$k") ]] || die "$EX_AWS" "cluster lacks required tag '$k'"
@@ -1163,6 +1166,7 @@ cancel_own_step() {
   aws_write emr cancel-steps --cluster-id "$CLUSTER_ID" --step-ids "$STEP_ID" \
     --step-cancellation-option SEND_INTERRUPT >/dev/null || printf '[%s] FAIL cancel-steps %s failed; cancel it manually\n' "$SCRIPT_NAME" "$STEP_ID" >&2
 }
+# shellcheck disable=SC2329 # invoked by the INT/TERM trap below
 on_interrupt() {
   trap - INT TERM
   if [[ $FINISHED == no && -n $STEP_ID ]]; then

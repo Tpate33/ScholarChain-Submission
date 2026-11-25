@@ -61,12 +61,12 @@ valid) and scripts/emr/check-submit-args.sh (RESULT PASS). <Add: shellcheck
 scripts/cleanup.sh and bash -n scripts/cleanup.sh results, or "not yet run".>
 
 Manual setup outside Terraform (identity and account bootstrap, disclosed):
-- Personal AWS paid account 663570374448; root MFA enabled; no root access keys.
+- Personal AWS paid account <redacted-account-id>; root MFA enabled; no root access keys.
 - Budget ScholarChain-monthly, USD 10/month, created in the console.
 - IAM user scholarchain-admin created in the console: console password, MFA,
   no access keys, AdministratorAccess and SignInLocalDevelopmentAccess.
   CLI sign-in with aws login (profile scholarchain-login); caller identity
-  arn:aws:iam::663570374448:user/scholarchain-admin. AWS Organizations and IAM
+  arn:aws:iam::<redacted-account-id>:user/scholarchain-admin. AWS Organizations and IAM
   Identity Center not enabled.
 - Service quota L-1216C47A (us-east-1) increase requested 2026-11-18 13:17 (-06:00),
   request 6878646f637c437d9413cf7d19b0cdd7bm5zIMb4; approved by AWS Support to

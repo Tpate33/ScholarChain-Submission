@@ -13,7 +13,8 @@
 #   scripts/run-bounded-spark.sh --execute <environment> <run-config>     (token required)
 #
 #   <run-config>  committed file infra/terraform/environments/<environment>/runs/<name>.conf
-#   Account, Region and the operator profile come from infra/terraform/environments/<env>/env.conf.
+#   Region and the operator profile come from infra/terraform/environments/<env>/env.conf, the account
+#   ID from the human-local, gitignored env.local.conf next to it (load_env_conf, lib/common.sh).
 #   Bucket and cluster names are derived: scholarchain-<env>-{data,logs}-<account>-<region>,
 #   scholarchain-<env>-spark-run. Run from the repository root on a clean tree. No interactive prompt.
 #

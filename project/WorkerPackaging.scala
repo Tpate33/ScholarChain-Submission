@@ -5,6 +5,17 @@ import java.util.concurrent.TimeUnit
 
 /** Explicit worker staging, independent of the normal services package and module graph. */
 object WorkerPackaging {
+
+  /**
+   * Build-time base-image check (BE-P13-01), a shell-form RUN body for both OCI images: fails the
+   * image build unless the base holds a non-empty lib/server/libjvm.so and `java -version` exits 0.
+   * Prints the architecture, the library size and the Java version into the build log. No network.
+   */
+  val BaseJvmProbe: String =
+    "set -eu; uname -m; " +
+      "jvm=$(find / -xdev -path '*/lib/server/libjvm.so' -type f 2>/dev/null | head -n 1); " +
+      "ls -l \"$jvm\"; test -s \"$jvm\"; java -version"
+
   private val mains = Seq(
     ("production-load", "loader", "scholarchain.services.ProductionLoadMain", "ProductionLoadMain"),
     (
@@ -75,6 +86,7 @@ exec java -XX:InitialRAMPercentage=50.0 -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOut
     IO.write(
       out / "Dockerfile",
       s"""FROM $baseImage
+RUN $BaseJvmProbe
 WORKDIR /opt/scholarchain-worker
 COPY --chown=10001:10001 . .
 RUN mkdir -p /work && chown 10001:10001 /work
@@ -96,7 +108,8 @@ and output roots writable by UID 10001. No automatic download, AWS call or conta
 occurs during staging. Launching --execute requires separate run authorization.
 Build an OCI image only after separately verifying the ledger base image is cached locally.
 Override the image entrypoint for ER with --entrypoint /bin/sh and the desired bin path.
-The base is the existing pinned ledger tag; no immutable OCI digest is asserted here.
+The base is the ledger image reference; the build fails unless its libjvm.so is non-empty
+and java -version succeeds. Build for linux/amd64 (the ECS task architecture).
 """
     )
     val files = (out ** "*").get.filter(_.isFile).sortBy(f => IO.relativize(out, f).get)

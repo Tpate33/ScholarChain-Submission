@@ -47,6 +47,8 @@
 /infra/terraform/**/*.tfstate
 /infra/terraform/**/*.tfstate.*
 /infra/terraform/**/crash.log
+# Human-local, untracked real account identifiers (BE-P13-01; infra-engineer introduces it).
+/infra/terraform/environments/*/env.local.conf
 
 # --- Local secret files at the repository root (role law 8) ----------------
 # Ignores /.env, /.env.<anything>, and /.envrc. Re-includes exactly one file,

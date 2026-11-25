@@ -31,6 +31,48 @@ variable "second_subnet_cidr" {
 variable "second_az_id" {
   type = string
 }
+# AZ ID of base's private subnet (TF_VAR_availability_zone_id from env.conf); the first public (ALB)
+# subnet is placed here, the second in second_az_id.
+variable "availability_zone_id" {
+  type = string
+  validation {
+    condition     = can(regex("^[a-z]{3,4}[0-9]-az[0-9]+$", var.availability_zone_id))
+    error_message = "availability_zone_id must be an AZ ID such as use1-az4."
+  }
+}
+# Two public subnets for the internet-facing API load balancer (an ALB needs two AZs). Each /24../27
+# (an ALB subnet needs at least a /27), canonical, distinct, inside the base VPC CIDR and not overlapping
+# the private subnets (overlap and VPC containment are checked by AWS at apply, not offline).
+variable "public_subnet_cidrs" {
+  type = list(string)
+  validation {
+    condition = length(var.public_subnet_cidrs) == 2 && length(distinct(var.public_subnet_cidrs)) == 2 && alltrue([
+      for c in var.public_subnet_cidrs : can(regex("^([0-9]{1,3}\\.){3}[0-9]{1,3}/(2[4-7])$", c)) && try(cidrhost(c, 0) == split("/", c)[0], false)
+    ])
+    error_message = "Exactly two distinct canonical IPv4 CIDRs /24../27 are required."
+  }
+}
+# Comma-separated IPv4 CIDRs allowed to reach the API load balancer (TF_VAR_api_ingress_cidrs from the
+# human-local env.local.conf). No default. 1 to 4 entries, each canonical and /24../32: 0.0.0.0/0 and
+# every other wide range are refused.
+variable "api_ingress_cidrs" {
+  type = string
+  validation {
+    condition = length(split(",", var.api_ingress_cidrs)) <= 4 && length(distinct(split(",", var.api_ingress_cidrs))) == length(split(",", var.api_ingress_cidrs)) && alltrue([
+      for c in split(",", var.api_ingress_cidrs) : can(regex("^([0-9]{1,3}\\.){3}[0-9]{1,3}/(2[4-9]|3[0-2])$", c)) && try(cidrhost(c, 0) == split("/", c)[0], false)
+    ])
+    error_message = "api_ingress_cidrs must be 1 to 4 distinct comma-separated canonical IPv4 CIDRs, each /24../32 (never 0.0.0.0/0)."
+  }
+}
+# ACM certificate ARN for HTTPS listeners, or exactly "none" for HTTP listeners on non-default ports
+# (TF_VAR_api_certificate_arn from env.local.conf). No default.
+variable "api_certificate_arn" {
+  type = string
+  validation {
+    condition     = var.api_certificate_arn == "none" || can(regex("^arn:aws:acm:us-east-1:[0-9]{12}:certificate/[0-9a-f-]{36}$", var.api_certificate_arn))
+    error_message = "api_certificate_arn must be \"none\" or an ACM certificate ARN in us-east-1."
+  }
+}
 variable "kms_key_arn" {
   type = string
 }
@@ -120,6 +162,12 @@ variable "materialization_manifests" {
   validation {
     condition     = alltrue([for k in ["query", "evidence", "graph", "er", "loader", "collector"] : try(jsondecode(var.materialization_manifests[k]).schemaVersion == "scholarchain.s3-materialize.v1" && jsondecode(var.materialization_manifests[k]).retryMaxAttempts == 1, false)])
     error_message = "All six tasks require a one-attempt materialization manifest."
+  }
+  # CR-P13-04 m1: the committed file names the data bucket only as the token @DATA_BUCKET@ (compute.tf
+  # replaces it with var.data_bucket); no account ID and no ARN.
+  validation {
+    condition     = alltrue([for v in values(var.materialization_manifests) : !strcontains(v, "arn:") && !strcontains(v, var.aws_account_id)])
+    error_message = "materialization_manifests must not contain an ARN or the account ID; write the data bucket as @DATA_BUCKET@."
   }
 }
 variable "graph_experiment_deadline" {

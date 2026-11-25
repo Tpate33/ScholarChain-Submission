@@ -46,7 +46,7 @@ VALIDATION RESULTS:
 
 **env.conf**
 - No REPLACE-ME is left.
-- account 663570374448, us-east-1, use1-az4, `admin_principal_arn=arn:aws:iam::663570374448:user/scholarchain-admin`, owner taufeeq, expiration 2026-11-26, profiles. All of these are your values from IE-P6-03 and human-gate.md.
+- account <redacted-account-id>, us-east-1, use1-az4, `admin_principal_arn=arn:aws:iam::<redacted-account-id>:user/scholarchain-admin`, owner taufeeq, expiration 2026-11-26, profiles. All of these are your values from IE-P6-03 and human-gate.md.
 - `load_env_conf` checks the ARN's form and account. `deploy.sh` checks that `sts get-caller-identity` equals that ARN.
 
 **emr-run/terraform.tfvars**
@@ -121,7 +121,7 @@ command -v jq xxd base64        # the scripts require these
 cd /Users/taufeeqpatel/Desktop/ScholarChain
 git status --porcelain                       # must be empty (the untracked attempt-4 report must be committed first)
 aws login --profile scholarchain-login
-aws sts get-caller-identity --profile scholarchain-admin --query Arn --output text   # expect arn:aws:iam::663570374448:user/scholarchain-admin (checks the credential_process route, B9)
+aws sts get-caller-identity --profile scholarchain-admin --query Arn --output text   # expect arn:aws:iam::<redacted-account-id>:user/scholarchain-admin (checks the credential_process route, B9)
 SCHOLARCHAIN_PLAN_FIRST_WITH_DEPLOY_PROFILE=bootstrap scripts/plan.sh dev bootstrap
 shasum -a 256 infra/terraform/bootstrap/tfplan    # must equal the PLAN-SHA256 line
 terraform -chdir=infra/terraform/bootstrap show -no-color tfplan
@@ -136,7 +136,7 @@ Expected output (not observed):
 Where files land: `infra/terraform/bootstrap/tfplan` and `infra/terraform/bootstrap/.terraform/scholarchain-plan.meta`, both gitignored.
 
 What to check in `show`:
-- bucket `scholarchain-tfstate-663570374448-us-east-1`, `force_destroy = false`
+- bucket `scholarchain-tfstate-<redacted-account-id>-us-east-1`, `force_destroy = false`
 - all four public-access-block flags true, AES256, versioning Enabled
 - lifecycle: abort incomplete uploads after 1 day; noncurrent versions expire after 90 days
 - policy: TLS-only deny (`aws:SecureTransport` = false); it may show as known after apply
@@ -147,7 +147,7 @@ What to check in `show`:
 Order after that (nothing started):
 1. Sign the checksum, then run `scripts/deploy.sh dev <HEAD sha40> <plan sha256>` in your Terminal. Keep a copy of the local state file in your archive.
 2. Run `SCHOLARCHAIN_PLAN_FIRST_WITH_DEPLOY_PROFILE=base scripts/plan.sh dev base` (expected about 40 add: IAM R1–R3 and R5, KMS key, VPC, buckets). Sign, then `deploy.sh`.
-3. Add the `scholarchain-readonly` and `scholarchain-operator` profiles with role ARNs `arn:aws:iam::663570374448:role/scholarchain-dev-{readonly,operator}`, and verify them with `sts get-caller-identity`.
+3. Add the `scholarchain-readonly` and `scholarchain-operator` profiles with role ARNs `arn:aws:iam::<redacted-account-id>:role/scholarchain-dev-{readonly,operator}`, and verify them with `sts get-caller-identity`.
 4. Run the dry run at the current HEAD, then `SCHOLARCHAIN_CONFIRM_SPARK_RUN=<stage token> … --stage` (operator profile).
 5. Run `scripts/plan.sh dev emr-run` (read-only profile; I can run it after base). Sign, then `deploy.sh` (it checks the quota is at least 8).
 6. Run `--execute` within 900 s.

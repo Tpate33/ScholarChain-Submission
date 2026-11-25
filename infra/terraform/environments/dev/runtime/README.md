@@ -12,14 +12,133 @@ interface endpoints and a DynamoDB gateway; two immutable ECR repositories; six
 Fargate task definitions, three services with desired count zero; private Cloud
 Map; graph scaling initially suspended at zero admission (1–2 during the experiment); logs/dashboard/CPU alarms; and an
 external minute-based Lambda stop monitor with notification and failure alarm.
-There is no public ingress, NAT, ALB, replica, Container Insights or new VPC.
+There is no NAT, replica, Container Insights or new VPC.
 
-`terraform.tfvars.json` and `approved-run.json` are intentionally absent: current
-inventory, image digests, addresses, manifests, reviewed gates and spending are
-unknown. They must be fixed and committed before a live plan. Never insert secret
-values into either file, Terraform input, command strings or materialization JSON.
+## API load balancer (IE-P13-02, human decision 2026-11-24)
+
+`alb.tf` adds an internet-facing ALB so the smoke test and the demo can reach
+the query and evidence services. Graph stays private. Services stay in the
+private subnet without public IPs; the ALB sits in two new public subnets
+(`public_subnet_cidrs`, AZ IDs `availability_zone_id` and `second_az_id`) with an
+internet gateway and their own route table. The private route table is unchanged.
+
+- Ingress: only `api_ingress_cidrs` (1-4 canonical IPv4 CIDRs, /24../32, never
+  0.0.0.0/0), from the human-local, gitignored `../env.local.conf`, exported by
+  `scripts/lib/common.sh` as `TF_VAR_api_ingress_cidrs`. ALB egress goes only to
+  the tasks group, on the two container ports. Tasks admit the ALB group on those
+  ports only.
+- HTTPS (443 query, 8443 evidence, policy ELBSecurityPolicy-TLS13-1-2-2021-06) when
+  `api_certificate_arn` is an ACM ARN. The certificate names a custom domain, which
+  the human points at the ALB outside this stack, and that domain goes in
+  `../smoke.conf`. With `api_certificate_arn=none` the listeners are HTTP on
+  8080/8081. **Trade-off:** the service API key (Bearer token) and the answers then
+  cross the internet unencrypted. The CIDR restriction limits who can connect, but
+  anyone on the network path can still read the key. Use HTTP only for a short dev
+  demo, and rotate the key in Secrets Manager afterwards.
+- Health check: `GET /healthz` on the container port (liveness). `scripts/smoke-test.sh`
+  checks `/healthz` and `/readyz` through each listener.
+- Output `api_endpoint`: `alb_dns_name`, `query_base_url`, `evidence_base_url`
+  (copy these into `../smoke.conf` in a reviewed commit after apply).
+- Cost: these prices are reference values that were NOT verified in this session.
+  ALB about 0.0225 USD/h plus LCU about 0.008 USD per LCU-hour (smoke traffic is
+  far below 1 LCU). Public IPv4 addresses are about 0.005 USD/h each, with at least
+  one per ALB subnet (2). The internet gateway has no hourly charge, and data
+  transfer out is negligible at smoke volume. Total: about 0.035-0.04 USD/h while
+  the runtime stack exists, including the time services run at desired count zero.
+  The ALB bills until `cleanup.sh ... apply-destroy runtime`. No NAT gateway.
+- Access logs are off, to avoid a log-delivery bucket policy. Requests are visible
+  only in the service logs.
+
+`terraform.tfvars` is committed as a **placeholder file** (IE-P13-05, human decision
+2026-11-24); `approved-run.json` is still intentionally absent. Current inventory,
+image digests, manifests, reviewed gates and spending are unknown, and both must be
+fixed and committed before a live plan. Never insert secret values into either file,
+Terraform input, command strings or materialization JSON.
+
+## Filling the variables file (IE-P13-05)
+
+The file name is `terraform.tfvars` (HCL), the convention of `base` and `emr-run`,
+instead of the earlier `terraform.tfvars.json`: HCL allows the comments that mark
+each placeholder. `scripts/plan.sh` refuses any other auto-loaded variables file
+(`terraform.tfvars.json`, `*.auto.tfvars`, `*.auto.tfvars.json`) in this directory.
+Terraform loads `terraform.tfvars` automatically, and a value in it **overrides** a
+`TF_VAR_*` environment variable of the same name. That is why the file never assigns
+an account-bearing or script-supplied variable, and `plan.sh` refuses it if it does.
+The inputs come from three sources:
+
+| Source | Variables | How |
+|---|---|---|
+| `scripts/lib/common.sh` (`tf_env`) | `aws_account_id`, `environment`, `course`, `owner`, `expiration`, `availability_zone_id` (env.conf), `api_ingress_cidrs`, `api_certificate_arn` (env.local.conf), `data_bucket`, `logs_bucket` (derived like base: `scholarchain-dev-data\|logs-<account>-us-east-1`) | automatic |
+| Human Terminal, `export TF_VAR_<name>=...` before `scripts/plan.sh dev runtime`, never committed | `vpc_id` (base output `vpc_id`), `private_subnet_id` (base output `private_subnet_id`), `private_route_table_id` (route table of base's private subnet; not a base output), `s3_prefix_list_id` (the managed S3 prefix list `com.amazonaws.us-east-1.s3`; not a base output), `kms_key_arn` (base output `emr_kms_key_arn`), `runtime_image`, `worker_image`, `collector_image` (`<account>.dkr.ecr.us-east-1.amazonaws.com/<repo>@sha256:<digest>`), `notification_email`, `emr_cluster_id` (reviewed `j-...`, or empty to disable the EMR branch) | the human's shell |
+| `terraform.tfvars`, committed in a reviewed commit | `second_subnet_cidr`, `second_az_id`, `public_subnet_cidrs`, `run_id`, `run_start`, `runtime_deadline`, `emr_deadline`, `graph_experiment_deadline`, `ports`, `commands`, `config_files`, `config_objects`, `zone_prefixes`, `materialization_manifests` | edit, review, commit |
+
+The committed file already holds the proposed CIDRs: `second_subnet_cidr = 10.42.0.64/26`,
+and `public_subnet_cidrs = [10.42.0.128/27, 10.42.0.160/27]`. They lie inside base's
+VPC `10.42.0.0/24` and clear of base's private subnet `10.42.0.0/26`. They were checked
+against base's committed `terraform.tfvars` only, not against the live VPC. Every
+other value contains `REPLACE-ME`.
+
+Steps, in your own Terminal:
+
+1. Replace every `REPLACE-ME` value in `terraform.tfvars`. `second_az_id` must differ
+   from `use1-az4` and offer Neptune `db.t4g.medium` and Fargate. The run times and
+   `run_id` must equal the reviewed `approved-run.json`. In `materialization_manifests`,
+   write every `bucket` field as the literal token `@DATA_BUCKET@`, never the real
+   bucket name (`scholarchain-dev-data-<account>-us-east-1` carries the account ID).
+   `compute.tf` replaces the token with `var.data_bucket` (exported by `tf_env`) at
+   plan time, so the task definitions get the real name and the committed file does
+   not. Review the diff and commit it. The file must hold no account ID, ARN, IP
+   address, e-mail address or secret: `plan.sh` refuses any non-comment line that
+   contains `arn:`, the env.local.conf account ID, or a 12-digit number (after
+   removing 64-hex sha256 values; a byte count of 12 or more digits is refused too),
+   and a variable validation refuses a manifest that contains `arn:` or the account
+   ID. IP addresses and e-mail addresses are not machine-checked; review for them.
+2. Export the ten identifiers from the table, for example
+   `export TF_VAR_vpc_id=vpc-...`. Take them from `terraform -chdir=infra/terraform/environments/dev/base output`
+   and read-only `aws ec2 describe-route-tables` / `describe-managed-prefix-lists` calls.
+   Keep a private, uncommitted note of them outside the repository.
+3. Run `scripts/plan.sh dev runtime`. It refuses (exit 3, or 2 for a malformed shape)
+   if any of the following holds:
+   - a non-comment line of `terraform.tfvars` still contains `REPLACE-ME`;
+   - a non-comment line of `terraform.tfvars` contains `arn:`, the account ID or a
+     12-digit number (outside a sha256 value);
+   - the file assigns a variable from the first two rows;
+   - another auto-loaded variables file exists;
+   - a `TF_VAR_*` from the second row is unset, `REPLACE-ME`, or of the wrong shape;
+   - the KMS ARN or an image is not in the env.local.conf account and Region.
+
+   It prints names and counts only, never a value.
+
+**Which control rejects an unfilled file:** `scripts/plan.sh`
+(`require_runtime_inputs`) rejects every placeholder. As a second layer, the variable
+validations reject some placeholders: `run_id`, the four times, `zone_prefixes`,
+`materialization_manifests`, and (by type) `ports`. Other placeholders pass
+Terraform's own validation: `second_az_id`, `commands`, `config_files` and
+`config_objects`. For those, `plan.sh` is the only gate before AWS rejects them at
+apply.
+
+## Cleanup recovery (CR-P13-03)
+
+`scripts/cleanup.sh dev plan-destroy runtime` evaluates this stack's variable
+validations even though a destroy plan creates nothing. It therefore needs a
+**filled, validation-passing `terraform.tfvars` committed** at HEAD, because cleanup
+requires a clean tree. Keep the filled file that was applied committed until
+`apply-destroy runtime` reports `RESULT DESTROYED`. Do not revert it to placeholders
+earlier.
+
+If the file was lost or reverted after an apply, restore the applied version in your
+own Terminal with `git show <applied commit>:infra/terraform/environments/dev/runtime/terraform.tfvars`.
+Write it to the same path, commit it, and rerun `plan-destroy runtime`. Any
+validation-passing values also work, because a destroy plan does not use them.
+
+The ten human identifiers are not needed for teardown. In teardown mode `tf_env`
+exports inert, validation-passing values for them (`vpc-000...`, a zero-digest image
+under the account, `teardown-only@example.invalid`, an empty EMR ID), as it already
+does for the API variables (CR-P13-02 m-B). `plan.sh` refuses the zero digest for a
+create plan.
 All materialization entries are explicit nonsecret bucket/key/size/hash/local-path
-references; the storage-owned SDK helper downloads them into the image's existing
+references (bucket written as `@DATA_BUCKET@` in `terraform.tfvars`, substituted in
+`compute.tf`); the storage-owned SDK helper downloads them into the image's existing
 UID-10001-writable `/work`. Runtime config paths are comma-separated absolute
 `SCHOLARCHAIN_CONFIG_FILES`. Worker bootstrap uses the packaged `bin/s3-materialize` launcher; normal
 runtime helper classpath is `/opt/docker/lib/*`. All six final invocations are
